@@ -46,5 +46,43 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
             1. this method also requires setuptools `sudo apt install python3-setuptools`
             2. install package globally: `sudo -E python3 setup.py install`
             3. test: `python3 setup.py test`
+    5. TODO: add to pypi
 
 5. enjoy.
+
+# Basic Example Usage
+
+```python
+import yottadb
+
+db = yottadb.Context()
+
+key1 = db['^hello']
+print(key1, key1.value)
+key1.value = 'Hello world!'
+print(key1, key1.value)
+
+key2 = db['^hello']['cowboy']
+key2.value = 'Howdy partner!'
+print(key2, key2.value)
+
+key3 = db['^hello']['chinese']
+key3.value = '你好世界!'
+print(key3, key3.value)
+
+for subscript in key1.subscripts:
+    sub_key = key1[subscript]
+    print(sub_key, sub_key.value) 
+
+key1.delete_node()
+
+print(key1, key1.value)
+for subscript in key1.subscripts:
+    sub_key = key1[subscript]
+    print(sub_key, sub_key.value)
+
+key1.delete_tree()
+for subscript in key1.subscripts:
+    sub_key = key1[subscript]
+    print(sub_key, sub_key.value)
+```
