@@ -143,20 +143,3 @@ def tree_data(ydb):
 
     for key, value in TREE_DATA:
         ydb.delete_tree(*key)
-
-encoded_files = (
-    (f"{os.environ['PWD']}/tests/encoded_files/GBK_diff_utf-8_encoded_GBK.txt", 'GBK'),
-    (f"{os.environ['PWD']}/tests/encoded_files/ISO-8859-1_diff_utf-8_encoded_ISO-8859-1.txt", 'ISO-8859-1'),
-    (f"{os.environ['PWD']}/tests/encoded_files/Windows-1251_diff_utf-8_encoded_Windows-1251.txt", 'Windows-1251'),
-)
-
-@pytest.fixture(scope="function", params=encoded_files)
-def text_from_files(request):
-    filename = request.param[0]
-    encoding = request.param[1]
-    text_data = {'encoding':encoding}
-    with open(filename, 'r', encoding=encoding) as f:
-        text_data['text_str'] = f.read()
-    with open(filename, 'rb') as f:
-        text_data['text_bytes'] = f.read()
-    return text_data

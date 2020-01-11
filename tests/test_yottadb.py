@@ -18,64 +18,6 @@ import yottadb
 from yottadb import api as api
 
 
-
-def test_set_get_in_encoding_str(ydb:yottadb.Context, text_from_files):
-    encoding = text_from_files['encoding']
-    text_str = text_from_files['text_str']
-
-    ydb.set(varname='testencoding', value=text_str, val_encoding=encoding)
-    assert ydb.get(varname='testencoding', val_encoding=encoding) == text_str
-
-def test_set_get_in_encoding_bytes(ydb:yottadb.Context, text_from_files):
-    encoding = text_from_files['encoding']
-    text_str = text_from_files['text_str']
-    text_bytes = text_from_files['text_bytes']
-
-    ydb.set(varname='testencoding', value=text_bytes, val_encoding=None)
-    assert ydb.get(varname='testencoding', val_encoding=None) == text_bytes
-    assert ydb.get(varname='testencoding', val_encoding=encoding) == text_str
-
-def test_set_get_in_encoding_default(ydb:yottadb.Context, text_from_files):
-    encoding = text_from_files['encoding']
-    text_str = text_from_files['text_str']
-    text_bytes = text_from_files['text_bytes']
-    context = yottadb.Context(api=ydb.api, val_encoding=encoding)
-
-    context.set('testencoding', value=text_str)
-    assert context.get('testencoding') == text_str
-    assert context.get('testencoding', val_encoding=None) == text_bytes
-
-def test_set_get_with_encoded_subscripts_defaults(ydb, text_from_files):
-    encoding = text_from_files['encoding']
-    text_str = text_from_files['text_str']
-    context = yottadb.Context(api=ydb.api, subs_encoding=encoding)
-
-    context.set('testencoding', (text_str, text_str), 'test')
-    assert context.get('testencoding', (text_str, text_str)) == 'test'
-
-
-def test_set_get_with_encoded_subscripts_str(ydb, text_from_files):
-    encoding = text_from_files['encoding']
-    text_str = text_from_files['text_str']
-
-    ydb.set('testencoding', (text_str, text_str), 'test', subs_encoding=encoding)
-    assert ydb.get('testencoding', (text_str, text_str), subs_encoding=encoding) == 'test'
-    with pytest.raises(yottadb.YottaDBError) as e:
-        ydb.get('testencoding', (text_str, text_str))
-        assert e.code == yottadb.LOCAL_VAR_UNDEF
-
-def test_set_get_with_encoded_subscripts_bytes(ydb, text_from_files):
-    encoding = text_from_files['encoding']
-    text_bytes = text_from_files['text_bytes']
-    text_str = text_from_files['text_str']
-
-    ydb.set('testencoding', (text_bytes, text_bytes), 'test', subs_encoding=None)
-    assert ydb.get('testencoding', (text_bytes, text_bytes), subs_encoding=None) == 'test'
-    with pytest.raises(yottadb.YottaDBError) as e:
-        assert ydb.get('testencoding', (text_str, text_str)) == 'test'
-        assert e.code == yottadb.LOCAL_VAR_UNDEF
-
-
 def test_key_smoke_test1(ydb, simple_data):
     key = ydb['^test1']
     assert key.value == 'test1value'
