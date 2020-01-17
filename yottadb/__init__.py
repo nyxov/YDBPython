@@ -15,9 +15,6 @@ from typing import Optional, List, Union, Generator, Sequence, NamedTuple, cast,
 import enum
 from builtins import property
 
-Data = Union[bytes, str]
-
-
 from _yottadb import YottaDBError
 from _yottadb import YottaDBLockTimeout
 
@@ -39,6 +36,8 @@ import yottadb.simple as simple
 import yottadb.simple_threaded as simple_threaded_api
 
 from yottadb.api import API, SimpleAPI, SimpleThreadedAPI
+
+Data = Union[bytes, str]
 
 ASCII = 'ascii'
 UTF8 = 'utf-8'
