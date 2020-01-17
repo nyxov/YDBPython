@@ -1,10 +1,3 @@
-/* Flag type to indicate if _s or _st function was called. Used internally to unify wrappers for for _s and _st functions */
-typedef enum
-{
-	SIMPLE,
-	SIMPLE_THREADED
-} api_type;
-
 /* A structure that represents a key using ydb c types. used internally for converting between python and ydb c types */
 typedef struct
 {
@@ -33,35 +26,35 @@ typedef struct
  *		ONE - FIVE	-	the ordered arguments that the simple and simple threaded api's share
  *		RETSTATUS	-	the variable that the return status will be assigned to
  */
-#define CALL_WRAP_2(API, SFUNC, STFUNC, TPTOKEN, ERRBUF,  ONE, TWO, RETSTATUS) 								\
+#define CALL_WRAP_2(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF,  ONE, TWO, RETSTATUS) 								\
 {																											\
-	if ( (API) == SIMPLE_THREADED)																			\
+	if ((THREADED))																			\
 		(RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO));											\
-	else if ((API) == SIMPLE)																				\
+	else																				\
 		(RETSTATUS) = (SFUNC)((ONE), (TWO));																\
 }
 
-#define CALL_WRAP_3(API, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, RETSTATUS) 						\
+#define CALL_WRAP_3(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, RETSTATUS) 						\
 {																											\
-	if ((API) == SIMPLE_THREADED)																			\
+	if (THREADED)																			\
 		(RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO), (THREE));									\
-	else if ((API) == SIMPLE)																				\
+	else                                                                                                    \
 		(RETSTATUS) = (SFUNC)((ONE), (TWO), (THREE));														\
 }
 
-#define CALL_WRAP_4(API, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, FOUR, RETSTATUS) 					\
+#define CALL_WRAP_4(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, FOUR, RETSTATUS) 					\
 {																											\
-	if ( (API) == SIMPLE_THREADED)																			\
+	if (THREADED)																			\
 		(RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO), (THREE), (FOUR));							\
-	else if ((API) == SIMPLE)																				\
+	else                                                                                                    \
 		(RETSTATUS) = (SFUNC)((ONE), (TWO), (THREE), (FOUR));												\
 }
 
-#define CALL_WRAP_5(API, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, FOUR, FIVE,  RETSTATUS) 			\
+#define CALL_WRAP_5(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, FOUR, FIVE,  RETSTATUS) 			\
 {																											\
-	if ((API) == SIMPLE_THREADED)																			\
+	if (THREADED)																			\
 		(RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO), (THREE), (FOUR), (FIVE));					\
-	else if ((API) == SIMPLE)																				\
+	else                                                                                                    \
 		(RETSTATUS) = (SFUNC)((ONE), (TWO), (THREE), (FOUR), (FIVE));										\
 }
 

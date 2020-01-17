@@ -441,18 +441,18 @@ static void raise_YottaDBError(int status, ydb_buffer_t* error_string_buffer)
  */
 
 /* FOR ALL BELOW WRAPPERS:
- * does all the work to wrap the 2 related functions using the api_type flag to make the few modifications related how the
+ * does all the work to wrap the 2 related functions using the threaded flag to make the few modifications related how the
  * simple and simple threaded APIs are different.
  *
  * Parameters:
  *    self, args, kwds	- same as proxy functions.
- *    api_type 			- either SIMPLE or SIMPLE_THREADED used by the proxy functions to indicate which API was being called.
+ *    threaded 			- either true for simple_treaded api or false used by the proxy functions to indicate which API was being called.
  *
  * FOR ALL
  */
 
 /* Wrapper for ydb_data_s and ydb_data_st. */
-static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds, api_type api)
+static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds, bool threaded)
 {
 	bool return_NULL = false;
 	char *varname;
@@ -481,7 +481,7 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds, api_type a
 	ret_value = (unsigned int*) malloc(sizeof(unsigned int));
 
 	/* Call the wrapped function */
-	CALL_WRAP_4(api, ydb_data_s, ydb_data_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, ret_value, status);
+	CALL_WRAP_4(threaded, ydb_data_s, ydb_data_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, ret_value, status);
 
 	/* check status for Errors and Raise Exception */
 	if (status<0)
@@ -509,17 +509,17 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds, api_type a
 /* Proxy for ydb_data_s() */
 static PyObject* data_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return data(self, args, kwds, SIMPLE);
+	return data(self, args, kwds, false);
 }
 
 /* Proxy for ydb_data_st() */
 static PyObject* data_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return data(self, args, kwds, SIMPLE_THREADED);
+	return data(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_delete_s() and ydb_delete_st() */
-static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int deltype, status, varname_len, subs_used;
@@ -547,7 +547,7 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds, 
 	error_string_buffer = empty_buffer(YDB_MAX_ERRORMSG);
 
 	/* Call the wrapped function */
-	CALL_WRAP_4(api, ydb_delete_s, ydb_delete_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, deltype, status);
+	CALL_WRAP_4(threaded, ydb_delete_s, ydb_delete_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, deltype, status);
 
 
 	/* check status for Errors and Raise Exception */
@@ -570,17 +570,17 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds, 
 /* Proxy for ydb_delete_s() */
 static PyObject* delete_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return delete_wrapper(self, args, kwds, SIMPLE);
+	return delete_wrapper(self, args, kwds, false);
 }
 
 /* Proxy for ydb_delete_st() */
 static PyObject* delete_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return delete_wrapper(self, args, kwds, SIMPLE_THREADED);
+	return delete_wrapper(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_delete_excl_s() and ydb_delete_excl_st() */
-static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int namecount, status;
@@ -610,7 +610,7 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds, ap
 		namecount = PySequence_Length(varnames);
 	ydb_buffer_t* varnames_ydb = convert_py_bytes_sequence_to_ydb_buffer_array(varnames);
 
-	CALL_WRAP_2(api, ydb_delete_excl_s, ydb_delete_excl_st, tp_token, error_string_buffer, namecount, varnames_ydb, status);
+	CALL_WRAP_2(threaded, ydb_delete_excl_s, ydb_delete_excl_st, tp_token, error_string_buffer, namecount, varnames_ydb, status);
 
 	/* check status for Errors and Raise Exception */
 	if (status<0)
@@ -632,19 +632,19 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds, ap
 /* Proxy for ydb_delete_excl_s() */
 static PyObject* delete_excel_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return delete_excel(self, args, kwds, SIMPLE);
+	return delete_excel(self, args, kwds, false);
 }
 
 /* Proxy for ydb_delete_excl_st() */
 static PyObject* delete_excel_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return delete_excel(self, args, kwds, SIMPLE_THREADED);
+	return delete_excel(self, args, kwds, true);
 }
 
 
 
 /* Wrapper for ydb_get_s() and ydb_get_st() */
-static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int subs_used, status, return_length, varname_len;
@@ -672,7 +672,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds, api_type ap
 	ret_value = empty_buffer(1024);
 
 	/* Call the wrapped function */
-	CALL_WRAP_4(api, ydb_get_s, ydb_get_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, ret_value, status);
+	CALL_WRAP_4(threaded, ydb_get_s, ydb_get_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, ret_value, status);
 
 	/* check to see if length of string was longer than 1024 is so, try again with proper length */
 	if (status == YDB_ERR_INVSTRLEN)
@@ -681,7 +681,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds, api_type ap
 		YDB_FREE_BUFFER(ret_value);
 		ret_value = empty_buffer(return_length);
 		/* Call the wrapped function */
-		CALL_WRAP_4(api, ydb_get_s, ydb_get_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, ret_value, status);
+		CALL_WRAP_4(threaded, ydb_get_s, ydb_get_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, ret_value, status);
 	}
 
 	/* check status for Errors and Raise Exception */
@@ -710,17 +710,17 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds, api_type ap
 /* Proxy for ydb_get_s() */
 static PyObject* get_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return get(self, args, kwds, SIMPLE);
+	return get(self, args, kwds, false);
 }
 
 /* Proxy for ydb_get_st() */
 static PyObject* get_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return get(self, args, kwds, SIMPLE_THREADED);
+	return get(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_incr_s() and ydb_incr_st() */
-static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int status, subs_used;
@@ -765,7 +765,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds, api_type a
 	ret_value = empty_buffer(50);
 
 	/* Call the wrapped function */
-	CALL_WRAP_5(api, ydb_incr_s, ydb_incr_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, increment_ydb,
+	CALL_WRAP_5(threaded, ydb_incr_s, ydb_incr_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, increment_ydb,
 	            ret_value, status);
 
 	/* check status for Errors and Raise Exception */
@@ -797,17 +797,17 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds, api_type a
 /* Proxy for ydb_incr_s() */
 static PyObject* incr_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return incr(self, args, kwds, SIMPLE);
+	return incr(self, args, kwds, false);
 }
 
 /* Proxy for ydb_incr_st() */
 static PyObject* incr_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return incr(self, args, kwds, SIMPLE_THREADED);
+	return incr(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_lock_s() and ydb_lock_st() */
-static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int keys_len, initial_arguments, number_of_arguments;
@@ -841,16 +841,16 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, api_type a
 
 	/* build ffi call */
 	ret_type = &ffi_type_sint;
-	if (api == SIMPLE_THREADED)
+	if (threaded)
 		initial_arguments = 4;
-	else if (api == SIMPLE)
+	else if (!threaded)
 		initial_arguments = 2;
 
 	number_of_arguments = initial_arguments + (keys_len * 3);
 	ffi_type *arg_types[number_of_arguments];
 	void *arg_values[number_of_arguments];
 	/* ffi signature */
-	if (api == SIMPLE_THREADED)
+	if (threaded)
 	{
 		arg_types[0] = &ffi_type_uint64; // tptoken
 		arg_values[0] = &tp_token; // tptoken
@@ -860,7 +860,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, api_type a
 		arg_values[2] = &timeout_nsec; // timout_nsec
 		arg_types[3] = &ffi_type_sint; // namecount
 		arg_values[3] = &keys_len; // namecount
-	} else if (api == SIMPLE)
+	} else if (!threaded)
 	{
 		arg_types[0] = &ffi_type_uint64; // timout_nsec
 		arg_values[0] = &timeout_nsec; // timout_nsec
@@ -883,9 +883,9 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, api_type a
 	if (ffi_prep_cif(&call_interface, FFI_DEFAULT_ABI, number_of_arguments, ret_type, arg_types) == FFI_OK)
 	{
 		/* Call the wrapped function */
-		if (api == SIMPLE_THREADED)
+		if (threaded)
 			ffi_call(&call_interface, FFI_FN(ydb_lock_st), &status, arg_values);
-		else if (api == SIMPLE)
+		else if (!threaded)
 			ffi_call(&call_interface, FFI_FN(ydb_lock_s), &status, arg_values);
 	} else
 	{
@@ -919,17 +919,17 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, api_type a
 /* Proxy for ydb_lock_s() */
 static PyObject* lock_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return lock(self, args, kwds, SIMPLE);
+	return lock(self, args, kwds, false);
 }
 
 /* Proxy for ydb_lock_st() */
 static PyObject* lock_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return lock(self, args, kwds, SIMPLE_THREADED);
+	return lock(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_lock_decr_s() and ydb_lock_decr_st() */
-static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int status, varname_len, subs_used;
@@ -956,7 +956,7 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds, api_t
 	error_string_buffer = empty_buffer(YDB_MAX_ERRORMSG);
 
 	/* Call the wrapped function */
-	CALL_WRAP_3(api, ydb_lock_decr_s, ydb_lock_decr_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, status);
+	CALL_WRAP_3(threaded, ydb_lock_decr_s, ydb_lock_decr_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, status);
 
 	/* check status for Errors and Raise Exception */
 	if (status<0)
@@ -979,17 +979,17 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds, api_t
 /* Proxy for ydb_lock_decr_s() */
 static PyObject* lock_decr_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return lock_decr(self, args, kwds, SIMPLE);
+	return lock_decr(self, args, kwds, false);
 }
 
 /* Proxy for ydb_lock_decr_st() */
 static PyObject* lock_decr_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return lock_decr(self, args, kwds, SIMPLE_THREADED);
+	return lock_decr(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_lock_incr_s() and ydb_lock_incr_st() */
-static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int status, varname_len, subs_used;
@@ -1016,7 +1016,7 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds, api_t
 	SETUP_SUBS(subsarray, subs_used, subsarray_y);
 	error_string_buffer = empty_buffer(YDB_MAX_ERRORMSG);
 	/* Call the wrapped function */
-	CALL_WRAP_4(api, ydb_lock_incr_s, ydb_lock_incr_st, tp_token, error_string_buffer, timeout_nsec, varname_y,
+	CALL_WRAP_4(threaded, ydb_lock_incr_s, ydb_lock_incr_st, tp_token, error_string_buffer, timeout_nsec, varname_y,
 	            subs_used, subsarray_y, status);
 
 	/* check status for Errors and Raise Exception */
@@ -1044,17 +1044,17 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds, api_t
 /* Proxy for ydb_lock_incr_s() */
 static PyObject* lock_incr_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return lock_incr(self, args, kwds, SIMPLE);
+	return lock_incr(self, args, kwds, false);
 }
 
 /* Proxy for ydb_lock_incr_st() */
 static PyObject* lock_incr_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return lock_incr(self, args, kwds, SIMPLE_THREADED);
+	return lock_incr(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_node_next_s() and ydb_node_next_st() */
-static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, varname_len, subs_used;
@@ -1088,7 +1088,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds, api_t
 	ret_subsarray = empty_buffer_array(ret_subs_used, max_subscript_string);
 
 	/* Call the wrapped function */
-	CALL_WRAP_5(api, ydb_node_next_s, ydb_node_next_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y,
+	CALL_WRAP_5(threaded, ydb_node_next_s, ydb_node_next_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y,
 	            &ret_subs_used, ret_subsarray, status);
 
 	/* If not enough buffers in ret_subsarray */
@@ -1098,7 +1098,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds, api_t
 		real_ret_subs_used = ret_subs_used;
 		ret_subsarray = empty_buffer_array(real_ret_subs_used, max_subscript_string);
 		/* recall the wrapped function */
-		CALL_WRAP_5(api, ydb_node_next_s, ydb_node_next_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y,
+		CALL_WRAP_5(threaded, ydb_node_next_s, ydb_node_next_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y,
 		            &ret_subs_used, ret_subsarray, status);
 	}
 
@@ -1112,7 +1112,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds, api_t
 		ret_subsarray[ret_subs_used].len_used = 0;
 		ret_subs_used = real_ret_subs_used;
 		/* recall the wrapped function */
-		CALL_WRAP_5(api, ydb_node_next_s, ydb_node_next_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y,
+		CALL_WRAP_5(threaded, ydb_node_next_s, ydb_node_next_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y,
 		            &ret_subs_used, ret_subsarray, status);
 	}
 
@@ -1140,17 +1140,17 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds, api_t
 /* Proxy for ydb_node_next_s() */
 static PyObject* node_next_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return node_next(self, args, kwds, SIMPLE);
+	return node_next(self, args, kwds, false);
 }
 
 /* Proxy for ydb_node_next_st() */
 static PyObject* node_next_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return node_next(self, args, kwds, SIMPLE_THREADED);
+	return node_next(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_node_previous_s() and ydb_node_previous_st() */
-static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, varname_len, subs_used;
@@ -1186,7 +1186,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds, a
 	ret_subsarray = empty_buffer_array(ret_subs_used, max_subscript_string);
 
 	/* Call the wrapped function */
-	CALL_WRAP_5(api, ydb_node_previous_s, ydb_node_previous_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y,
+	CALL_WRAP_5(threaded, ydb_node_previous_s, ydb_node_previous_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y,
 	            &ret_subs_used, ret_subsarray, status);
 
 	/* if a buffer is not long enough */
@@ -1199,7 +1199,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds, a
 		ret_subsarray[ret_subs_used].len_used = 0;
 		ret_subs_used = real_ret_subs_used;
 		/* recall the wrapped function */
-		CALL_WRAP_5(api, ydb_node_previous_s, ydb_node_previous_st, tp_token, error_string_buffer, varname_y,
+		CALL_WRAP_5(threaded, ydb_node_previous_s, ydb_node_previous_st, tp_token, error_string_buffer, varname_y,
 		            subs_used, subsarray_y, &ret_subs_used, ret_subsarray, status);
 	}
 	/* check status for Errors and Raise Exception */
@@ -1228,17 +1228,17 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds, a
 /* Proxy for ydb_node_previous_s() */
 static PyObject* node_previous_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return node_previous(self, args, kwds, SIMPLE);
+	return node_previous(self, args, kwds, false);
 }
 
 /* Proxy for ydb_node_previous_st() */
 static PyObject* node_previous_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return node_previous(self, args, kwds, SIMPLE_THREADED);
+	return node_previous(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_set_s() and ydb_set_st() */
-static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int status, varname_len, value_len, subs_used;
@@ -1269,7 +1269,7 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds, api_type ap
 	value_buffer = convert_str_to_buffer(value, value_len);
 
 	/* Call the wrapped function */
-	CALL_WRAP_4(api, ydb_set_s, ydb_set_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, value_buffer, status);
+	CALL_WRAP_4(threaded, ydb_set_s, ydb_set_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y, value_buffer, status);
 
 	/* check status for Errors and Raise Exception */
 	if (status<0)
@@ -1291,17 +1291,17 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds, api_type ap
 /* Proxy for ydb_set_s() */
 static PyObject* set_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return set(self, args, kwds, SIMPLE);
+	return set(self, args, kwds, false);
 }
 
 /* Proxy for ydb_set_st() */
 static PyObject* set_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return set(self, args, kwds, SIMPLE_THREADED);
+	return set(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_str2zwr_s() and ydb_str2zwr_st() */
-static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int str_len, status, return_length;
@@ -1325,7 +1325,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds, api_typ
 	zwr_buf = empty_buffer(1024);
 
 	/* Call the wrapped function */
-	CALL_WRAP_2(api, ydb_str2zwr_s, ydb_str2zwr_st, tp_token, error_string_buf, &str_buf, zwr_buf, status);
+	CALL_WRAP_2(threaded, ydb_str2zwr_s, ydb_str2zwr_st, tp_token, error_string_buf, &str_buf, zwr_buf, status);
 
 
 	/* recall with properly sized buffer if zwr_buf is not long enough */
@@ -1335,7 +1335,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds, api_typ
 		YDB_FREE_BUFFER(zwr_buf);
 		zwr_buf = empty_buffer(return_length);
 		/* recall the wrapped function */
-		CALL_WRAP_2(api, ydb_str2zwr_s, ydb_str2zwr_st, tp_token, error_string_buf, &str_buf, zwr_buf, status);
+		CALL_WRAP_2(threaded, ydb_str2zwr_s, ydb_str2zwr_st, tp_token, error_string_buf, &str_buf, zwr_buf, status);
 	}
 
 	/* check status for Errors and Raise Exception */
@@ -1361,17 +1361,17 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds, api_typ
 /* Proxy for ydb_str2zwr_s() */
 static PyObject* str2zwr_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return str2zwr(self, args, kwds, SIMPLE);
+	return str2zwr(self, args, kwds, false);
 }
 
 /* Proxy for ydb_str2zwr_st() */
 static PyObject* str2zwr_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return str2zwr(self, args, kwds, SIMPLE_THREADED);
+	return str2zwr(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_subscript_next_s() and ydb_subscript_next_st() */
-static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int status, return_length, varname_len, subs_used;
@@ -1399,7 +1399,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds, 
 	ret_value = empty_buffer(1024);
 
 	/* Call the wrapped function */
-	CALL_WRAP_4(api, ydb_subscript_next_s, ydb_subscript_next_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y,
+	CALL_WRAP_4(threaded, ydb_subscript_next_s, ydb_subscript_next_st, tp_token, error_string_buffer, varname_y, subs_used, subsarray_y,
 	            ret_value, status);
 
 	/* check to see if length of string was longer than 1024 is so, try again with proper length */
@@ -1409,7 +1409,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds, 
 		YDB_FREE_BUFFER(ret_value);
 		ret_value = empty_buffer(return_length);
 		/* recall the wrapped function */
-		CALL_WRAP_4(api, ydb_subscript_next_s, ydb_subscript_next_st, tp_token, error_string_buffer, varname_y,
+		CALL_WRAP_4(threaded, ydb_subscript_next_s, ydb_subscript_next_st, tp_token, error_string_buffer, varname_y,
 		            subs_used, subsarray_y, ret_value, status);
 	}
 	/* check status for Errors and Raise Exception */
@@ -1437,17 +1437,17 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds, 
 /* Proxy for ydb_subscript_next_s() */
 static PyObject* subscript_next_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return subscript_next(self, args, kwds, SIMPLE);
+	return subscript_next(self, args, kwds, false);
 }
 
 /* Proxy for ydb_subscript_next_st() */
 static PyObject* subscript_next_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return subscript_next(self, args, kwds, SIMPLE_THREADED);
+	return subscript_next(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_subscript_previous_s() and ydb_subscript_previous_st() */
-static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int status, return_length, varname_len, subs_used;
@@ -1475,7 +1475,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 	ret_value = empty_buffer(1024);
 
 	/* Call the wrapped function */
-	CALL_WRAP_4(api, ydb_subscript_previous_s, ydb_subscript_previous_st, tp_token, error_string_buffer, varname_y,
+	CALL_WRAP_4(threaded, ydb_subscript_previous_s, ydb_subscript_previous_st, tp_token, error_string_buffer, varname_y,
 	            subs_used, subsarray_y, ret_value, status);
 
 	/* check to see if length of string was longer than 1024 is so, try again with proper length */
@@ -1484,7 +1484,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 		return_length = ret_value->len_used;
 		YDB_FREE_BUFFER(ret_value);
 		ret_value = empty_buffer(return_length);
-		CALL_WRAP_4(api, ydb_subscript_previous_s, ydb_subscript_previous_st, tp_token, error_string_buffer, varname_y,
+		CALL_WRAP_4(threaded, ydb_subscript_previous_s, ydb_subscript_previous_st, tp_token, error_string_buffer, varname_y,
 		            subs_used, subsarray_y, ret_value, status);
 	}
 
@@ -1513,13 +1513,13 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 /* Proxy for ydb_subscript_previous_s() */
 static PyObject* subscript_previous_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return subscript_previous(self, args, kwds, SIMPLE);
+	return subscript_previous(self, args, kwds, false);
 }
 
 /* Proxy for ydb_subscript_previous_st() */
 static PyObject* subscript_previous_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return subscript_previous(self, args, kwds, SIMPLE_THREADED);
+	return subscript_previous(self, args, kwds, true);
 }
 
 /* Callback functions used by Wrapper for ydb_tp_s() / ydb_tp_st() */
@@ -1580,7 +1580,7 @@ static int callback_wrapper_s(void *function_with_arguments)
 }
 
 /* Wrapper for ydb_tp_s() / ydb_tp_st() */
-static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int namecount, status;
@@ -1632,10 +1632,10 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds, api_type api
 	Py_DECREF(varnames);
 
 	/* Call the wrapped function */
-	if (api == SIMPLE_THREADED)
+	if (threaded)
 		status = ydb_tp_st(tp_token, error_string_buffer, callback_wrapper_st, function_with_arguments, transid,
 		                    namecount, varname_buffers);
-	else if (api == SIMPLE)
+	else if (!threaded)
 		status = ydb_tp_s(callback_wrapper_s, function_with_arguments, transid, namecount, varname_buffers);
 
 	/* check status for Errors and Raise Exception */
@@ -1660,17 +1660,17 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds, api_type api
 /* Proxy for ydb_tp_s() */
 static PyObject* tp_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return tp(self, args, kwds, SIMPLE);
+	return tp(self, args, kwds, false);
 }
 
 /* Proxy for ydb_tp_st() */
 static PyObject* tp_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return tp(self, args, kwds, SIMPLE_THREADED);
+	return tp(self, args, kwds, true);
 }
 
 /* Wrapper for ydb_zwr2str_s() and ydb_zwr2str_st() */
-static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds, api_type api)
+static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
 {
 	bool return_NULL = false;
 	int zwr_len, status, return_length;
@@ -1695,7 +1695,7 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds, api_typ
 	str_buf = empty_buffer(1024);
 
 	/* Call the wrapped function */
-	CALL_WRAP_2(api, ydb_zwr2str_s, ydb_zwr2str_st, tp_token, error_string_buf, &zwr_buf, str_buf, status);
+	CALL_WRAP_2(threaded, ydb_zwr2str_s, ydb_zwr2str_st, tp_token, error_string_buf, &zwr_buf, str_buf, status);
 
 	/* recall with properly sized buffer if zwr_buf is not long enough */
 	if (status == YDB_ERR_INVSTRLEN)
@@ -1704,7 +1704,7 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds, api_typ
 		YDB_FREE_BUFFER(str_buf);
 		str_buf = empty_buffer(return_length);
 		/* recall the wrapped function */
-		CALL_WRAP_2(api, ydb_zwr2str_s, ydb_zwr2str_st, tp_token, error_string_buf, &zwr_buf, str_buf, status);
+		CALL_WRAP_2(threaded, ydb_zwr2str_s, ydb_zwr2str_st, tp_token, error_string_buf, &zwr_buf, str_buf, status);
 	}
 
 	/* check status for Errors and Raise Exception */
@@ -1729,13 +1729,13 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds, api_typ
 /* Proxy for ydb_zwr2str_s() */
 static PyObject* zwr2str_s(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return zwr2str(self, args, kwds, SIMPLE);
+	return zwr2str(self, args, kwds, false);
 }
 
 /* Proxy for ydb_zwr2str_st() */
 static PyObject* zwr2str_st(PyObject* self, PyObject* args, PyObject* kwds)
 {
-	return zwr2str(self, args, kwds, SIMPLE_THREADED);
+	return zwr2str(self, args, kwds, true);
 }
 
 /*Comprehensive API
