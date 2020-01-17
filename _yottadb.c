@@ -32,7 +32,7 @@ typedef struct
 {
 	ydb_buffer_t *varname;
 	int subs_used;
-	ydb_buffer_t *subsarray; //array
+	ydb_buffer_t *subsarray;
 } YDBKey;
 
 /*  */
