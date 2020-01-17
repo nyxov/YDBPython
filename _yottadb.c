@@ -33,7 +33,7 @@ typedef struct
 	ydb_buffer_t *varname;
 	int subs_used;
 	ydb_buffer_t *subsarray; //array
-} key_ydb;
+} YDBKey;
 
 /*  */
 #define	LOAD_BUFFER(BUFFERP, STR, LEN)	\
@@ -345,12 +345,12 @@ PyObject* convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
 /* The workhorse routine of a couple of routines that convert from Python objects (varname and subsarray) to YDB keys.
  *
  * Parameters:
- *    dest		- pointer to the key_ydb to fill.
+ *    dest		- pointer to the YDBKey to fill.
  *    varname	- Python Bytes object representing the varname
  *    subsarray	- array of python Bytes objects representing the array of subcripts
  */
 
-static void load_key_ydb(key_ydb *dest, PyObject *varname, PyObject *subsarray)
+static void load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray)
 {
 	dest->varname = convert_py_bytes_to_ydb_buffer_t(varname);
 	if (subsarray != Py_None)
@@ -361,12 +361,12 @@ static void load_key_ydb(key_ydb *dest, PyObject *varname, PyObject *subsarray)
 		dest->subs_used = 0;
 }
 
-/* Routine to free a key_ydb structure.
+/* Routine to free a YDBKey structure.
  *
  * Parameters:
- *    key	- pointer to the key_ydb to free.
+ *    key	- pointer to the YDBKey to free.
  */
-static void free_key_ydb(key_ydb* key)
+static void free_YDBKey(YDBKey* key)
 {
 	int i;
 
@@ -444,20 +444,20 @@ static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence)
 	return true;
 }
 
-/* Routine to covert a sequence of keys in Python sequences and bytes to an array of key_ydbs. Assumes that the input
- * has already been validated with 'validate_py_keys_sequence' above. Use 'free_key_ydb_array' below to free the returned
+/* Routine to covert a sequence of keys in Python sequences and bytes to an array of YDBKeys. Assumes that the input
+ * has already been validated with 'validate_py_keys_sequence' above. Use 'free_YDBKey_array' below to free the returned
  * value.
  *
  * Parameters:
  *    sequence	- a Python object that has already been validated with 'validate_py_keys_sequence' or equivalent.
  */
-static key_ydb* convert_key_sequence_to_key_ydb_array(PyObject* sequence)
+static YDBKey* convert_key_sequence_to_YDBKey_array(PyObject* sequence)
 {
 	int i, keys_len;
 	PyObject *key, *varname, *subsarray;
-	key_ydb *ret_keys;
+	YDBKey *ret_keys;
 	keys_len = PySequence_Length(sequence);
-	ret_keys = (key_ydb*)malloc(keys_len * sizeof(key_ydb));
+	ret_keys = (YDBKey*)malloc(keys_len * sizeof(YDBKey));
 	for (i=0; i< keys_len; i++)
 	{
 		key = PySequence_GetItem(sequence, i);
@@ -465,24 +465,24 @@ static key_ydb* convert_key_sequence_to_key_ydb_array(PyObject* sequence)
 		subsarray = Py_None;
 		if (PySequence_Length(key) == 2)
 			subsarray = PySequence_GetItem(key, 1);
-		load_key_ydb(&ret_keys[i], varname, subsarray);
+		load_YDBKey(&ret_keys[i], varname, subsarray);
 		Py_DECREF(key);
 		Py_DECREF(subsarray);
 	}
 	return ret_keys;
 }
 
-/* Routine to free an array of key_ydbs as returned by above 'convert_key_sequence_to_key_ydb_array'.
+/* Routine to free an array of YDBKeys as returned by above 'convert_key_sequence_to_YDBKey_array'.
  *
  * Parameters:
  *    keysarray	- the array that is to be freed.
  *    len		- the number of elements in keysarray.
  */
-static void free_key_ydb_array(key_ydb* keysarray, int len)
+static void free_YDBKey_array(YDBKey* keysarray, int len)
 {
 	int i;
 	for(i = 0; i < len; i++)
-		free_key_ydb(&keysarray[i]);
+		free_YDBKey(&keysarray[i]);
 }
 
 /* Routine to help raise a YottaDBError. The caller still needs to return NULL for the Exception to be raised.
@@ -904,7 +904,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, api_type a
 	ffi_type *ret_type;
 	PyObject *keys, *keys_default;
 	ydb_buffer_t *error_string_buffer;
-	key_ydb *keys_ydb;
+	YDBKey *keys_ydb;
 
 	/* Defaults for non-required arguments */
 	timeout_nsec = 0;
@@ -923,7 +923,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, api_type a
 
 	/* Setup for Call */
 	error_string_buffer = empty_buffer(YDB_MAX_ERRORMSG);
-	keys_ydb = convert_key_sequence_to_key_ydb_array(keys);
+	keys_ydb = convert_key_sequence_to_YDBKey_array(keys);
 	Py_DECREF(keys_default);
 
 	/* build ffi call */
@@ -995,7 +995,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, api_type a
 
 	/* free allocated memory */
 	YDB_FREE_BUFFER(error_string_buffer);
-	free_key_ydb_array(keys_ydb, keys_len);
+	free_YDBKey_array(keys_ydb, keys_len);
 
 	if (return_NULL)
 		return NULL;
