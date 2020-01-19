@@ -30,5 +30,5 @@ from _yottadb import subscript_previous_st as subscript_previous
 from _yottadb import tp_st as tp
 from _yottadb import zwr2str_st as zwr2str
 
-def data(varname: bytes, subsarray:Optional[Sequence[bytes]] = ..., tp_token: int = ...) -> int:
+def data(varname: bytes, subsarray:Optional[Sequence[bytes]] = None, tp_token: int = _yottadb.YDB_NOTTP) -> int:
     return _yottadb.data(True, varname, subsarray, tp_token)
