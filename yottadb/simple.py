@@ -11,7 +11,9 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
-from _yottadb import data_s as data
+from typing import Optional, Sequence
+import _yottadb
+
 from _yottadb import delete_s as delete
 from _yottadb import delete_excel_s as delete_excel
 from _yottadb import get_s as get
@@ -27,3 +29,6 @@ from _yottadb import subscript_next_s as subscript_next
 from _yottadb import subscript_previous_s as subscript_previous
 from _yottadb import tp_s as tp
 from _yottadb import zwr2str_s as zwr2str
+
+def data(varname: bytes, subsarray:Optional[Sequence[bytes]] = ..., tp_token: int = ...) -> int:
+    return _yottadb.data(False, varname, subsarray, tp_token)

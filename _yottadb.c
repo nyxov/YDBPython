@@ -454,8 +454,9 @@ static void raise_YottaDBError(int status, ydb_buffer_t* error_string_buffer)
  */
 
 /* Wrapper for ydb_data_s and ydb_data_st. */
-static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds, bool threaded)
+static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	char *varname;
 	int varname_len, subs_used, status;
@@ -469,8 +470,8 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds, bool threa
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
-	static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+	static char *kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
 		return NULL;
 
 	if (!validate_subsarray_object(subsarray))
@@ -509,16 +510,16 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds, bool threa
 }
 
 /* Proxy for ydb_data_s() */
-static PyObject* data_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return data(self, args, kwds, false);
-}
+//static PyObject* data_s(PyObject* self, PyObject* args, PyObject* kwds)
+//{
+//	return data(self, args, kwds, false);
+//}
 
-/* Proxy for ydb_data_st() */
-static PyObject* data_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return data(self, args, kwds, true);
-}
+///* Proxy for ydb_data_st() */
+//static PyObject* data_st(PyObject* self, PyObject* args, PyObject* kwds)
+//{
+//	return data(self, args, kwds, true);
+//}
 
 /* Wrapper for ydb_delete_s() and ydb_delete_st() */
 static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
@@ -1768,13 +1769,7 @@ static PyObject* zwr2str_st(PyObject* self, PyObject* args, PyObject* kwds)
 /* Pull everything together into a Python Module */
 static PyMethodDef methods[] = {
 	/* Simple and Simple Threaded API Functions */
-	{"data_st", (PyCFunction)data_st, METH_VARARGS | METH_KEYWORDS, "used to learn what type of data is at a node.\n "
-																		"0 : There is neither a value nor a subtree, "
-																		"i.e., it is undefined.\n"
-																		"1 : There is a value, but no subtree\n"
-																		"10 : There is no value, but there is a subtree.\n"
-																		"11 : There are both a value and a subtree.\n"},
-	{"data_s", (PyCFunction)data_s, METH_VARARGS | METH_KEYWORDS, "used to learn what type of data is at a node.\n "
+	{"data", (PyCFunction)data, METH_VARARGS | METH_KEYWORDS, "used to learn what type of data is at a node.\n "
 																		"0 : There is neither a value nor a subtree, "
 																		"i.e., it is undefined.\n"
 																		"1 : There is a value, but no subtree\n"
