@@ -89,13 +89,13 @@ static ydb_buffer_t* empty_buffer(int len)
  */
 static ydb_buffer_t* convert_str_to_buffer(char *str, int len)
 {
-	char *copy;
+    bool done;
 	ydb_buffer_t *ret_buffer;
 
 	ret_buffer = (ydb_buffer_t*)malloc(sizeof(ydb_buffer_t));
-	copy = (char*)malloc(sizeof(char)*len);
-	strncpy(copy, str, len);
-	LOAD_BUFFER(ret_buffer, copy, len);
+	YDB_MALLOC_BUFFER(ret_buffer, len);
+	YDB_COPY_STRING_TO_BUFFER(str, ret_buffer, done);
+    // figure out how to handle error case (done == false)
 
 	return ret_buffer;
 }
@@ -215,8 +215,9 @@ static bool validate_subsarray_object(PyObject *subsarray)
  */
 ydb_buffer_t* convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence)
 {
+    bool done;
 	int num, len;
-	char *str_c, *bytes_c;
+	char *bytes_c;
 	PyObject *bytes;
 	ydb_buffer_t *return_buffer_array;
 
@@ -227,9 +228,10 @@ ydb_buffer_t* convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence)
 		bytes = PySequence_GetItem(sequence, i);
 		len = PyBytes_Size(bytes);
 		bytes_c = PyBytes_AsString(bytes);
-		str_c = (char*)malloc(sizeof(char)*(len));
-		strncpy(str_c, bytes_c, len);
-		LOAD_BUFFER(&return_buffer_array[i], str_c, len);
+		YDB_MALLOC_BUFFER(&return_buffer_array[i], len);
+	    YDB_COPY_STRING_TO_BUFFER(bytes_c, &return_buffer_array[i], done);
+        // figure out how to handle error case (done == false)
+
 		Py_DECREF(bytes);
 	}
 	return return_buffer_array;

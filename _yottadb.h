@@ -6,14 +6,6 @@ typedef struct
 	ydb_buffer_t *subsarray;
 } YDBKey;
 
-/*  */
-#define	LOAD_BUFFER(BUFFERP, STR, LEN)	\
-{										\
-	(BUFFERP)->len_alloc = LEN;			\
-	(BUFFERP)->len_used = LEN;			\
-	(BUFFERP)->buf_addr = STR;			\
-}
-
 /* CALL_WRAP_2 through CALL_WRAP_5 are macros to set up the call to the 2 similar api functions. The number at the end
  * represents the number of elements that the simple api call has and that the 2 have in common.
  *
