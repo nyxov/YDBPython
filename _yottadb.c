@@ -522,8 +522,9 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds)
 //}
 
 /* Wrapper for ydb_delete_s() and ydb_delete_st() */
-static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int deltype, status, varname_len, subs_used;
 	char *varname;
@@ -537,8 +538,8 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds, 
 	deltype = YDB_DEL_NODE;
 
 	/* parse and validate */
-	static char* kwlist[] = {"varname", "subsarray", "delete_type", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OiK", kwlist, &varname, &varname_len, &subsarray, &deltype, &tp_token))
+	static char* kwlist[] = {"threaded", "varname", "subsarray", "delete_type", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OiK", kwlist, &threaded, &varname, &varname_len, &subsarray, &deltype, &tp_token))
 		return NULL;
 
 	if (!validate_subsarray_object(subsarray))
@@ -570,21 +571,10 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds, 
 		return Py_None;
 }
 
-/* Proxy for ydb_delete_s() */
-static PyObject* delete_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return delete_wrapper(self, args, kwds, false);
-}
-
-/* Proxy for ydb_delete_st() */
-static PyObject* delete_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return delete_wrapper(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_delete_excl_s() and ydb_delete_excl_st() */
-static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int namecount, status;
 	uint64_t tp_token;
@@ -596,8 +586,8 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds, bo
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
-	static char* kwlist[] = {"varnames", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OK", kwlist, &varnames, &tp_token))
+	static char* kwlist[] = {"threaded", "varnames", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "p|OK", kwlist, &threaded, &varnames, &tp_token))
 		return NULL;
 
 	if(varnames != NULL && !validate_sequence_of_bytes(varnames))
@@ -632,23 +622,10 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds, bo
 		return Py_None;
 }
 
-/* Proxy for ydb_delete_excl_s() */
-static PyObject* delete_excel_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return delete_excel(self, args, kwds, false);
-}
-
-/* Proxy for ydb_delete_excl_st() */
-static PyObject* delete_excel_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return delete_excel(self, args, kwds, true);
-}
-
-
-
 /* Wrapper for ydb_get_s() and ydb_get_st() */
-static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int subs_used, status, return_length, varname_len;
 	char *varname;
@@ -661,8 +638,8 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds, bool thread
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
-	static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+	static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
 		return NULL;
 
 	if (!validate_subsarray_object(subsarray))
@@ -710,21 +687,10 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds, bool thread
 		return return_python_string;
 }
 
-/* Proxy for ydb_get_s() */
-static PyObject* get_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return get(self, args, kwds, false);
-}
-
-/* Proxy for ydb_get_st() */
-static PyObject* get_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return get(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_incr_s() and ydb_incr_st() */
-static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int status, subs_used;
 	uint64_t tp_token;
@@ -738,8 +704,8 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds, bool threa
 	increment = default_increment;
 
 	/* parse and validate */
-	static char* kwlist[] = {"varname", "subsarray", "increment", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOK", kwlist, &varname, &subsarray, &increment, &tp_token)) {
+	static char* kwlist[] = {"threaded","varname", "subsarray", "increment", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "pO|OOK", kwlist, &threaded, &varname, &subsarray, &increment, &tp_token)) {
 		Py_DECREF(default_increment);
 		return NULL;
 	}
@@ -797,21 +763,10 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds, bool threa
 		return return_python_string;
 }
 
-/* Proxy for ydb_incr_s() */
-static PyObject* incr_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return incr(self, args, kwds, false);
-}
-
-/* Proxy for ydb_incr_st() */
-static PyObject* incr_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return incr(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_lock_s() and ydb_lock_st() */
-static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int keys_len, initial_arguments, number_of_arguments;
 	uint64_t tp_token;
@@ -829,8 +784,8 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, bool threa
 	keys = keys_default;
 
 	/* parse and validate */
-	static char* kwlist[] = {"keys", "timeout_nsec", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OKK", kwlist, &keys, &timeout_nsec, &tp_token))
+	static char* kwlist[] = {"threaded", "keys", "timeout_nsec", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "p|OKK", kwlist, &threaded, &keys, &timeout_nsec, &tp_token))
 		return NULL;
 
 	if (!validate_py_keys_sequence_bytes(keys))
@@ -919,21 +874,10 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds, bool threa
 		return Py_None;
 }
 
-/* Proxy for ydb_lock_s() */
-static PyObject* lock_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return lock(self, args, kwds, false);
-}
-
-/* Proxy for ydb_lock_st() */
-static PyObject* lock_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return lock(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_lock_decr_s() and ydb_lock_decr_st() */
-static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int status, varname_len, subs_used;
 	char *varname;
@@ -946,8 +890,8 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds, bool 
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
-	static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+	static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
 		return NULL;
 
 	if (!validate_subsarray_object(subsarray))
@@ -979,21 +923,10 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds, bool 
 		return Py_None;
 }
 
-/* Proxy for ydb_lock_decr_s() */
-static PyObject* lock_decr_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return lock_decr(self, args, kwds, false);
-}
-
-/* Proxy for ydb_lock_decr_st() */
-static PyObject* lock_decr_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return lock_decr(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_lock_incr_s() and ydb_lock_incr_st() */
-static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int status, varname_len, subs_used;
 	char *varname;
@@ -1008,8 +941,8 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds, bool 
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
-	static char* kwlist[] = {"varname", "subsarray","timeout_nsec",  "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OLK", kwlist, &varname, &varname_len, &subsarray, &timeout_nsec, &tp_token))
+	static char* kwlist[] = {"threaded", "varname", "subsarray","timeout_nsec",  "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OLK", kwlist, &threaded, &varname, &varname_len, &subsarray, &timeout_nsec, &tp_token))
 		return NULL;
 
 	if (!validate_subsarray_object(subsarray))
@@ -1044,21 +977,10 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds, bool 
 		return Py_None;
 }
 
-/* Proxy for ydb_lock_incr_s() */
-static PyObject* lock_incr_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return lock_incr(self, args, kwds, false);
-}
-
-/* Proxy for ydb_lock_incr_st() */
-static PyObject* lock_incr_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return lock_incr(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_node_next_s() and ydb_node_next_st() */
-static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, varname_len, subs_used;
 	char *varname;
@@ -1071,8 +993,8 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds, bool 
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
-	static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+	static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
 		return NULL;
 
 	if (!validate_subsarray_object(subsarray))
@@ -1140,21 +1062,10 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds, bool 
 		return return_tuple;
 }
 
-/* Proxy for ydb_node_next_s() */
-static PyObject* node_next_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return node_next(self, args, kwds, false);
-}
-
-/* Proxy for ydb_node_next_st() */
-static PyObject* node_next_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return node_next(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_node_previous_s() and ydb_node_previous_st() */
-static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, varname_len, subs_used;
 	char *varname;
@@ -1168,8 +1079,8 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds, b
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
-	static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+	static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
 		return NULL;
 
 	if (!validate_subsarray_object(subsarray))
@@ -1228,21 +1139,10 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds, b
 		return return_tuple;
 }
 
-/* Proxy for ydb_node_previous_s() */
-static PyObject* node_previous_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return node_previous(self, args, kwds, false);
-}
-
-/* Proxy for ydb_node_previous_st() */
-static PyObject* node_previous_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return node_previous(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_set_s() and ydb_set_st() */
-static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int status, varname_len, value_len, subs_used;
 	uint64_t tp_token;
@@ -1257,8 +1157,8 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds, bool thread
 	value = "";
 
 	/* parse and validate */
-	static char* kwlist[] = {"varname", "subsarray", "value", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|Oy#K", kwlist, &varname, &varname_len, &subsarray,
+	static char* kwlist[] = {"threaded", "varname", "subsarray", "value", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|Oy#K", kwlist, &threaded, &varname, &varname_len, &subsarray,
 	            &value, &value_len, &tp_token))
 		return NULL;
 
@@ -1291,21 +1191,10 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds, bool thread
 		return Py_None;
 }
 
-/* Proxy for ydb_set_s() */
-static PyObject* set_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return set(self, args, kwds, false);
-}
-
-/* Proxy for ydb_set_st() */
-static PyObject* set_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return set(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_str2zwr_s() and ydb_str2zwr_st() */
-static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int str_len, status, return_length;
 	uint64_t tp_token;
@@ -1318,8 +1207,8 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds, bool th
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
-	static char* kwlist[] = {"input", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &str, &str_len, &tp_token))
+	static char* kwlist[] = {"threaded", "input", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|K", kwlist, &threaded, &str, &str_len, &tp_token))
 		return NULL;
 
 	/* Setup for Call */
@@ -1361,21 +1250,10 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds, bool th
 		return return_value;
 }
 
-/* Proxy for ydb_str2zwr_s() */
-static PyObject* str2zwr_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return str2zwr(self, args, kwds, false);
-}
-
-/* Proxy for ydb_str2zwr_st() */
-static PyObject* str2zwr_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return str2zwr(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_subscript_next_s() and ydb_subscript_next_st() */
-static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int status, return_length, varname_len, subs_used;
 	char *varname;
@@ -1388,8 +1266,8 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds, 
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
-		static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-		if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+		static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
+		if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
 			return NULL;
 
 	if (!validate_subsarray_object(subsarray))
@@ -1437,21 +1315,10 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds, 
 		return return_python_string;
 }
 
-/* Proxy for ydb_subscript_next_s() */
-static PyObject* subscript_next_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return subscript_next(self, args, kwds, false);
-}
-
-/* Proxy for ydb_subscript_next_st() */
-static PyObject* subscript_next_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return subscript_next(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_subscript_previous_s() and ydb_subscript_previous_st() */
-static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int status, return_length, varname_len, subs_used;
 	char *varname;
@@ -1464,8 +1331,8 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 	tp_token = YDB_NOTTP;
 
 	/* Setup for Call */
-	static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+	static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
 		return NULL;
 
 	if (!validate_subsarray_object(subsarray))
@@ -1511,18 +1378,6 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 		return NULL;
 	else
 		return return_python_string;
-}
-
-/* Proxy for ydb_subscript_previous_s() */
-static PyObject* subscript_previous_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return subscript_previous(self, args, kwds, false);
-}
-
-/* Proxy for ydb_subscript_previous_st() */
-static PyObject* subscript_previous_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return subscript_previous(self, args, kwds, true);
 }
 
 /* Callback functions used by Wrapper for ydb_tp_s() / ydb_tp_st() */
@@ -1583,8 +1438,9 @@ static int callback_wrapper_s(void *function_with_arguments)
 }
 
 /* Wrapper for ydb_tp_s() / ydb_tp_st() */
-static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int namecount, status;
 	uint64_t tp_token;
@@ -1605,8 +1461,8 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds, bool threade
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
-	static char *kwlist[] = {"callback", "args", "kwargs", "transid", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOsK", kwlist, &callback, &callback_args, &callback_kwargs, &transid, &tp_token))
+	static char *kwlist[] = {"threaded", "callback", "args", "kwargs", "transid", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "pO|OOsK", kwlist, &threaded, &callback, &callback_args, &callback_kwargs, &transid, &tp_token))
 		return NULL; // raise exception
 
 	/* validate input */
@@ -1660,21 +1516,10 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds, bool threade
 		return Py_BuildValue("i", status);
 }
 
-/* Proxy for ydb_tp_s() */
-static PyObject* tp_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return tp(self, args, kwds, false);
-}
-
-/* Proxy for ydb_tp_st() */
-static PyObject* tp_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return tp(self, args, kwds, true);
-}
-
 /* Wrapper for ydb_zwr2str_s() and ydb_zwr2str_st() */
-static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds, bool threaded)
+static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds)
 {
+    bool threaded;
 	bool return_NULL = false;
 	int zwr_len, status, return_length;
 	uint64_t tp_token;
@@ -1688,8 +1533,8 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds, bool th
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
-	static char* kwlist[] = {"input", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &zwr, &zwr_len, &tp_token))
+	static char* kwlist[] = {"threaded", "input", "tp_token", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|K", kwlist, &threaded, &zwr, &zwr_len, &tp_token))
 		return NULL;
 
 	/* Setup for Call */
@@ -1729,18 +1574,6 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds, bool th
 		return return_value;
 }
 
-/* Proxy for ydb_zwr2str_s() */
-static PyObject* zwr2str_s(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return zwr2str(self, args, kwds, false);
-}
-
-/* Proxy for ydb_zwr2str_st() */
-static PyObject* zwr2str_st(PyObject* self, PyObject* args, PyObject* kwds)
-{
-	return zwr2str(self, args, kwds, true);
-}
-
 /*Comprehensive API
  *Utility Functions
  *
@@ -1775,69 +1608,40 @@ static PyMethodDef methods[] = {
 																		"1 : There is a value, but no subtree\n"
 																		"10 : There is no value, but there is a subtree.\n"
 																		"11 : There are both a value and a subtree.\n"},
-	{"delete_s", (PyCFunction)delete_s, METH_VARARGS | METH_KEYWORDS, "deletes node value or tree data at node"},
-	{"delete_st", (PyCFunction)delete_st, METH_VARARGS | METH_KEYWORDS, "deletes node value or tree data at node"},
-	{"delete_excel_s", (PyCFunction)delete_excel_s, METH_VARARGS | METH_KEYWORDS, "delete the trees of all local variables "
+	{"delete", (PyCFunction)delete_wrapper, METH_VARARGS | METH_KEYWORDS, "deletes node value or tree data at node"},
+	{"delete_excel", (PyCFunction)delete_excel, METH_VARARGS | METH_KEYWORDS, "delete the trees of all local variables "
 	                                                                                "except those in the 'varnames' array"},
-	{"delete_excel_st", (PyCFunction)delete_excel_st, METH_VARARGS | METH_KEYWORDS, "delete the trees of all local variables except "
-	                                                                                "those in the 'varnames' array"},
-	{"get_s", (PyCFunction)get_s, METH_VARARGS | METH_KEYWORDS, "returns the value of a node or raises exception"},
-	{"get_st", (PyCFunction)get_st, METH_VARARGS | METH_KEYWORDS, "returns the value of a node or raises exception"},
-	{"incr_s", (PyCFunction)incr_s, METH_VARARGS | METH_KEYWORDS, "increments value by the value specified by 'increment'"},
-	{"incr_st", (PyCFunction)incr_st, METH_VARARGS | METH_KEYWORDS, "increments value by the value specified by 'increment'"},
-	{"lock_s", (PyCFunction)lock_s, METH_VARARGS | METH_KEYWORDS, "..."},
-	{"lock_st", (PyCFunction)lock_st, METH_VARARGS | METH_KEYWORDS, "..."},
-	{"lock_decr_s", (PyCFunction)lock_decr_s, METH_VARARGS | METH_KEYWORDS, "Decrements the count of the specified lock held "
+	{"get", (PyCFunction)get, METH_VARARGS | METH_KEYWORDS, "returns the value of a node or raises exception"},
+	{"incr", (PyCFunction)incr, METH_VARARGS | METH_KEYWORDS, "increments value by the value specified by 'increment'"},
+
+	{"lock", (PyCFunction)lock, METH_VARARGS | METH_KEYWORDS, "..."},
+
+	{"lock_decr", (PyCFunction)lock_decr, METH_VARARGS | METH_KEYWORDS, "Decrements the count of the specified lock held "
 	                                                                        "by the process. As noted in the Concepts section, a "
 	                                                                        "lock whose count goes from 1 to 0 is released. A lock "
 	                                                                        "whose name is specified, but which the process does "
 	                                                                        "not hold, is ignored."},
-	{"lock_decr_st", (PyCFunction)lock_decr_st, METH_VARARGS | METH_KEYWORDS, "Decrements the count of the specified lock held by "
-	                                                                          "the process. As noted in the Concepts section, a "
-	                                                                          "lock whose count goes from 1 to 0 is released. A "
-	                                                                          "lock whose name is specified, but which the process "
-	                                                                          "does not hold, is ignored."},
-	{"lock_incr_s", (PyCFunction)lock_incr_s, METH_VARARGS | METH_KEYWORDS, "Without releasing any locks held by the process, "
+	{"lock_incr", (PyCFunction)lock_incr, METH_VARARGS | METH_KEYWORDS, "Without releasing any locks held by the process, "
 	                                                                        "attempt to acquire the requested lock incrementing it"
 	                                                                        " if already held."},
-	{"lock_incr_st", (PyCFunction)lock_incr_st, METH_VARARGS | METH_KEYWORDS, "Without releasing any locks held by the process, "
-	                                                                          "attempt to acquire the requested lock incrementing "
-	                                                                          "it if already held."},
-	{"str2zwr_s", (PyCFunction)str2zwr_s, METH_VARARGS | METH_KEYWORDS, "returns the zwrite formatted (Bytes Object) version of the"
-	                                                                    " Bytes object provided as input."},
-	{"str2zwr_st", (PyCFunction)str2zwr_st, METH_VARARGS | METH_KEYWORDS, "returns the zwrite formatted (Bytes Object) version of "
-	                                                                      "the Bytes object provided as input."},
-	{"node_next_s", (PyCFunction)node_next_s, METH_VARARGS | METH_KEYWORDS, "facilitate depth-first traversal of a local or global"
+	{"node_next", (PyCFunction)node_next, METH_VARARGS | METH_KEYWORDS, "facilitate depth-first traversal of a local or global"
 	                                                                        " variable tree. returns string tuple of subscripts of"
 	                                                                        " next node with value."},
-	{"node_next_st", (PyCFunction)node_next_st, METH_VARARGS | METH_KEYWORDS, "facilitate depth-first traversal of a local or "
-	                                                                          "global variable tree. returns string tuple of "
-	                                                                          "subscripts of next node with value."},
-	{"node_previous_s", (PyCFunction)node_previous_s, METH_VARARGS | METH_KEYWORDS, "facilitate depth-first traversal of a local "
+	{"node_previous", (PyCFunction)node_previous, METH_VARARGS | METH_KEYWORDS, "facilitate depth-first traversal of a local "
 	                                                                                "or global variable tree. returns string tuple"
 	                                                                                "of subscripts of previous node with value."},
-	{"node_previous_st", (PyCFunction)node_previous_st, METH_VARARGS | METH_KEYWORDS, "facilitate depth-first traversal of a local"
-	                                                                                  " or global variable tree. returns string "
-	                                                                                  "tuple of subscripts of previous node with "
-	                                                                                  "value."},
-	{"set_s", (PyCFunction)set_s, METH_VARARGS | METH_KEYWORDS, "sets the value of a node or raises exception"},
-	{"set_st", (PyCFunction)set_st, METH_VARARGS | METH_KEYWORDS, "sets the value of a node or raises exception"},
-	{"subscript_next_s", (PyCFunction)subscript_next_s, METH_VARARGS | METH_KEYWORDS, "returns the name of the next subscript at "
+	{"set", (PyCFunction)set, METH_VARARGS | METH_KEYWORDS, "sets the value of a node or raises exception"},
+    {"str2zwr", (PyCFunction)str2zwr, METH_VARARGS | METH_KEYWORDS, "returns the zwrite formatted (Bytes Object) version of the"
+	                                                                    " Bytes object provided as input."},
+	{"subscript_next", (PyCFunction)subscript_next, METH_VARARGS | METH_KEYWORDS, "returns the name of the next subscript at "
 	                                                                                  "the same level as the one given"},
-	{"subscript_next_st", (PyCFunction)subscript_next_st, METH_VARARGS | METH_KEYWORDS, "returns the name of the next subscript at"
-	                                                                                    " the same level as the one given"},
-	{"subscript_previous_s", (PyCFunction)subscript_previous_s, METH_VARARGS | METH_KEYWORDS, "returns the name of the previous "
+	{"subscript_previous", (PyCFunction)subscript_previous, METH_VARARGS | METH_KEYWORDS, "returns the name of the previous "
 	                                                                                          "subscript at the same level as the "
 	                                                                                          "one given"},
-	{"subscript_previous_st", (PyCFunction)subscript_previous_st, METH_VARARGS | METH_KEYWORDS, "returns the name of the previous "
-	                                                                                            "subscript at the same level as the"
-	                                                                                            " one given"},
-	{"tp_s", (PyCFunction)tp_s, METH_VARARGS | METH_KEYWORDS, "transaction"},
-	{"tp_st", (PyCFunction)tp_st, METH_VARARGS | METH_KEYWORDS, "transaction"},
-	{"zwr2str_s", (PyCFunction)zwr2str_s, METH_VARARGS | METH_KEYWORDS, "returns the Bytes Object from the zwrite formated Bytes "
+	{"tp", (PyCFunction)tp, METH_VARARGS | METH_KEYWORDS, "transaction"},
+
+	{"zwr2str", (PyCFunction)zwr2str, METH_VARARGS | METH_KEYWORDS, "returns the Bytes Object from the zwrite formated Bytes "
 	                                                                    "object provided as input."},
-	{"zwr2str_st", (PyCFunction)zwr2str_st, METH_VARARGS | METH_KEYWORDS, "returns the Bytes Object from the zwrite formated Bytes"
-	                                                                      " object provided as input."},
 	/* API Utility Functions */
 	{NULL, NULL, 0, NULL}        /* Sentinel */
 };

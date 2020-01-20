@@ -11,24 +11,72 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
-from typing import Optional, Sequence
 import _yottadb
 
-from _yottadb import delete_st as delete
-from _yottadb import delete_excel_st as delete_excel
-from _yottadb import get_st as get
-from _yottadb import incr_st as incr
-from _yottadb import lock_st as lock
-from _yottadb import lock_decr_st as lock_decr
-from _yottadb import lock_incr_st as lock_incr
-from _yottadb import node_next_st as node_next
-from _yottadb import node_previous_st as node_previous
-from _yottadb import set_st as set
-from _yottadb import str2zwr_st as str2zwr
-from _yottadb import subscript_next_st as subscript_next
-from _yottadb import subscript_previous_st as subscript_previous
-from _yottadb import tp_st as tp
-from _yottadb import zwr2str_st as zwr2str
+from typing import Optional, Sequence, Tuple, Callable, Dict
+Key = Tuple[bytes, Optional[Sequence[bytes]]]
+
 
 def data(varname: bytes, subsarray:Optional[Sequence[bytes]] = None, tp_token: int = _yottadb.YDB_NOTTP) -> int:
     return _yottadb.data(True, varname, subsarray, tp_token)
+
+
+def delete(varname: bytes, subsarray: Optional[Sequence[bytes]] = None, delete_type: int= _yottadb.YDB_DEL_NODE,
+           tp_token: int = _yottadb.YDB_NOTTP) -> None:
+    return _yottadb.delete(True, varname, subsarray, delete_type, tp_token)
+
+
+def delete_excel(varnames: Optional[Sequence[bytes]] = None, tp_token: int = _yottadb.YDB_NOTTP) -> None:
+    return _yottadb.delete_excel(True, varnames, tp_token)
+
+
+def get(varname:bytes, subsarray: Optional[Sequence[bytes]] = None, tp_token: int = _yottadb.YDB_NOTTP) -> bytes:
+    return _yottadb.get(True, varname, subsarray, tp_token)
+
+
+def incr(varname: bytes, subsarray: Optional[Sequence[bytes]] = None, increment: bytes = b'1', tp_token: int = _yottadb.YDB_NOTTP) -> None:
+    return _yottadb.incr(True, varname, subsarray, increment, tp_token)
+
+
+def lock(keys:Sequence[Key], timeout_nsec: int = 0, tp_token: int = _yottadb.YDB_NOTTP) -> None:
+    return _yottadb.lock(True, keys, timeout_nsec, tp_token)
+
+
+def lock_decr(varname: bytes, subsarray: Optional[Sequence[bytes]] = None, tp_token: int = _yottadb.YDB_NOTTP) -> None:
+    return _yottadb.lock_decr(True, varname, subsarray, tp_token)
+
+
+def lock_incr(varname: bytes, subsarray: Optional[Sequence[bytes]] = None, timeout_nsec: int = 0,
+              tp_token: int = _yottadb.YDB_NOTTP) -> None:
+    return _yottadb.lock_incr(True, varname, subsarray, timeout_nsec, tp_token)
+
+
+def node_next(varname: bytes, subsarray: Optional[Sequence[bytes]] = None, tp_token: int = _yottadb.YDB_NOTTP) -> Tuple[bytes]:
+    return _yottadb.node_next(True, varname, subsarray, tp_token)
+
+
+def node_previous(varname: bytes, subsarray: Optional[Sequence[bytes]] = None, tp_token: int = _yottadb.YDB_NOTTP) -> Tuple[bytes]:
+    return _yottadb.node_previous(True, varname, subsarray, tp_token)
+
+
+def set(varname:bytes, subsarray:Optional[Sequence[bytes]]= None, value:bytes= b'', tp_token:int= _yottadb.YDB_NOTTP) -> None:
+    return _yottadb.set(True, varname, subsarray, value, tp_token)
+
+
+def str2zwr(input:bytes, tp_token:int = _yottadb.YDB_NOTTP) -> bytes:
+    return _yottadb.str2zwr(True, input, tp_token)
+
+
+def subscript_next(varname:bytes, subsarray:Optional[Sequence[bytes]]= None, tp_token:int= _yottadb.YDB_NOTTP) -> bytes:
+    return _yottadb.subscript_next(True, varname, subsarray, tp_token)
+
+
+def subscript_previous(varname:bytes, subsarray:Optional[Sequence[bytes]]= None, tp_token:int= _yottadb.YDB_NOTTP) -> bytes:
+    return _yottadb.subscript_previous(True, varname, subsarray, tp_token)
+
+def tp(callback:Callable, args:Tuple = (), kwargs:Dict = {}, transid:str= "BATCH", tp_token:int= _yottadb.YDB_NOTTP) -> int:
+    return _yottadb.tp(True, callback, args, kwargs, transid, tp_token)
+
+
+def zwr2str(input: bytes, tp_token: int = _yottadb.YDB_NOTTP) -> bytes:
+    return _yottadb.zwr2str(True, input, tp_token)

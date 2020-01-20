@@ -47,30 +47,30 @@ def bank(ydb):
 
     ydb.api.delete(varname=b'^account', delete_type=_yottadb.YDB_DEL_TREE)
 
-def test_get_st_1_positional(ydb, simple_data):
+def test_get_1_positional(ydb, simple_data):
     assert ydb.api.get(b'^test1') == b'test1value'
     
-def test_get_st_1_keywords(ydb, simple_data):
+def test_get_1_keywords(ydb, simple_data):
     assert ydb.api.get(varname=b'^test1') == b'test1value'
     assert ydb.api.get(varname=b'^test1', tp_token=0) == b'test1value'
     
-def test_get_st_2_positional(ydb, simple_data):
+def test_get_2_positional(ydb, simple_data):
     assert ydb.api.get(b'^test2', [b'sub1']) == b'test2value'
 
-def test_get_st_2_keywords(ydb, simple_data):
+def test_get_2_keywords(ydb, simple_data):
     assert ydb.api.get(varname=b'^test2', subsarray=[b'sub1']) == b'test2value'
 
-def test_get_st_3_positional(ydb, simple_data):
+def test_get_3_positional(ydb, simple_data):
     assert ydb.api.get(b'^test3') == b'test3value1'
     assert ydb.api.get(b'^test3', [b'sub1']) == b'test3value2'
     assert ydb.api.get(b'^test3', [b'sub1', b'sub2']) == b'test3value3'
 
-def test_get_st_3_keywords(ydb, simple_data):
+def test_get_3_keywords(ydb, simple_data):
     assert ydb.api.get(varname=b'^test3') == b'test3value1'
     assert ydb.api.get(varname=b'^test3', subsarray=[b'sub1']) == b'test3value2'
     assert ydb.api.get(varname=b'^test3', subsarray=[b'sub1', b'sub2']) == b'test3value3'
     
-def test_get_st_YottaDBErrors(ydb, simple_data):
+def test_get_YottaDBErrors(ydb, simple_data):
     with pytest.raises(_yottadb.YottaDBError):
         ydb.api.get(b'^testerror')
     with pytest.raises(_yottadb.YottaDBError):
@@ -78,63 +78,63 @@ def test_get_st_YottaDBErrors(ydb, simple_data):
     with pytest.raises(_yottadb.YottaDBError):
         ydb.api.get(b'^testerror', [b'sub1'])
 
-def test_get_st_long_value(ydb):
+def test_get_long_value(ydb):
     ydb.api.set(varname=b'testlong', value=(b'a'*_yottadb.YDB_MAX_STR))
     assert ydb.api.get(varname=b'testlong') == b'a'*_yottadb.YDB_MAX_STR
 
-def test_set_st_1_positional(ydb):
+def test_set_1_positional(ydb):
     ydb.api.set(b'test4', value=b'test4value')
     assert ydb.api.get(b'test4') == b'test4value'
 
-def test_set_st_1_keywords(ydb):
+def test_set_1_keywords(ydb):
     ydb.api.set(varname=b'test5', value=b'test5value')
     assert ydb.api.get(b'test5') == b'test5value'
 
-def test_set_st_2_positional(ydb):
+def test_set_2_positional(ydb):
     ydb.api.set(b'test6', (b'sub1',), b'test6value')
     assert ydb.api.get(b'test6', (b'sub1',)) == b'test6value'
 
-def test_set_st_2_keywords(ydb):
+def test_set_2_keywords(ydb):
     ydb.api.set(varname=b'test7', subsarray=(b'sub1',), value=b'test7value')
     assert ydb.api.get(b'test7', (b'sub1',)) == b'test7value'
 
-def test_set_st_YottaDBErrors(ydb):
+def test_set_YottaDBErrors(ydb):
     with pytest.raises(_yottadb.YottaDBError):
         ydb.api.set(b'a'*32, value=b"some_value")
 
-def test_set_st_i18n(ydb):
+def test_set_i18n(ydb):
     ydb.api.set(varname=b'testchinese', value=bytes('你好世界', encoding='utf-8'))
     assert ydb.api.get(b'testchinese') == bytes('你好世界', encoding='utf-8')
 
-def test_delete_st_1_positional(ydb):
+def test_delete_1_positional(ydb):
     ydb.api.set(varname=b'test8', value=b'test8value')
     assert ydb.api.get(b'test8') == b'test8value'
     ydb.api.delete(b'test8')
     with pytest.raises(_yottadb.YottaDBError):
         ydb.api.get(b'test8')
 
-def test_delete_st_1_keywords(ydb):
+def test_delete_1_keywords(ydb):
     ydb.api.set(varname=b'test9', value=b'test9value')
     assert ydb.api.get(b'test9') == b'test9value'
     ydb.api.delete(varname=b'test9', delete_type=_yottadb.YDB_DEL_NODE)
     with pytest.raises(_yottadb.YottaDBError):
         ydb.api.get(b'test9')
 
-def test_delete_st_2_positional(ydb):
+def test_delete_2_positional(ydb):
     ydb.api.set(varname=b'test10', subsarray=(b'sub1',), value=b'test10value')
     assert ydb.api.get(b'test10', (b'sub1',)) == b'test10value'
     ydb.api.delete(b'test10', (b'sub1',))
     with pytest.raises(_yottadb.YottaDBError):
         ydb.api.get(b'test10', (b'sub1',))
 
-def test_delete_st_2_keywords(ydb):
+def test_delete_2_keywords(ydb):
     ydb.api.set(varname=b'test11', subsarray=(b'sub1',),  value=b'test11value')
     assert ydb.api.get(b'test11', (b'sub1',)) == b'test11value'
     ydb.api.delete(varname=b'test11', subsarray=(b'sub1',), delete_type=_yottadb.YDB_DEL_NODE)
     with pytest.raises(_yottadb.YottaDBError):
         ydb.api.get(b'test11', (b'sub1',))
 
-def test_delete_st_3_positional(ydb):
+def test_delete_3_positional(ydb):
     ydb.api.set(varname=b'test12', value=b'test12 node value')
     ydb.api.set(varname=b'test12', subsarray=(b'sub1',), value=b'test12 subnode value')
     assert ydb.api.get(b'test12') == b'test12 node value'
@@ -147,7 +147,7 @@ def test_delete_st_3_positional(ydb):
     with pytest.raises(_yottadb.YottaDBError):
         ydb.api.get(b'test12', (b'sub1',))
 
-def test_delete_st_3_keywords(ydb):
+def test_delete_3_keywords(ydb):
     ydb.api.set(varname=b'test13', value=b'test13 node value')
     ydb.api.set(varname=b'test13', subsarray=(b'sub1',), value=b'test13 subnode value')
     assert ydb.api.get(b'test13') == b'test13 node value'
@@ -161,7 +161,7 @@ def test_delete_st_3_keywords(ydb):
         ydb.api.get(b'test13', (b'sub1',))
 
 
-def test_data_st_positional(ydb, simple_data):
+def test_data_positional(ydb, simple_data):
     assert ydb.api.data(b'^nodata') == _yottadb.YDB_DATA_NO_DATA
     assert ydb.api.data(b'^test1') == _yottadb.YDB_DATA_HAS_VALUE_NO_TREE
     assert ydb.api.data(b'^test2') == _yottadb.YDB_DATA_NO_VALUE_HAS_TREE
@@ -170,7 +170,7 @@ def test_data_st_positional(ydb, simple_data):
     assert ydb.api.data(b'^test3', (b'sub1',)) == _yottadb.YDB_DATA_HAS_VALUE_HAS_TREE
     assert ydb.api.data(b'^test3', (b'sub1', b'sub2')) == _yottadb.YDB_DATA_HAS_VALUE_NO_TREE
 
-def test_lock_incr_st_1(ydb):
+def test_lock_incr_1(ydb):
     t1 = datetime.datetime.now()
     ydb.api.lock_incr(b'test1')
     t2 = datetime.datetime.now()
@@ -178,7 +178,7 @@ def test_lock_incr_st_1(ydb):
     assert time_elapse < 0.01
     ydb.api.lock_decr(b'test1')
 
-def test_lock_incr_st_2(ydb):
+def test_lock_incr_2(ydb):
     t1 = datetime.datetime.now()
     ydb.api.lock_incr(b'test2', (b'sub1',))
     t2 = datetime.datetime.now()
@@ -186,29 +186,29 @@ def test_lock_incr_st_2(ydb):
     assert time_elapse < 0.01
     ydb.api.lock_decr(b'test2', (b'sub1',))
 
-def test_lock_incr_st_timeout_1(ydb):
-    subprocess.Popen(shlex.split('python ydbpython_extention_by_hand_poc/tests/lock.py -t 2 ^test1'))
+def test_lock_incr_timeout_1(ydb):
+    subprocess.Popen(shlex.split('python YDBPython/tests/lock.py -t 2 ^test1'))
     time.sleep(1)
     with pytest.raises(_yottadb.YottaDBLockTimeout):
         ydb.api.lock_incr(b'^test1')
     time.sleep(1)
 
-def test_lock_incr_st_timeout_2(ydb):
-    subprocess.Popen(shlex.split('python ydbpython_extention_by_hand_poc/tests/lock.py -t 2 ^test2 sub1'))
+def test_lock_incr_timeout_2(ydb):
+    subprocess.Popen(shlex.split('python YDBPython/tests/lock.py -t 2 ^test2 sub1'))
     time.sleep(1)
     with pytest.raises(_yottadb.YottaDBLockTimeout):
         ydb.api.lock_incr(b'^test2', (b'sub1',))
     time.sleep(1)
 
-def test_lock_incr_st_timeout_3(ydb):
-    subprocess.Popen(shlex.split('python ydbpython_extention_by_hand_poc/tests/lock.py -t 2 ^test2'))
+def test_lock_incr_timeout_3(ydb):
+    subprocess.Popen(shlex.split('python YDBPython/tests/lock.py -t 2 ^test2'))
     time.sleep(1)
     with pytest.raises(_yottadb.YottaDBLockTimeout):
         ydb.api.lock_incr(b'^test2', (b'sub1',))
     time.sleep(1)
 
-def test_lock_incr_st_timeout_4(ydb):
-    subprocess.Popen(shlex.split('python ydbpython_extention_by_hand_poc/tests/lock.py -t 2 ^test2 sub1'))
+def test_lock_incr_timeout_4(ydb):
+    subprocess.Popen(shlex.split('python YDBPython/tests/lock.py -t 2 ^test2 sub1'))
     time.sleep(1)
     t1 = datetime.datetime.now()
     ydb.api.lock_incr(b'test2')
@@ -223,14 +223,14 @@ def simple_function(param, tp_token=NOTTP):
     print(param)
     return _yottadb.YDB_OK
 
-def test_tp_st_0(ydb):
+def test_tp_0(ydb):
     ydb.api.tp(simple_function, args=('test0',))
 
 def simple_functional_function(ydb,tp_token=NOTTP):
     ydb.api.set(varname=b'^testtp1', value = b'after', tp_token=tp_token)
     return _yottadb.YDB_OK
 
-def test_tp_st_1(ydb):
+def test_tp_1(ydb):
     ydb.api.set(varname=b'^testtp1', value=b'before')
     ydb.api.tp(simple_functional_function, kwargs={'ydb':ydb})
     assert ydb.api.get(varname=b'^testtp1') == b'after'
@@ -253,7 +253,7 @@ def transfer_transaction(from_account, to_account, amount, ydb,tp_token=NOTTP):
     else:
         return _yottadb.YDB_OK
 
-def test_tp_st_2(ydb, bank):
+def test_tp_2(ydb, bank):
     account1 = bank[0]['account#']
     account2 = bank[1]['account#']
     account1_balance = bank[0]['account_balance']
@@ -265,7 +265,7 @@ def test_tp_st_2(ydb, bank):
     assert int(ydb.api.get(varname=b'^account', subsarray=(account1, b'balance'))) == account1_balance - transfer_amount
     assert int(ydb.api.get(varname=b'^account', subsarray=(account2, b'balance'))) == account2_balance + transfer_amount
 
-def test_tp_st_2_rollback(ydb, bank):
+def test_tp_2_rollback(ydb, bank):
     account1 = bank[0]['account#']
     account2 = bank[1]['account#']
     account1_balance = bank[0]['account_balance']
@@ -284,11 +284,11 @@ def callback_that_raises_exception(tp_token=None):
     a = 1/0
 
 
-def test_tp_st_3_python_exception_raised_in_callback(ydb):
+def test_tp_3_python_exception_raised_in_callback(ydb):
     with pytest.raises(ZeroDivisionError):
         ydb.api.tp(callback_that_raises_exception)
 
-def test_subscript_next_st_1(ydb, simple_data):
+def test_subscript_next_1(ydb, simple_data):
     assert ydb.api.subscript_next(varname=b'^%') == b'^Test5'
     assert ydb.api.subscript_next(varname=b'^a') == b'^test1'
     assert ydb.api.subscript_next(varname=b'^test1') == b'^test2'
@@ -320,7 +320,7 @@ def test_subscript_next_i18n(ydb):
     ydb.api.set(varname=b'testi18n', subsarray=(bytes('中文', encoding='utf-8'),), value=b'chinese')
     assert ydb.api.subscript_next(varname=b'testi18n', subsarray=(b'',)) == bytes('中文', encoding='utf-8')
 
-def test_subscript_previous_st_1(ydb, simple_data):
+def test_subscript_previous_1(ydb, simple_data):
     assert ydb.api.subscript_previous(varname=b'^z') == b'^test6'
     assert ydb.api.subscript_previous(varname=b'^a') == b'^Test5'
     assert ydb.api.subscript_previous(varname=b'^test1') == b'^Test5'
@@ -349,7 +349,7 @@ def test_subscript_previous_long(ydb):
     ydb.api.set(varname=b'testLongSubscript', subsarray=(b'a'*_yottadb.YDB_MAX_STR,), value=b'toolong')
     assert ydb.api.subscript_previous(varname=b'testLongSubscript', subsarray=(b'',)) == b'a'*_yottadb.YDB_MAX_STR
 
-def test_node_next_st_1(ydb, simple_data):
+def test_node_next_1(ydb, simple_data):
     assert ydb.api.node_next(b'^test3') == (b'sub1',)
     assert ydb.api.node_next(b'^test3', subsarray=(b'sub1',)) == (b'sub1', b'sub2')
     with pytest.raises(_yottadb.YottaDBError) as e:
@@ -357,7 +357,7 @@ def test_node_next_st_1(ydb, simple_data):
         assert e.code == _yottadb.YDB_ERR_NODEEND
     assert ydb.api.node_next(b'^test6') == (b'sub6', b'subsub6')
 
-def test_node_next_st_many_subscipts(ydb):
+def test_node_next_many_subscipts(ydb):
     ydb.api.set(varname=b'testmanysubscripts', subsarray=(b'sub1', b'sub2', b'sub3', b'sub4', b'sub5', b'sub6'), value=b'123')
     assert ydb.api.node_next(b'testmanysubscripts') == (b'sub1', b'sub2', b'sub3', b'sub4', b'sub5', b'sub6')
 
@@ -380,29 +380,29 @@ def test_node_previous_long_subscripts(ydb):
 
 
 
-def test_lock_st_blocking_other(ydb, simple_data):
+def test_lock_blocking_other(ydb, simple_data):
     t1 = KeyTuple(b'^test1')
     t2 = KeyTuple(b'^test2', (b'sub1',))
     t3 = KeyTuple(b'^test3', (b'sub1', b'sub2'))
     keys_to_lock = (t1, t2, t3)
     ydb.api.lock(keys=keys_to_lock, timeout_nsec=0)
     print(t1)
-    assert execute(f"python ydbpython_extention_by_hand_poc/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t1)}") == "Lock Failed"
-    assert execute(f"python ydbpython_extention_by_hand_poc/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t2)}") == "Lock Failed"
-    assert execute(f"python ydbpython_extention_by_hand_poc/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Failed"
+    assert execute(f"python YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t1)}") == "Lock Failed"
+    assert execute(f"python YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t2)}") == "Lock Failed"
+    assert execute(f"python YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Failed"
     ydb.api.lock()
-    assert execute(f"python ydbpython_extention_by_hand_poc/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t1)}") == "Lock Success"
-    assert execute(f"python ydbpython_extention_by_hand_poc/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t2)}") == "Lock Success"
-    assert execute(f"python ydbpython_extention_by_hand_poc/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Success"
+    assert execute(f"python YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t1)}") == "Lock Success"
+    assert execute(f"python YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t2)}") == "Lock Success"
+    assert execute(f"python YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Success"
 
 
-def test_lock_st_being_blocked(ydb):
-    subprocess.Popen(shlex.split('python ydbpython_extention_by_hand_poc/tests/lock.py ^test1'))
+def test_lock_being_blocked(ydb):
+    subprocess.Popen(shlex.split('python YDBPython/tests/lock.py ^test1'))
     time.sleep(1)
     with pytest.raises(_yottadb.YottaDBLockTimeout):
         ydb.api.lock([KeyTuple(b'^test1')])
 
-def test_lock_st_max_names(ydb):
+def test_lock_max_names(ydb):
     keys = []
     for i in range(_yottadb.YDB_MAX_NAMES):
         keys.append([bytes(f'^testlock{i}', encoding='utf-8')])
@@ -413,7 +413,7 @@ def test_lock_st_max_names(ydb):
         assert e.code == _yottadb.YDB_ERR_NAMECOUNT2HI
 
 
-def test_delete_excel_st(ydb):
+def test_delete_excel(ydb):
     ydb.api.set(varname=b'testdeleteexcel1', value = b"1")
     ydb.api.set(varname=b'testdeleteexcel2', subsarray=(b'sub1',), value=b"2")
     ydb.api.set(varname=b'testdeleteexcelexception', subsarray=(b'sub1',), value=b"3")
@@ -556,9 +556,9 @@ str2zwr_test_ids = [f'{input} -> {output}' for input, output in str2zwr_tests]
 zwr2str_test_ids = [f'{input} -> {output}' for output, input in str2zwr_tests]
 
 @pytest.mark.parametrize('input, output', str2zwr_tests, ids=str2zwr_test_ids)
-def test_str2zwr_st(ydb, input, output):
+def test_str2zwr(ydb, input, output):
     assert ydb.api.str2zwr(input) == output
 
 @pytest.mark.parametrize('output, input', str2zwr_tests, ids=zwr2str_test_ids)
-def test_zwr2str_st(ydb, input, output):
+def test_zwr2str(ydb, input, output):
     assert ydb.api.zwr2str(input) == output
