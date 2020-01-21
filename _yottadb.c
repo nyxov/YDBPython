@@ -45,7 +45,7 @@ PyObject* make_getter_code()
 	"    return ''\n"
 	"\n";
 
-	d = PyDict_New();
+	dict = PyDict_New();
 	PyDict_SetItemString(dict, "__builtins__", PyEval_GetBuiltins());
 	output = PyRun_String(code,Py_file_input,dict,dict);
 	if (output==NULL)
