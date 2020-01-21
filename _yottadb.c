@@ -28,7 +28,7 @@
 PyObject* make_getter_code()
 {
 	const char *code;
-	PyObject *d, *output;
+	PyObject *dict, *output;
 
 	code =
 	"@property\n"
@@ -46,17 +46,17 @@ PyObject* make_getter_code()
 	"\n";
 
 	d = PyDict_New();
-	PyDict_SetItemString(d, "__builtins__", PyEval_GetBuiltins());
-	output = PyRun_String(code,Py_file_input,d,d);
+	PyDict_SetItemString(dict, "__builtins__", PyEval_GetBuiltins());
+	output = PyRun_String(code,Py_file_input,dict,dict);
 	if (output==NULL)
 	{
-		Py_DECREF(d);
+		Py_DECREF(dict);
 		return NULL;
 	}
 	Py_DECREF(output);
-	PyDict_DelItemString(d,"__builtins__"); /* __builtins__ should not be an attribute of the exception */
+	PyDict_DelItemString(dict,"__builtins__"); /* __builtins__ should not be an attribute of the exception */
 
-	return d;
+	return dict;
 }
 
 /* LOCAL UTILITY FUNCTIONS */
