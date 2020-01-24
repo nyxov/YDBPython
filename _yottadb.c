@@ -107,22 +107,17 @@ static void free_buffer_array(ydb_buffer_t *array, int len)
 static bool validate_sequence_of_bytes(PyObject *sequence)
 {
 	int i;
-	PyObject *item;
+	PyObject *item, *seq;
 
-	if (!PySequence_Check(sequence))
+    seq = PySequence_Fast(sequence, "argument must be iterable");
+	if (!seq || PyBytes_Check(sequence)) /* PyBytes it's self is a sequence */
 		return false;
 
-	if (PyBytes_Check(sequence)) /* PyBytes it's self is a sequence */
-		return false;
-
-	for (i=0; i<PySequence_Length(sequence); i++) /* check each item for a bytes object */
+	for (i=0; i<PySequence_Fast_GET_SIZE(seq); i++) /* check each item for a bytes object */
 	{
-		item = PySequence_GetItem(sequence, i);
-		if (!PyBytes_Check(item)) {
-			Py_DECREF(item);
+		item = PySequence_Fast_GET_ITEM(seq, i);
+		if (!PyBytes_Check(item))
 			return false;
-		}
-		Py_DECREF(item);
 	}
 	return true;
 }
