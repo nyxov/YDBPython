@@ -104,7 +104,7 @@ def test_Key_delete_node(ydb):
 
     testkey.delete_node()
 
-    assert testkey.value ==None
+    assert testkey.value == None
     assert subkey.value =='test6 subvalue'
 
 def test_Key_delete_tree(ydb):
