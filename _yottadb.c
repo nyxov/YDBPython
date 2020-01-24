@@ -673,51 +673,54 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds)
 /* Wrapper for ydb_incr_s() and ydb_incr_st() */
 static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds)
 {
-    bool threaded;
+    bool threaded, copy_success;
 	bool return_NULL = false;
-	int status, subs_used;
+	int status, subs_used, varname_len, increment_len;
 	uint64_t tp_token;
-	PyObject *varname, *subsarray, *default_increment, *increment, *return_python_string;
-	ydb_buffer_t *increment_ydb, error_string_buffer, ret_value, *varname_y, *subsarray_y;
+	char *varname, *increment;
+	PyObject *subsarray, *return_python_string;
+	ydb_buffer_t increment_y, error_string_buffer, ret_value, varname_y, *subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
 	tp_token = YDB_NOTTP;
-	default_increment = Py_BuildValue("i", 1);
-	increment = default_increment;
+	increment = "1";
+	increment_len = 1;
 
 	/* parse and validate */
 	static char* kwlist[] = {"threaded","varname", "subsarray", "increment", "tp_token", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "pO|OOK", kwlist, &threaded, &varname, &subsarray, &increment, &tp_token)) {
-		Py_DECREF(default_increment);
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|Oy#K", kwlist, &threaded, &varname, &varname_len, &subsarray,
+	                                    &increment, &increment_len, &tp_token)) {
 		return NULL;
 	}
 
-	if (!PyBytes_Check(increment)) {
-		PyErr_Format(PyExc_TypeError, "'varname' must be a bytes object. recieved %s", increment);
-		Py_DECREF(default_increment);
-		return NULL;
-	}
 	if (!validate_subsarray_object(subsarray)) {
-		Py_DECREF(default_increment);
 		return NULL;
 	}
 
-	if (!PyBytes_Check(increment)) {
-		PyErr_Format(PyExc_TypeError, "'increment' must be a bytes object. recieved %s", increment);
-		Py_DECREF(default_increment);
-		return NULL;
-	}
 	/* Setup for Call */
-	varname_y = convert_py_bytes_to_ydb_buffer_t(varname);
+	YDB_MALLOC_BUFFER(&varname_y, varname_len);
+	YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+	if (!copy_success)
+	{
+		PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in incr() for varname");
+		return_NULL = true;
+	}
+
 	SETUP_SUBS(subsarray, subs_used, subsarray_y);
 
-	increment_ydb = convert_py_bytes_to_ydb_buffer_t(increment);
+    YDB_MALLOC_BUFFER(&increment_y, increment_len);
+	YDB_COPY_STRING_TO_BUFFER(increment, &increment_y, copy_success);
+	if (!copy_success)
+	{
+		PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in incr() for increment");
+		return_NULL = true;
+	}
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	YDB_MALLOC_BUFFER(&ret_value, 50);
 
 	/* Call the wrapped function */
-	CALL_WRAP_5(threaded, ydb_incr_s, ydb_incr_st, tp_token, &error_string_buffer, varname_y, subs_used, subsarray_y, increment_ydb,
+	CALL_WRAP_5(threaded, ydb_incr_s, ydb_incr_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &increment_y,
 	            &ret_value, status);
 
 	/* check status for Errors and Raise Exception */
@@ -732,10 +735,9 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds)
 		return_python_string = Py_BuildValue("y#", ret_value.buf_addr, ret_value.len_used);
 
 	/* free allocated memory */
-	Py_DECREF(default_increment);
-	YDB_FREE_BUFFER(varname_y);
+	YDB_FREE_BUFFER(&varname_y);
 	free_buffer_array(subsarray_y, subs_used);
-	YDB_FREE_BUFFER(increment_ydb);
+	YDB_FREE_BUFFER(&increment_y);
 	YDB_FREE_BUFFER(&error_string_buffer);
 	YDB_FREE_BUFFER(&ret_value);
 
