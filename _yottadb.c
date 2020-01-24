@@ -96,32 +96,6 @@ static void free_buffer_array(ydb_buffer_t *array, int len)
 		YDB_FREE_BUFFER(&((ydb_buffer_t*)array)[0]);
 }
 
-/* UTILITIES TO CONVERT BETWEEN PYUNICODE STRING OBJECTS AND YDB_BUFFER_TS */
-
-/* Routine to convert from a Python bytes object to a ydb_buffer_t
- *
- * Parameters:
- *   bytes	- a python bytes object
- *
- * this function copies the bytes string from the PyBytes object so you should free it with YDB_FREE_BUFFER
- */
-static ydb_buffer_t* convert_py_bytes_to_ydb_buffer_t(PyObject *bytes)
-{
-    bool copy_success;
-	int len;
-	char* bytes_c;
-	ydb_buffer_t *ret_buffer;
-
-	len = PyBytes_Size(bytes);
-	bytes_c = PyBytes_AsString(bytes);
-
-	ret_buffer = (ydb_buffer_t*)calloc(1, sizeof(ydb_buffer_t));
-	YDB_MALLOC_BUFFER(ret_buffer, len);
-	YDB_COPY_STRING_TO_BUFFER(bytes_c, ret_buffer, copy_success);
-	// raise error on !copy_success
-
-	return ret_buffer;
-}
 
 /* UTILITIES TO CONVERT BETWEEN SEQUENCES OF PYUNICODE STRING OBJECTS AND AN ARRAY OF YDB_BUFFER_TS */
 
@@ -235,7 +209,20 @@ PyObject* convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
 
 static void load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray)
 {
-	dest->varname = convert_py_bytes_to_ydb_buffer_t(varname);
+    bool copy_success;
+	int len;
+	char* bytes_c;
+	ydb_buffer_t *varanme_y;
+
+	len = PyBytes_Size(varname);
+	bytes_c = PyBytes_AsString(varname);
+
+	varanme_y = (ydb_buffer_t*)calloc(1, sizeof(ydb_buffer_t));
+	YDB_MALLOC_BUFFER(varanme_y, len);
+	YDB_COPY_STRING_TO_BUFFER(bytes_c, varanme_y, copy_success);
+	// raise error on !copy_success
+
+	dest->varname = varanme_y;
 	if (subsarray != Py_None)
 	{
 		dest->subs_used = PySequence_Length(subsarray);
