@@ -223,7 +223,7 @@ static void free_YDBKey(YDBKey* key) {
     int i;
 
     YDB_FREE_BUFFER((key->varname));
-    for (i=0; i<key->subs_used; i++)
+    for (i=0; i < key->subs_used; i++)
         YDB_FREE_BUFFER(&((ydb_buffer_t*)key->subsarray)[i]);
 }
 
@@ -255,7 +255,7 @@ static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence) {
             PyErr_Format(PyExc_TypeError, "item %d in 'keys' sequence is not a sequence", i);
             Py_DECREF(key);
             return false;
-        } if (1 != PySequence_Length(key) && 2 != PySequence_Length(key)) {
+        } if ((1 != PySequence_Length(key)) && (2 != PySequence_Length(key))) {
             PyErr_Format(PyExc_TypeError, "item %d in 'keys' sequence is not a sequence of 1 or 2 items", i);
             Py_DECREF(key);
             return false;
@@ -302,7 +302,7 @@ static YDBKey* convert_key_sequence_to_YDBKey_array(PyObject* sequence) {
     YDBKey *ret_keys;
     len_keys = PySequence_Length(sequence);
     ret_keys = (YDBKey*)malloc(len_keys * sizeof(YDBKey));
-    for (i=0; i< len_keys; i++) {
+    for (i=0; i < len_keys; i++) {
         key = PySequence_GetItem(sequence, i);
         varname = PySequence_GetItem(key, 0);
         subsarray = Py_None;
@@ -508,7 +508,7 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "p|OK", kwlist, &threaded, &varnames, &tp_token))
         return NULL;
 
-    if(varnames != NULL && !validate_sequence_of_bytes(varnames)) {
+    if((varnames != NULL) && (!validate_sequence_of_bytes(varnames))) {
         PyErr_SetString(PyExc_TypeError, "'varnames' must be an sequence of bytes.");
         return NULL;
     }
