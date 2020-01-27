@@ -330,7 +330,7 @@ static void free_YDBKey_array(YDBKey* keysarray, int len) {
 }
 
 /* Routine to help raise a YottaDBError. The caller still needs to return NULL for the Exception to be raised.
- * This routine will check if the message has been set in the error_string_buffer and look it up if it has not been.
+ * This routine will check if the message has been set in the error_string_buffer and look it up if not.
  *
  * Parameters:
  *    status                - the error code that is returned by the wrapped ydb_ function.
