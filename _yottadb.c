@@ -48,7 +48,7 @@ PyObject* make_getter_code()
 	dict = PyDict_New();
 	PyDict_SetItemString(dict, "__builtins__", PyEval_GetBuiltins());
 	output = PyRun_String(code,Py_file_input,dict,dict);
-	if (output==NULL)
+	if (NULL == output)
 	{
 		Py_DECREF(dict);
 		return NULL;
@@ -132,7 +132,7 @@ static bool validate_sequence_of_bytes(PyObject *sequence)
  */
 static bool validate_subsarray_object(PyObject *subsarray)
 {
-	 if (subsarray != Py_None) /* don't check if None */
+	 if (Py_None != subsarray)
 	 {
 		if (!validate_sequence_of_bytes(subsarray))
 		{
@@ -219,7 +219,7 @@ static void load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray)
 	// raise error on !copy_success
 
 	dest->varname = varanme_y;
-	if (subsarray != Py_None)
+	if (Py_None != subsarray)
 	{
 		dest->subs_used = PySequence_Length(subsarray);
 		dest->subsarray = convert_py_bytes_sequence_to_ydb_buffer_array(subsarray);
@@ -274,7 +274,7 @@ static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence)
 			Py_DECREF(key);
 			return false;
 		}
-		if (PySequence_Length(key) != 1 && PySequence_Length(key) != 2)
+		if (1 != PySequence_Length(key) && 2 != PySequence_Length(key))
 		{
 			PyErr_Format(PyExc_TypeError, "item %d in 'keys' sequence is not a sequence of 1 or 2 items", i);
 			Py_DECREF(key);
@@ -291,7 +291,7 @@ static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence)
 		}
 		Py_DECREF(varname);
 
-		if (PySequence_Length(key) == 2)
+		if (2 == PySequence_Length(key))
 		{
 			subsarray = PySequence_GetItem(key, 1);
 			if (!validate_subsarray_object(subsarray))
@@ -319,6 +319,7 @@ static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence)
  */
 static YDBKey* convert_key_sequence_to_YDBKey_array(PyObject* sequence)
 {
+    //TODO: change to use fast sequence
 	int i, keys_len;
 	PyObject *key, *varname, *subsarray;
 	YDBKey *ret_keys;
@@ -329,7 +330,8 @@ static YDBKey* convert_key_sequence_to_YDBKey_array(PyObject* sequence)
 		key = PySequence_GetItem(sequence, i);
 		varname = PySequence_GetItem(key, 0);
 		subsarray = Py_None;
-		if (PySequence_Length(key) == 2)
+
+		if (2 == PySequence_Length(key))
 			subsarray = PySequence_GetItem(key, 1);
 		load_YDBKey(&ret_keys[i], varname, subsarray);
 		Py_DECREF(key);
@@ -364,10 +366,10 @@ static void raise_YottaDBError(int status, ydb_buffer_t* error_string_buffer)
 	ydb_buffer_t ignored_buffer;
 	PyObject *tuple;
 
-	if (error_string_buffer->len_used == 0)
+	if (0 == error_string_buffer->len_used)
 	{
 		msg_status = ydb_message(status, error_string_buffer);
-		if (msg_status == YDB_ERR_SIMPLEAPINOTALLOWED)
+		if (YDB_ERR_SIMPLEAPINOTALLOWED == msg_status)
 		{
 			YDB_MALLOC_BUFFER(&ignored_buffer, YDB_MAX_ERRORMSG)
 			ydb_message_t(YDB_NOTTP, &ignored_buffer, status, error_string_buffer);
@@ -443,7 +445,7 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds)
 	CALL_WRAP_4(threaded, ydb_data_s, ydb_data_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, ret_value, status);
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
@@ -517,7 +519,7 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds)
 
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
@@ -568,7 +570,7 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds)
 	CALL_WRAP_2(threaded, ydb_delete_excl_s, ydb_delete_excl_st, tp_token, &error_string_buffer, namecount, varnames_ydb, status);
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		/* free allocated memory */
@@ -623,7 +625,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds)
 	CALL_WRAP_4(threaded, ydb_get_s, ydb_get_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_value, status);
 
 	/* check to see if length of string was longer than 1024 is so, try again with proper length */
-	if (status == YDB_ERR_INVSTRLEN)
+	if (YDB_ERR_INVSTRLEN == status)
 	{
 		return_length = ret_value.len_used;
 		YDB_MALLOC_BUFFER(&ret_value, return_length);
@@ -632,7 +634,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds)
 	}
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
@@ -707,7 +709,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds)
 	            &ret_value, status);
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
@@ -821,12 +823,12 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds)
 	}
 
 	/* check for errors */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, error_string_buffer);
 		return_NULL = true;
 		return NULL;
-	} else if (status==YDB_LOCK_TIMEOUT)
+	} else if (YDB_LOCK_TIMEOUT == status)
 	{
 		PyErr_SetString(YottaDBLockTimeout, "Not able to acquire all requested locks in the specified time.");
 		return_NULL = true;
@@ -881,7 +883,7 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds)
 	CALL_WRAP_3(threaded, ydb_lock_decr_s, ydb_lock_decr_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, status);
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
@@ -937,11 +939,11 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds)
 	            subs_used, subsarray_y, status);
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
-	} else if (status==YDB_LOCK_TIMEOUT)
+	} else if (YDB_LOCK_TIMEOUT == status)
 	{
 		PyErr_SetString(YottaDBLockTimeout, "Not able to acquire all requested locks in the specified time.");
 		return_NULL = true;
@@ -993,7 +995,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds)
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	max_subscript_string = 1024;
 	default_ret_subs_used = subs_used + 5;
-	if (default_ret_subs_used > YDB_MAX_SUBS)
+	if (YDB_MAX_SUBS < default_ret_subs_used)
 		default_ret_subs_used = YDB_MAX_SUBS;
 	real_ret_subs_used = default_ret_subs_used;
 	ret_subs_used = default_ret_subs_used;
@@ -1004,7 +1006,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds)
 	            &ret_subs_used, ret_subsarray, status);
 
 	/* If not enough buffers in ret_subsarray */
-	if (status == YDB_ERR_INSUFFSUBS)
+	if (YDB_ERR_INSUFFSUBS == status)
 	{
 		free_buffer_array(ret_subsarray, default_ret_subs_used);
 		real_ret_subs_used = ret_subs_used;
@@ -1015,7 +1017,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds)
 	}
 
 	/* if a buffer is not long enough */
-	while(status == YDB_ERR_INVSTRLEN)
+	while(YDB_ERR_INVSTRLEN == status)
 	{
 		max_subscript_string = ret_subsarray[ret_subs_used].len_used;
 		free(ret_subsarray[ret_subs_used].buf_addr);
@@ -1029,7 +1031,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds)
 	}
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
@@ -1086,7 +1088,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds)
 
 	max_subscript_string = 1024;
 	default_ret_subs_used = subs_used - 1;
-	if (default_ret_subs_used <= 0)
+	if (0 >= default_ret_subs_used)
 		default_ret_subs_used = 1;
 	real_ret_subs_used = default_ret_subs_used;
 	ret_subs_used = default_ret_subs_used;
@@ -1097,7 +1099,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds)
 	            &ret_subs_used, ret_subsarray, status);
 
 	/* if a buffer is not long enough */
-	while(status == YDB_ERR_INVSTRLEN)
+	while(YDB_ERR_INVSTRLEN == status)
 	{
 		max_subscript_string = ret_subsarray[ret_subs_used].len_used;
 		free(ret_subsarray[ret_subs_used].buf_addr);
@@ -1110,7 +1112,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds)
 		            subs_used, subsarray_y, &ret_subs_used, ret_subsarray, status);
 	}
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
@@ -1181,7 +1183,7 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds)
 	            status);
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
@@ -1228,7 +1230,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds)
 
 
 	/* recall with properly sized buffer if zwr_buf is not long enough */
-	if (status == YDB_ERR_INVSTRLEN)
+	if (YDB_ERR_INVSTRLEN == status)
 	{
 		return_length = zwr_buf.len_used;
 		YDB_FREE_BUFFER(&zwr_buf);
@@ -1238,7 +1240,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds)
 	}
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buf);
 		return_NULL = true;
@@ -1297,7 +1299,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds)
 	            &ret_value, status);
 
 	/* check to see if length of string was longer than 1024 is so, try again with proper length */
-	if (status == YDB_ERR_INVSTRLEN)
+	if (YDB_ERR_INVSTRLEN == status)
 	{
 		return_length = ret_value.len_used;
 		YDB_FREE_BUFFER(&ret_value);
@@ -1307,7 +1309,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds)
 		            subs_used, subsarray_y, &ret_value, status);
 	}
 	/* check status for Errors and Raise Exception */
-	if (status<0) {
+	if (0 > status) {
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
 	}
@@ -1368,7 +1370,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 	            subs_used, subsarray_y, &ret_value, status);
 
 	/* check to see if length of string was longer than 1024 is so, try again with proper length */
-	if (status == YDB_ERR_INVSTRLEN)
+	if (YDB_ERR_INVSTRLEN == status)
 	{
 		return_length = ret_value.len_used;
 		YDB_FREE_BUFFER(&ret_value);
@@ -1378,7 +1380,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 	}
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
@@ -1425,7 +1427,7 @@ static int callback_wrapper_st(uint64_t tp_token, ydb_buffer_t*errstr, void *fun
 	Py_DECREF(tp_token_py);
 
 	return_value = PyObject_Call(function, args, kwargs);
-	if (return_value == NULL) {
+	if (NULL == return_value) {
 		/* function raised an exception */
 		return -2; /* MAGIC NUMBER flag to raise exception at the next level up */
 	}
@@ -1447,7 +1449,7 @@ static int callback_wrapper_s(void *function_with_arguments)
 	args = PyTuple_GetItem(function_with_arguments, 1);
 	kwargs = PyTuple_GetItem(function_with_arguments, 2);
 	return_value = PyObject_Call(function, args, kwargs);
-	if (return_value == NULL)
+	if (NULL == return_value)
 	{	/* function raised an exception */
 		return -2; /* MAGIC NUMBER flag to raise exception at the next level up */
 	}
@@ -1517,11 +1519,11 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds)
 		status = ydb_tp_s(callback_wrapper_s, function_with_arguments, transid, namecount, varname_buffers);
 
 	/* check status for Errors and Raise Exception */
-	if (status==-2) {/* MAGIC VALUE to indicate that the callback
+	if (-2 == status) {/* MAGIC VALUE to indicate that the callback
 					 * function raised an exception and should be raised
 					 */
 		return_NULL = true;
-	} else if (status<0)
+	} else if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buffer);
 		return_NULL = true;
@@ -1565,7 +1567,7 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds)
 	CALL_WRAP_2(threaded, ydb_zwr2str_s, ydb_zwr2str_st, tp_token, &error_string_buf, &zwr_buf, &str_buf, status);
 
 	/* recall with properly sized buffer if zwr_buf is not long enough */
-	if (status == YDB_ERR_INVSTRLEN)
+	if (YDB_ERR_INVSTRLEN == status)
 	{
 		return_length = str_buf.len_used;
 		YDB_FREE_BUFFER(&str_buf);
@@ -1575,13 +1577,13 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds)
 	}
 
 	/* check status for Errors and Raise Exception */
-	if (status<0)
+	if (0 > status)
 	{
 		raise_YottaDBError(status, &error_string_buf);
 		return_NULL = true;
 	}
 
-	if (! return_NULL)
+	if (!return_NULL)
 		return_value =  Py_BuildValue("y#", str_buf.buf_addr, str_buf.len_used);
 
 	YDB_FREE_BUFFER(&error_string_buf);
@@ -1676,7 +1678,7 @@ static struct PyModuleDef _yottadbmodule = {
 PyMODINIT_FUNC PyInit__yottadb(void)
 {
 	PyObject *module = PyModule_Create(&_yottadbmodule);
-	if (module == NULL)
+	if (NULL == module)
 		return NULL;
 
     /* Defining Module 'Constants' */
@@ -1721,7 +1723,7 @@ PyMODINIT_FUNC PyInit__yottadb(void)
 	/* Excetpions */
 	/* setting up YottaDBError */
 	PyObject* exc_dict = make_getter_code();
-	if (exc_dict == NULL)
+	if (NULL == exc_dict)
 		return NULL;
 	
 	YottaDBError = PyErr_NewException("_yottadb.YottaDBError",

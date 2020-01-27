@@ -54,7 +54,7 @@ typedef struct
 {																						\
 	SUBSUSED = 0;																		\
 	SUBSARRAY_YDB = NULL;																\
-	if (SUBSARRAY_PY != Py_None)														\
+	if (Py_None != SUBSARRAY_PY)														\
 	{																					\
 		SUBSUSED = PySequence_Length(SUBSARRAY_PY);										\
 		SUBSARRAY_YDB = convert_py_bytes_sequence_to_ydb_buffer_array(SUBSARRAY_PY);	\
