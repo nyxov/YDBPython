@@ -225,7 +225,6 @@ static void free_YDBKey(YDBKey* key) {
     YDB_FREE_BUFFER((key->varname));
     for (i=0; i<key->subs_used; i++)
         YDB_FREE_BUFFER(&((ydb_buffer_t*)key->subsarray)[i]);
-    free(key);
 }
 
 /* Routine to validate a sequence of Python sequences representing keys. (Used only by lock().)
@@ -327,6 +326,7 @@ static void free_YDBKey_array(YDBKey* keysarray, int len) {
     int i;
     for(i = 0; i < len; i++)
         free_YDBKey(&keysarray[i]);
+    free(keysarray);
 }
 
 /* Routine to help raise a YottaDBError. The caller still needs to return NULL for the Exception to be raised.
