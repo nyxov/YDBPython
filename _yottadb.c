@@ -144,18 +144,18 @@ static bool validate_subsarray_object(PyObject *subsarray) {
  */
 ydb_buffer_t* convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence) {
     bool done;
-    int num, len;
+    int sequence_len, bytes_len;
     char *bytes_c;
     PyObject *bytes;
     ydb_buffer_t *return_buffer_array;
 
-    num = PySequence_Length(sequence);
-    return_buffer_array = (ydb_buffer_t*)malloc((num) * sizeof(ydb_buffer_t));
-    for(int i = 0; i < num; i++) {
+    sequence_len = PySequence_Length(sequence);
+    return_buffer_array = (ydb_buffer_t*)malloc((sequence_len) * sizeof(ydb_buffer_t));
+    for(int i = 0; i < sequence_len; i++) {
         bytes = PySequence_GetItem(sequence, i);
-        len = PyBytes_Size(bytes);
+        bytes_len = PyBytes_Size(bytes);
         bytes_c = PyBytes_AsString(bytes);
-        YDB_MALLOC_BUFFER(&return_buffer_array[i], len);
+        YDB_MALLOC_BUFFER(&return_buffer_array[i], bytes_len);
         YDB_COPY_STRING_TO_BUFFER(bytes_c, &return_buffer_array[i], done);
         // figure out how to handle error case (done == false)
 
@@ -225,6 +225,7 @@ static void free_YDBKey(YDBKey* key) {
     YDB_FREE_BUFFER((key->varname));
     for (i=0; i<key->subs_used; i++)
         YDB_FREE_BUFFER(&((ydb_buffer_t*)key->subsarray)[i]);
+    free(key);
 }
 
 /* Routine to validate a sequence of Python sequences representing keys. (Used only by lock().)
