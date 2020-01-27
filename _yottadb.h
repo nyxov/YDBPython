@@ -1,6 +1,5 @@
 /* A structure that represents a key using ydb c types. used internally for converting between python and ydb c types */
-typedef struct
-{
+typedef struct {
 	ydb_buffer_t *varname;
 	int subs_used;
 	ydb_buffer_t *subsarray;
@@ -18,44 +17,38 @@ typedef struct
  *		ONE - FIVE	-	the ordered arguments that the simple and simple threaded api's share
  *		RETSTATUS	-	the variable that the return status will be assigned to
  */
-#define CALL_WRAP_2(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF,  ONE, TWO, RETSTATUS) 								\
-{																											\
-	if ((THREADED))																			\
+#define CALL_WRAP_2(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF,  ONE, TWO, RETSTATUS) {						\
+	if ((THREADED))			                																\
 		(RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO));											\
-	else																				\
+	else									                    											\
 		(RETSTATUS) = (SFUNC)((ONE), (TWO));																\
 }
 
-#define CALL_WRAP_3(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, RETSTATUS) 						\
-{																											\
-	if (THREADED)																			\
+#define CALL_WRAP_3(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, RETSTATUS) {					\
+	if (THREADED)																			                \
 		(RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO), (THREE));									\
 	else                                                                                                    \
 		(RETSTATUS) = (SFUNC)((ONE), (TWO), (THREE));														\
 }
 
-#define CALL_WRAP_4(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, FOUR, RETSTATUS) 					\
-{																											\
-	if (THREADED)																			\
+#define CALL_WRAP_4(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, FOUR, RETSTATUS) {			\
+	if (THREADED)																			                \
 		(RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO), (THREE), (FOUR));							\
 	else                                                                                                    \
 		(RETSTATUS) = (SFUNC)((ONE), (TWO), (THREE), (FOUR));												\
 }
 
-#define CALL_WRAP_5(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, FOUR, FIVE,  RETSTATUS) 			\
-{																											\
-	if (THREADED)																			\
+#define CALL_WRAP_5(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, FOUR, FIVE,  RETSTATUS) {    \
+	if (THREADED)																			                \
 		(RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO), (THREE), (FOUR), (FIVE));					\
 	else                                                                                                    \
 		(RETSTATUS) = (SFUNC)((ONE), (TWO), (THREE), (FOUR), (FIVE));										\
 }
 
-#define SETUP_SUBS(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB)								\
-{																						\
+#define SETUP_SUBS(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB) {								\
 	SUBSUSED = 0;																		\
 	SUBSARRAY_YDB = NULL;																\
-	if (Py_None != SUBSARRAY_PY)														\
-	{																					\
+	if (Py_None != SUBSARRAY_PY) {														\
 		SUBSUSED = PySequence_Length(SUBSARRAY_PY);										\
 		SUBSARRAY_YDB = convert_py_bytes_sequence_to_ydb_buffer_array(SUBSARRAY_PY);	\
 	}																					\
