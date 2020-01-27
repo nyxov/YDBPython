@@ -240,7 +240,7 @@ static void free_YDBKey(YDBKey* key) {
  *    keys_sequence        - a Python object that is to be validated.
  */
 static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence) {
-    int i, keys_len;
+    int i, len_keys;
     PyObject *key, *varname, *subsarray;
 
     if (!PySequence_Check(keys_sequence)) {
@@ -248,8 +248,8 @@ static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence) {
                         "the first being a bytes object(varname) and the following being a sequence of bytes objects(subsarray)");
         return false;
     }
-    keys_len = PySequence_Length(keys_sequence);
-    for (i=0; i < keys_len; i++) {
+    len_keys = PySequence_Length(keys_sequence);
+    for (i=0; i < len_keys; i++) {
         key = PySequence_GetItem(keys_sequence, i);
         if (!PySequence_Check(key)) {
             PyErr_Format(PyExc_TypeError, "item %d in 'keys' sequence is not a sequence", i);
@@ -297,12 +297,12 @@ static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence) {
  */
 static YDBKey* convert_key_sequence_to_YDBKey_array(PyObject* sequence) {
     //TODO: change to use fast sequence
-    int i, keys_len;
+    int i, len_keys;
     PyObject *key, *varname, *subsarray;
     YDBKey *ret_keys;
-    keys_len = PySequence_Length(sequence);
-    ret_keys = (YDBKey*)malloc(keys_len * sizeof(YDBKey));
-    for (i=0; i< keys_len; i++) {
+    len_keys = PySequence_Length(sequence);
+    ret_keys = (YDBKey*)malloc(len_keys * sizeof(YDBKey));
+    for (i=0; i< len_keys; i++) {
         key = PySequence_GetItem(sequence, i);
         varname = PySequence_GetItem(key, 0);
         subsarray = Py_None;
@@ -678,7 +678,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
 static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
     bool threaded;
     bool return_NULL = false;
-    int keys_len, initial_arguments, number_of_arguments;
+    int len_keys, initial_arguments, number_of_arguments;
     uint64_t tp_token;
     unsigned long long timeout_nsec;
     ffi_cif call_interface;
@@ -700,7 +700,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
 
     if (!validate_py_keys_sequence_bytes(keys))
         return NULL;
-    keys_len = PySequence_Length(keys);
+    len_keys = PySequence_Length(keys);
 
     /* Setup for Call */
     error_string_buffer = (ydb_buffer_t*)calloc(1, sizeof(ydb_buffer_t));
@@ -715,7 +715,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
     else if (!threaded)
         initial_arguments = 2;
 
-    number_of_arguments = initial_arguments + (keys_len * 3);
+    number_of_arguments = initial_arguments + (len_keys * 3);
     ffi_type *arg_types[number_of_arguments];
     void *arg_values[number_of_arguments];
     /* ffi signature */
@@ -727,15 +727,15 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
         arg_types[2] = &ffi_type_uint64; // timout_nsec
         arg_values[2] = &timeout_nsec; // timout_nsec
         arg_types[3] = &ffi_type_sint; // namecount
-        arg_values[3] = &keys_len; // namecount
+        arg_values[3] = &len_keys; // namecount
     } else if (!threaded) {
         arg_types[0] = &ffi_type_uint64; // timout_nsec
         arg_values[0] = &timeout_nsec; // timout_nsec
         arg_types[1] = &ffi_type_sint; // namecount
-        arg_values[1] = &keys_len; // namecount
+        arg_values[1] = &len_keys; // namecount
     }
 
-    for (int i = 0; i < keys_len; i++) {
+    for (int i = 0; i < len_keys; i++) {
         int first = initial_arguments + 3*i;
         arg_types[first] = &ffi_type_pointer;// varname
         arg_values[first] = &keys_ydb[i].varname; // varname
@@ -770,7 +770,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
     /* free allocated memory */
     YDB_FREE_BUFFER(error_string_buffer);
     free(error_string_buffer);
-    free_YDBKey_array(keys_ydb, keys_len);
+    free_YDBKey_array(keys_ydb, len_keys);
 
     if (return_NULL)
         return NULL;
