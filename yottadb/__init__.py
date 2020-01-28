@@ -19,10 +19,10 @@ from _yottadb import YottaDBError
 from _yottadb import YottaDBLockTimeout
 
 from _yottadb import YDB_NOTTP as NOTTP
-from _yottadb import YDB_ERR_NODEEND as NODEEND
+from _yottadb.errors import YDB_ERR_NODEEND as NODEEND
 
-from _yottadb import YDB_ERR_GVUNDEF as GLOBAL_VAR_UNDEF
-from _yottadb import YDB_ERR_LVUNDEF as LOCAL_VAR_UNDEF
+from _yottadb.errors import YDB_ERR_GVUNDEF as GLOBAL_VAR_UNDEF
+from _yottadb.errors import YDB_ERR_LVUNDEF as LOCAL_VAR_UNDEF
 
 from _yottadb import YDB_DEL_NODE as DEL_NODE
 from _yottadb import YDB_DEL_TREE as DEL_TREE

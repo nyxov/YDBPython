@@ -13,16 +13,34 @@
 #################################################################
 from setuptools import setup, Extension, find_packages
 import os
+import pathlib
 
 YDB_DIST = os.environ['ydb_dist']
+ERROR_DEF_FILES = ['libydberrors.h',  'libydberrors2.h']
+
+
+def create_error_code_module():
+    YDB_Dir = pathlib.Path(YDB_DIST)
+    py_error_file = pathlib.Path('.') / "_yottadb" / "errors.py"
+    with py_error_file.open('w') as py_file:
+        for filename in ERROR_DEF_FILES:
+            file_path = YDB_Dir / filename
+            with file_path.open() as file:
+                for line in file.readlines():
+                    if line[0:7] == "#define":
+                        parts = line.split()
+                        py_file.write(f'{parts[1]} = {parts[2]}\n')
+
+
+create_error_code_module()
 
 setup(name = 'yottadb',
       version = '0.0.1',
-      ext_modules = [Extension("_yottadb", sources = ['_yottadb.c'],
+      ext_modules = [Extension("_yottadb_wrapper", sources = ['_yottadb.c'],
                                include_dirs=[YDB_DIST], library_dirs=[YDB_DIST],
                                extra_link_args= ["-l", "yottadb", "-l", "ffi"])],
-      py_modules = ['yottadb'],
-      packages=find_packages(include=['yottadb', 'yottadb.*']),
+      py_modules = ['_yottadb', 'yottadb'],
+      packages=find_packages(include=['_yottadb', '_yottadb.*', 'yottadb', 'yottadb.*']),
       package_data={'': ['_yottadb.pyi']},
       include_package_data=True,
       setup_requires=['pytest-runner'],

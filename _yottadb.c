@@ -1570,7 +1570,7 @@ static struct PyModuleDef _yottadbmodule = {
     methods
 };
 
-PyMODINIT_FUNC PyInit__yottadb(void) {
+PyMODINIT_FUNC PyInit__yottadb_wrapper(void) {
     PyObject *module = PyModule_Create(&_yottadbmodule);
     if (NULL == module)
         return NULL;
@@ -1605,12 +1605,6 @@ PyMODINIT_FUNC PyInit__yottadb(void) {
     PyDict_SetItemString(module_dictionary, "YDB_NOTOK", Py_BuildValue("i", YDB_NOTOK));
     PyDict_SetItemString(module_dictionary, "YDB_LOCK_TIMEOUT", Py_BuildValue("i", YDB_LOCK_TIMEOUT));
     PyDict_SetItemString(module_dictionary, "YDB_NOTTP", Py_BuildValue("i", YDB_NOTTP));
-
-    //Error Codes
-    PyDict_SetItemString(module_dictionary, "YDB_ERR_GVUNDEF", Py_BuildValue("i", YDB_ERR_GVUNDEF));
-    PyDict_SetItemString(module_dictionary, "YDB_ERR_LVUNDEF", Py_BuildValue("i", YDB_ERR_LVUNDEF));
-    PyDict_SetItemString(module_dictionary, "YDB_ERR_NODEEND", Py_BuildValue("i", YDB_ERR_NODEEND));
-    PyDict_SetItemString(module_dictionary, "YDB_ERR_NUMOFLOW", Py_BuildValue("i", YDB_ERR_NUMOFLOW));
 
 
 

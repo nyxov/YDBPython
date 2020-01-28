@@ -296,21 +296,21 @@ def test_subscript_next_1(ydb, simple_data):
     assert ydb.api.subscript_next(varname=b'^test3') == b'^test4'
     with pytest.raises(_yottadb.YottaDBError) as e:
         ydb.api.subscript_next(varname=b'^test6')
-        assert e.code == _yottadb.YDB_ERR_NODEEND
+        assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
     assert ydb.api.subscript_next(varname=b'^test4', subsarray=(b'',)) == b'sub1'
     assert ydb.api.subscript_next(varname=b'^test4', subsarray=(b'sub1',)) == b'sub2'
     assert ydb.api.subscript_next(varname=b'^test4', subsarray=(b'sub2',)) == b'sub3'
     with pytest.raises(_yottadb.YottaDBError) as e:
         ydb.api.subscript_next(varname=b'^test4', subsarray=(b'sub3',))
-        assert e.code == _yottadb.YDB_ERR_NODEEND
+        assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
     assert ydb.api.subscript_next(varname=b'^test4', subsarray=(b'sub1', b'')) == b'subsub1'
     assert ydb.api.subscript_next(varname=b'^test4', subsarray=(b'sub1',b'subsub1')) == b'subsub2'
     assert ydb.api.subscript_next(varname=b'^test4', subsarray=(b'sub1', b'subsub2')) == b'subsub3'
     with pytest.raises(_yottadb.YottaDBError) as e:
         ydb.api.subscript_next(varname=b'^test4', subsarray=(b'sub3', b'subsub3'))
-        assert e.code == _yottadb.YDB_ERR_NODEEND
+        assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
 def test_subscript_next_long(ydb):
     ydb.api.set(varname=b'testLongSubscript', subsarray=(b'a'*_yottadb.YDB_MAX_STR,), value=b'toolong')
@@ -329,21 +329,21 @@ def test_subscript_previous_1(ydb, simple_data):
     assert ydb.api.subscript_previous(varname=b'^test4') == b'^test3'
     with pytest.raises(_yottadb.YottaDBError) as e:
         ydb.api.subscript_previous(varname=b'^Test5')
-        assert e.code == _yottadb.YDB_ERR_NODEEND
+        assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
     assert ydb.api.subscript_previous(varname=b'^test4', subsarray=(b'',)) == b'sub3'
     assert ydb.api.subscript_previous(varname=b'^test4', subsarray=(b'sub2',)) == b'sub1'
     assert ydb.api.subscript_previous(varname=b'^test4', subsarray=(b'sub3',)) == b'sub2'
     with pytest.raises(_yottadb.YottaDBError) as e:
         ydb.api.subscript_previous(varname=b'^test4', subsarray=(b'sub1',))
-        assert e.code == _yottadb.YDB_ERR_NODEEND
+        assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
     assert ydb.api.subscript_previous(varname=b'^test4', subsarray=(b'sub1', b'')) == b'subsub3'
     assert ydb.api.subscript_previous(varname=b'^test4', subsarray=(b'sub1', b'subsub2')) == b'subsub1'
     assert ydb.api.subscript_previous(varname=b'^test4', subsarray=(b'sub1', b'subsub3')) == b'subsub2'
     with pytest.raises(_yottadb.YottaDBError) as e:
         ydb.api.subscript_previous(varname=b'^test4', subsarray=(b'sub3', b'subsub1'))
-        assert e.code == _yottadb.YDB_ERR_NODEEND
+        assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
 def test_subscript_previous_long(ydb):
     ydb.api.set(varname=b'testLongSubscript', subsarray=(b'a'*_yottadb.YDB_MAX_STR,), value=b'toolong')
@@ -354,7 +354,7 @@ def test_node_next_1(ydb, simple_data):
     assert ydb.api.node_next(b'^test3', subsarray=(b'sub1',)) == (b'sub1', b'sub2')
     with pytest.raises(_yottadb.YottaDBError) as e:
         ydb.api.node_next(varname=b'^test3', subsarray=(b'sub1', b'sub2'))
-        assert e.code == _yottadb.YDB_ERR_NODEEND
+        assert e.code == _yottadb.errors.YDB_ERR_NODEEND
     assert ydb.api.node_next(b'^test6') == (b'sub6', b'subsub6')
 
 def test_node_next_many_subscipts(ydb):
@@ -369,7 +369,7 @@ def test_node_next_long_subscripts(ydb):
 def test_node_previous_1(ydb, simple_data):
     with pytest.raises(_yottadb.YottaDBError) as e:
         ydb.api.node_previous(b'^test3')
-        assert e.code == _yottadb.YDB_ERR_NODEEND
+        assert e.code == _yottadb.errors.YDB_ERR_NODEEND
     assert ydb.api.node_previous(b'^test3', (b'sub1',)) == ()
     assert ydb.api.node_previous(b'^test3', subsarray=(b'sub1',b'sub2')) == (b'sub1',)
 
@@ -410,7 +410,7 @@ def test_lock_max_names(ydb):
     keys.append([b'^JustOneMore'])
     with pytest.raises(_yottadb.YottaDBError) as e:
         ydb.api.lock(keys)
-        assert e.code == _yottadb.YDB_ERR_NAMECOUNT2HI
+        assert e.code == _yottadb.errors.YDB_ERR_NAMECOUNT2HI
 
 
 def test_delete_excel(ydb):
@@ -420,11 +420,11 @@ def test_delete_excel(ydb):
     ydb.api.delete_excel(varnames=(b'testdeleteexcelexception',))
     with pytest.raises(_yottadb.YottaDBError) as e:
         ydb.api.get(b'testdeleteexcel1')
-        assert e.code == _yottadb.YDB_ERR_LVUNDEF
+        assert e.code == _yottadb.errors.YDB_ERR_LVUNDEF
     with pytest.raises(_yottadb.YottaDBError) as e:
         print("trying to get 2")
         ydb.api.get(b'testdeleteexcel2', (b'sub1',))
-        assert e.code == _yottadb.YDB_ERR_LVUNDEF
+        assert e.code == _yottadb.errors.YDB_ERR_LVUNDEF
     assert ydb.api.get(b'testdeleteexcelexception', (b'sub1',)) == b"3"
 
 
@@ -531,9 +531,9 @@ def test_incr(ydb, key, initial, increment, result):
     ydb.api.delete(*key, _yottadb.YDB_DEL_TREE)
 
 incerement_error_test = [
-    (b"0", "1E47", _yottadb.YDB_ERR_NUMOFLOW),
-    (b"0", "-1E47", _yottadb.YDB_ERR_NUMOFLOW),
-    #("0", "1E-47", _yottadb.YDB_ERR_NUMOFLOW),
+    (b"0", "1E47", _yottadb.errors.YDB_ERR_NUMOFLOW),
+    (b"0", "-1E47", _yottadb.errors.YDB_ERR_NUMOFLOW),
+    #("0", "1E-47", _yottadb.errors.YDB_ERR_NUMOFLOW),
 ]
 increment_test_ids = [f'"{initial}" | "{type(increment).__name__}({increment})" | {error_number}' for initial, increment, error_number in incerement_error_test]
 @pytest.mark.parametrize('initial, increment, error_number', incerement_error_test, ids=increment_test_ids)
