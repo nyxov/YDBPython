@@ -15,6 +15,8 @@ from typing import Optional, List, Union, Generator, Sequence, NamedTuple, cast,
 import enum
 from builtins import property
 
+import _yottadb
+
 from _yottadb import YottaDBError
 from _yottadb import YottaDBLockTimeout
 
@@ -32,10 +34,6 @@ from _yottadb import YDB_DATA_HAS_VALUE_NO_TREE as DATA_HAS_VALUE_NO_TREE
 from _yottadb import YDB_DATA_HAS_VALUE_HAS_TREE as DATA_HAS_VALUE_HAS_TREE
 from _yottadb import YDB_DATA_NO_VALUE_HAS_TREE as DATA_NO_VALUE_HAS_TREE
 
-import yottadb.simple as simple
-import yottadb.simple_threaded as simple_threaded_api
-
-from yottadb.api import API, SimpleAPI, SimpleThreadedAPI
 
 Data = Union[bytes, str]
 
@@ -44,8 +42,6 @@ UTF8 = 'utf-8'
 DEFAULT_ENCODING = UTF8
 CONTEXT_ENCODING = 'CONTEXT'
 
-DEFAULT_API: API = SimpleAPI()
-_CURRENT_API: Optional[API] = None
 
 class SearchSpace(enum.Enum):
     LOCAL = enum.auto()
@@ -89,19 +85,13 @@ class Context:
     tp_token: int
     subs_encoding: str
     val_encoding: str
-    api: API
+    threaded: bool
 
-    def __init__(self, tp_token=NOTTP, subs_encoding=DEFAULT_ENCODING, val_encoding=DEFAULT_ENCODING, api:API=DEFAULT_API):
+    def __init__(self, tp_token=NOTTP, subs_encoding=DEFAULT_ENCODING, val_encoding=DEFAULT_ENCODING, threaded:bool = False):
         self.tp_token = tp_token
         self.subs_encoding = subs_encoding
         self.val_encoding = val_encoding
-
-        global _CURRENT_API
-        if _CURRENT_API is not None:
-            self.api = _CURRENT_API
-        elif issubclass(type(api), API) and api is not API:
-            self.api = api
-            _CURRENT_API = api
+        self.threaded = threaded
 
     def __getitem__(self, item:Data) -> 'Key':
         return Key(name=item, context=self)
@@ -119,19 +109,19 @@ class Context:
 
     def data(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> int:
         varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
-        return self.api.data(varname, subsarray, self.tp_token)
+        return _yottadb.data(self.threaded, varname, subsarray, self.tp_token)
 
     def delete_node(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> None:
         varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
-        self.api.delete(varname, subsarray, DEL_NODE, self.tp_token)
+        _yottadb.delete(self.threaded, varname, subsarray, DEL_NODE, self.tp_token)
 
     def delete_tree(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> None:
         varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
-        self.api.delete(varname, subsarray, DEL_TREE, self.tp_token)
+        _yottadb.delete(self.threaded, varname, subsarray, DEL_TREE, self.tp_token)
 
     def get(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING, val_encoding:Optional[str]=CONTEXT_ENCODING) -> Optional[Data]:
         varname, subsarray, subs_encoding, val_encoding = self._setup(varname, subsarray, subs_encoding, val_encoding)
-        val = self.api.get(varname, subsarray, self.tp_token)
+        val = _yottadb.get(self.threaded, varname, subsarray, self.tp_token)
         if val_encoding == None:
             return val
         else:
@@ -148,12 +138,12 @@ class Context:
         varname, subsarray, subs_encoding, val_encoding = self._setup(varname, subsarray, subs_encoding, val_encoding)
         if val_encoding is not None and isinstance(value, str):
             value = bytes(value, encoding=val_encoding)
-        self.api.set(varname, subsarray, value, self.tp_token)
+        _yottadb.set(self.threaded, varname, subsarray, value, self.tp_token)
 
 
     def subscript_next(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> Data:
         varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
-        sub = self.api.subscript_next(varname, subsarray, self.tp_token)
+        sub = _yottadb.subscript_next(self.threaded, varname, subsarray, self.tp_token)
         if subs_encoding == None:
             return sub
         else:

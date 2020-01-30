@@ -460,6 +460,12 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
     if (!validate_subsarray_object(subsarray))
         return NULL;
 
+    if ((deltype != YDB_DEL_NODE) && (deltype != YDB_DEL_TREE)) {
+        // 'deltype' is being set to something other than the default by 'PyArg_ParseTupleAndKeywords' when 'delete_type' argument
+        // is not used. This seems like a bug.
+        deltype = YDB_DEL_NODE;
+    }
+
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
@@ -1608,7 +1614,7 @@ PyMODINIT_FUNC PyInit__yottadb_wrapper(void) {
 
 
 
-    /* Excetpions */
+    /* Exceptions */
     /* setting up YottaDBError */
     PyObject* exc_dict = make_getter_code();
     if (NULL == exc_dict)

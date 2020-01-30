@@ -15,7 +15,6 @@ import pytest # type: ignore
 
 
 import yottadb
-from yottadb import api as api
 
 
 def test_key_smoke_test1(ydb, simple_data):

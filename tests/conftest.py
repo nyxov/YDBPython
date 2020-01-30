@@ -23,19 +23,7 @@ TEST_GLD = TEST_DATA_DIRECTORY + 'test_db.gld'
 TEST_DAT = TEST_DATA_DIRECTORY + 'test_db.dat'
 
 import yottadb
-from yottadb import api as api
 from yottadb import KeyTuple
-
-
-API: api.API
-try:
-    if os.environ['test_ydb_api'] == "SIMPLE":
-        API = api.SimpleAPI()
-    elif os.environ['test_ydb_api'] == "SIMPLE_THREADED":
-        API = api.SimpleThreadedAPI()
-except KeyError as e:
-    raise KeyError('test_ydb_api envionment valiable must be set to either "SIMPLE" OR "SIMPLE THREADED".')
-
 
 
 
@@ -43,9 +31,20 @@ def execute(command: str, stdin: str = "") -> str:
     process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr= subprocess.PIPE)
     return process.communicate(stdin.encode())[0].decode().strip()
 
+@pytest.fixture(scope="session")
+def threaded():
+    try:
+        if os.environ['test_ydb_api'] == "SIMPLE":
+            yield False
+        elif os.environ['test_ydb_api'] == "SIMPLE_THREADED":
+            yield True
+    except KeyError as e:
+        raise KeyError('test_ydb_api envionment valiable must be set to either "SIMPLE" OR "SIMPLE THREADED".')
+
+
 
 @pytest.fixture(scope="session")
-def ydb():
+def ydb(threaded):
     #setup
 
     # for some strange reason ydb will not want to run with
@@ -64,8 +63,11 @@ def ydb():
     execute(f'{YDB_INSTALL_DIR}/mupip create')
 
 
-    yield yottadb.Context(api=API)
-    print(f'\nTesting was done using using {API.__class__.__name__}')
+    yield yottadb.Context(threaded = threaded)
+    if threaded:
+        print(f'\nTesting was done using using simple threaded api')
+    else:
+        print(f'\nTesting was done using using simple api')
 
     #teardown
     execute(f'rm {TEST_GLD}')
