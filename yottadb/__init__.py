@@ -109,19 +109,19 @@ class Context:
 
     def data(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> int:
         varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
-        return _yottadb.data(self.threaded, varname, subsarray, self.tp_token)
+        return _yottadb.data(varname, subsarray, self.tp_token)
 
     def delete_node(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> None:
         varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
-        _yottadb.delete(self.threaded, varname, subsarray, DEL_NODE, self.tp_token)
+        _yottadb.delete(varname, subsarray, DEL_NODE, self.tp_token)
 
     def delete_tree(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> None:
         varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
-        _yottadb.delete(self.threaded, varname, subsarray, DEL_TREE, self.tp_token)
+        _yottadb.delete(varname, subsarray, DEL_TREE, self.tp_token)
 
     def get(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING, val_encoding:Optional[str]=CONTEXT_ENCODING) -> Optional[Data]:
         varname, subsarray, subs_encoding, val_encoding = self._setup(varname, subsarray, subs_encoding, val_encoding)
-        val = _yottadb.get(self.threaded, varname, subsarray, self.tp_token)
+        val = _yottadb.get(varname, subsarray, self.tp_token)
         if val_encoding == None:
             return val
         else:
@@ -138,12 +138,12 @@ class Context:
         varname, subsarray, subs_encoding, val_encoding = self._setup(varname, subsarray, subs_encoding, val_encoding)
         if val_encoding is not None and isinstance(value, str):
             value = bytes(value, encoding=val_encoding)
-        _yottadb.set(self.threaded, varname, subsarray, value, self.tp_token)
+        _yottadb.set(varname, subsarray, value, self.tp_token)
 
 
     def subscript_next(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> Data:
         varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
-        sub = _yottadb.subscript_next(self.threaded, varname, subsarray, self.tp_token)
+        sub = _yottadb.subscript_next(varname, subsarray, self.tp_token)
         if subs_encoding == None:
             return sub
         else:

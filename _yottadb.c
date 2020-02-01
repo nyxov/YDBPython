@@ -380,7 +380,7 @@ static void raise_YottaDBError(int status, ydb_buffer_t* error_string_buffer) {
 
 /* Wrapper for ydb_data_s and ydb_data_st. */
 static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
-    bool threaded, copy_success;
+    bool copy_success;
     bool return_NULL = false;
     char *varname;
     int varname_len, subs_used, status;
@@ -394,8 +394,8 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-    static char *kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
+    static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
         return NULL;
 
     if (!validate_subsarray_object(subsarray))
@@ -413,7 +413,7 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
     ret_value = (unsigned int*) malloc(sizeof(unsigned int));
 
     /* Call the wrapped function */
-    CALL_WRAP_4(threaded, ydb_data_s, ydb_data_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, ret_value, status);
+    status = ydb_data_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, ret_value);
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
@@ -439,7 +439,7 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
 
 /* Wrapper for ydb_delete_s() and ydb_delete_st() */
 static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded, copy_success;
+    bool copy_success;
     bool return_NULL = false;
     int deltype, status, varname_len, subs_used;
     char *varname;
@@ -453,8 +453,8 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
     deltype = YDB_DEL_NODE;
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded", "varname", "subsarray", "delete_type", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OiK", kwlist, &threaded, &varname, &varname_len, &subsarray, &deltype, &tp_token))
+    static char* kwlist[] = {"varname", "subsarray", "delete_type", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OiK", kwlist, &varname, &varname_len, &subsarray, &deltype, &tp_token))
         return NULL;
 
     if (!validate_subsarray_object(subsarray))
@@ -477,7 +477,7 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 
     /* Call the wrapped function */
-    CALL_WRAP_4(threaded, ydb_delete_s, ydb_delete_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, deltype, status);
+    status = ydb_delete_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, deltype);
 
 
     /* check status for Errors and Raise Exception */
@@ -498,7 +498,6 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
 
 /* Wrapper for ydb_delete_excl_s() and ydb_delete_excl_st() */
 static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded;
     bool return_NULL = false;
     int namecount, status;
     uint64_t tp_token;
@@ -510,8 +509,8 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded", "varnames", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "p|OK", kwlist, &threaded, &varnames, &tp_token))
+    static char* kwlist[] = {"varnames", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OK", kwlist, &varnames, &tp_token))
         return NULL;
 
     if((varnames != NULL) && (!validate_sequence_of_bytes(varnames))) {
@@ -526,7 +525,7 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
         namecount = PySequence_Length(varnames);
     ydb_buffer_t* varnames_ydb = convert_py_bytes_sequence_to_ydb_buffer_array(varnames);
 
-    CALL_WRAP_2(threaded, ydb_delete_excl_s, ydb_delete_excl_st, tp_token, &error_string_buffer, namecount, varnames_ydb, status);
+    status = ydb_delete_excl_st(tp_token, &error_string_buffer, namecount, varnames_ydb);
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
@@ -546,7 +545,7 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
 
 /* Wrapper for ydb_get_s() and ydb_get_st() */
 static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded, copy_success;
+    bool copy_success;
     bool return_NULL = false;
     int subs_used, status, return_length, varname_len;
     char *varname;
@@ -559,8 +558,8 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
+    static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
         return NULL;
 
     if (!validate_subsarray_object(subsarray))
@@ -578,14 +577,14 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&ret_value, 1024);
 
     /* Call the wrapped function */
-    CALL_WRAP_4(threaded, ydb_get_s, ydb_get_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_value, status);
+    status = ydb_get_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_value);
 
     /* check to see if length of string was longer than 1024 is so, try again with proper length */
     if (YDB_ERR_INVSTRLEN == status) {
         return_length = ret_value.len_used;
         YDB_MALLOC_BUFFER(&ret_value, return_length);
         /* Call the wrapped function */
-        CALL_WRAP_4(threaded, ydb_get_s, ydb_get_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_value, status);
+        status = ydb_get_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_value);
     }
 
     /* check status for Errors and Raise Exception */
@@ -611,7 +610,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
 
 /* Wrapper for ydb_incr_s() and ydb_incr_st() */
 static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded, copy_success;
+    bool copy_success;
     bool return_NULL = false;
     int status, subs_used, varname_len, increment_len;
     uint64_t tp_token;
@@ -626,8 +625,8 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
     increment_len = 1;
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded","varname", "subsarray", "increment", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|Oy#K", kwlist, &threaded, &varname, &varname_len, &subsarray,
+    static char* kwlist[] = {"varname", "subsarray", "increment", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|Oy#K", kwlist, &varname, &varname_len, &subsarray,
                                         &increment, &increment_len, &tp_token))
         return NULL;
 
@@ -654,8 +653,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&ret_value, 50);
 
     /* Call the wrapped function */
-    CALL_WRAP_5(threaded, ydb_incr_s, ydb_incr_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &increment_y,
-                &ret_value, status);
+    status = ydb_incr_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &increment_y, &ret_value);
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
@@ -682,7 +680,6 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
 
 /* Wrapper for ydb_lock_s() and ydb_lock_st() */
 static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded;
     bool return_NULL = false;
     int len_keys, initial_arguments, number_of_arguments;
     uint64_t tp_token;
@@ -700,8 +697,8 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
     keys = keys_default;
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded", "keys", "timeout_nsec", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "p|OKK", kwlist, &threaded, &keys, &timeout_nsec, &tp_token))
+    static char* kwlist[] = {"keys", "timeout_nsec", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OKK", kwlist, &keys, &timeout_nsec, &tp_token))
         return NULL;
 
     if (!validate_py_keys_sequence_bytes(keys))
@@ -716,30 +713,21 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* build ffi call */
     ret_type = &ffi_type_sint;
-    if (threaded)
-        initial_arguments = 4;
-    else if (!threaded)
-        initial_arguments = 2;
+    initial_arguments = 4;
 
     number_of_arguments = initial_arguments + (len_keys * 3);
     ffi_type *arg_types[number_of_arguments];
     void *arg_values[number_of_arguments];
     /* ffi signature */
-    if (threaded) {
-        arg_types[0] = &ffi_type_uint64; // tptoken
-        arg_values[0] = &tp_token; // tptoken
-        arg_types[1] = &ffi_type_pointer;// errstr
-        arg_values[1] = &error_string_buffer; // errstr
-        arg_types[2] = &ffi_type_uint64; // timout_nsec
-        arg_values[2] = &timeout_nsec; // timout_nsec
-        arg_types[3] = &ffi_type_sint; // namecount
-        arg_values[3] = &len_keys; // namecount
-    } else if (!threaded) {
-        arg_types[0] = &ffi_type_uint64; // timout_nsec
-        arg_values[0] = &timeout_nsec; // timout_nsec
-        arg_types[1] = &ffi_type_sint; // namecount
-        arg_values[1] = &len_keys; // namecount
-    }
+    arg_types[0] = &ffi_type_uint64; // tptoken
+    arg_values[0] = &tp_token; // tptoken
+    arg_types[1] = &ffi_type_pointer;// errstr
+    arg_values[1] = &error_string_buffer; // errstr
+    arg_types[2] = &ffi_type_uint64; // timout_nsec
+    arg_values[2] = &timeout_nsec; // timout_nsec
+    arg_types[3] = &ffi_type_sint; // namecount
+    arg_values[3] = &len_keys; // namecount
+
 
     for (int i = 0; i < len_keys; i++) {
         int first = initial_arguments + 3*i;
@@ -754,10 +742,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
     int status; // return value
     if (ffi_prep_cif(&call_interface, FFI_DEFAULT_ABI, number_of_arguments, ret_type, arg_types) == FFI_OK) {
         /* Call the wrapped function */
-        if (threaded)
-            ffi_call(&call_interface, FFI_FN(ydb_lock_st), &status, arg_values);
-        else if (!threaded)
-            ffi_call(&call_interface, FFI_FN(ydb_lock_s), &status, arg_values);
+        ffi_call(&call_interface, FFI_FN(ydb_lock_st), &status, arg_values);
     } else {
         PyErr_SetString(PyExc_SystemError, "ffi_prep_cif failed ");
         return_NULL = true;
@@ -786,7 +771,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
 
 /* Wrapper for ydb_lock_decr_s() and ydb_lock_decr_st() */
 static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded, copy_success;
+    bool copy_success;
     bool return_NULL = false;
     int status, varname_len, subs_used;
     char *varname;
@@ -799,8 +784,8 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
+    static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
         return NULL;
 
     if (!validate_subsarray_object(subsarray))
@@ -817,7 +802,7 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 
     /* Call the wrapped function */
-    CALL_WRAP_3(threaded, ydb_lock_decr_s, ydb_lock_decr_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, status);
+    status = ydb_lock_decr_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y);
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
@@ -838,7 +823,7 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
 
 /* Wrapper for ydb_lock_incr_s() and ydb_lock_incr_st() */
 static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded, copy_success;
+    bool copy_success;
     bool return_NULL = false;
     int status, varname_len, subs_used;
     char *varname;
@@ -853,8 +838,8 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded", "varname", "subsarray","timeout_nsec",  "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OLK", kwlist, &threaded, &varname, &varname_len, &subsarray, &timeout_nsec, &tp_token))
+    static char* kwlist[] = {"varname", "subsarray","timeout_nsec",  "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OLK", kwlist, &varname, &varname_len, &subsarray, &timeout_nsec, &tp_token))
         return NULL;
 
     if (!validate_subsarray_object(subsarray))
@@ -869,8 +854,7 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
     /* Call the wrapped function */
-    CALL_WRAP_4(threaded, ydb_lock_incr_s, ydb_lock_incr_st, tp_token, &error_string_buffer, timeout_nsec, &varname_y,
-                subs_used, subsarray_y, status);
+    status = ydb_lock_incr_st(tp_token, &error_string_buffer, timeout_nsec, &varname_y, subs_used, subsarray_y);
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
@@ -894,7 +878,7 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
 
 /* Wrapper for ydb_node_next_s() and ydb_node_next_st() */
 static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded, copy_success;
+    bool copy_success;
     bool return_NULL = false;
     int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, varname_len, subs_used;
     char *varname;
@@ -907,8 +891,8 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
+    static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
         return NULL;
 
     if (!validate_subsarray_object(subsarray))
@@ -932,8 +916,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
     ret_subsarray = empty_buffer_array(ret_subs_used, max_subscript_string);
 
     /* Call the wrapped function */
-    CALL_WRAP_5(threaded, ydb_node_next_s, ydb_node_next_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y,
-                &ret_subs_used, ret_subsarray, status);
+    status = ydb_node_next_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_subs_used, ret_subsarray);
 
     /* If not enough buffers in ret_subsarray */
     if (YDB_ERR_INSUFFSUBS == status) {
@@ -941,8 +924,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
         real_ret_subs_used = ret_subs_used;
         ret_subsarray = empty_buffer_array(real_ret_subs_used, max_subscript_string);
         /* recall the wrapped function */
-        CALL_WRAP_5(threaded, ydb_node_next_s, ydb_node_next_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y,
-                    &ret_subs_used, ret_subsarray, status);
+        status = ydb_node_next_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_subs_used, ret_subsarray);
     }
 
     /* if a buffer is not long enough */
@@ -954,8 +936,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
         ret_subsarray[ret_subs_used].len_used = 0;
         ret_subs_used = real_ret_subs_used;
         /* recall the wrapped function */
-        CALL_WRAP_5(threaded, ydb_node_next_s, ydb_node_next_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y,
-                    &ret_subs_used, ret_subsarray, status);
+        status = ydb_node_next_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_subs_used, ret_subsarray);
     }
 
     /* check status for Errors and Raise Exception */
@@ -980,7 +961,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
 
 /* Wrapper for ydb_node_previous_s() and ydb_node_previous_st() */
 static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded, copy_success;
+    bool copy_success;
     bool return_NULL = false;
     int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, varname_len, subs_used;
     char *varname;
@@ -994,8 +975,8 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
+    static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
         return NULL;
 
     if (!validate_subsarray_object(subsarray))
@@ -1020,8 +1001,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
     ret_subsarray = empty_buffer_array(ret_subs_used, max_subscript_string);
 
     /* Call the wrapped function */
-    CALL_WRAP_5(threaded, ydb_node_previous_s, ydb_node_previous_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y,
-                &ret_subs_used, ret_subsarray, status);
+    status = ydb_node_previous_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_subs_used, ret_subsarray);
 
     /* if a buffer is not long enough */
     while(YDB_ERR_INVSTRLEN == status) {
@@ -1032,8 +1012,8 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
         ret_subsarray[ret_subs_used].len_used = 0;
         ret_subs_used = real_ret_subs_used;
         /* recall the wrapped function */
-        CALL_WRAP_5(threaded, ydb_node_previous_s, ydb_node_previous_st, tp_token, &error_string_buffer, &varname_y,
-                    subs_used, subsarray_y, &ret_subs_used, ret_subsarray, status);
+        status = ydb_node_previous_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y,
+                                      &ret_subs_used, ret_subsarray);
     }
     /* check status for Errors and Raise Exception */
     if (0 > status) {
@@ -1059,7 +1039,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
 
 /* Wrapper for ydb_set_s() and ydb_set_st() */
 static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded, copy_success;
+    bool copy_success;
     bool return_NULL = false;
     int status, varname_len, value_len, subs_used;
     uint64_t tp_token;
@@ -1074,9 +1054,9 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
     value = "";
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded", "varname", "subsarray", "value", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|Oy#K", kwlist, &threaded, &varname, &varname_len, &subsarray,
-                &value, &value_len, &tp_token))
+    static char* kwlist[] = {"varname", "subsarray", "value", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|Oy#K", kwlist, &varname, &varname_len, &subsarray,
+                                     &value, &value_len, &tp_token))
         return NULL;
 
     if (!validate_subsarray_object(subsarray))
@@ -1099,8 +1079,7 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
     }
 
     /* Call the wrapped function */
-    CALL_WRAP_4(threaded, ydb_set_s, ydb_set_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &value_buffer,
-                status);
+    status = ydb_set_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &value_buffer);
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
@@ -1121,7 +1100,6 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
 
 /* Wrapper for ydb_str2zwr_s() and ydb_str2zwr_st() */
 static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded;
     bool return_NULL = false;
     int str_len, status, return_length;
     uint64_t tp_token;
@@ -1134,8 +1112,8 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded", "input", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|K", kwlist, &threaded, &str, &str_len, &tp_token))
+    static char* kwlist[] = {"input", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &str, &str_len, &tp_token))
         return NULL;
 
     /* Setup for Call */
@@ -1144,7 +1122,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&zwr_buf, 1024);
 
     /* Call the wrapped function */
-    CALL_WRAP_2(threaded, ydb_str2zwr_s, ydb_str2zwr_st, tp_token, &error_string_buf, &str_buf, &zwr_buf, status);
+    status = ydb_str2zwr_st(tp_token, &error_string_buf, &str_buf, &zwr_buf);
 
 
     /* recall with properly sized buffer if zwr_buf is not long enough */
@@ -1153,7 +1131,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
         YDB_FREE_BUFFER(&zwr_buf);
         YDB_MALLOC_BUFFER(&zwr_buf, return_length);
         /* recall the wrapped function */
-        CALL_WRAP_2(threaded, ydb_str2zwr_s, ydb_str2zwr_st, tp_token, &error_string_buf, &str_buf, &zwr_buf, status);
+        status = ydb_str2zwr_st(tp_token, &error_string_buf, &str_buf, &zwr_buf);
     }
 
     /* check status for Errors and Raise Exception */
@@ -1177,7 +1155,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
 
 /* Wrapper for ydb_subscript_next_s() and ydb_subscript_next_st() */
 static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded, copy_success;
+    bool copy_success;
     bool return_NULL = false;
     int status, return_length, varname_len, subs_used;
     char *varname;
@@ -1190,8 +1168,8 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-        static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
-        if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
+        static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+        if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
             return NULL;
 
     if (!validate_subsarray_object(subsarray))
@@ -1209,8 +1187,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
     YDB_MALLOC_BUFFER(&ret_value, 1024);
 
     /* Call the wrapped function */
-    CALL_WRAP_4(threaded, ydb_subscript_next_s, ydb_subscript_next_st, tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y,
-                &ret_value, status);
+    status = ydb_subscript_next_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_value);
 
     /* check to see if length of string was longer than 1024 is so, try again with proper length */
     if (YDB_ERR_INVSTRLEN == status) {
@@ -1218,8 +1195,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
         YDB_FREE_BUFFER(&ret_value);
         YDB_MALLOC_BUFFER(&ret_value, return_length);
         /* recall the wrapped function */
-        CALL_WRAP_4(threaded, ydb_subscript_next_s, ydb_subscript_next_st, tp_token, &error_string_buffer, &varname_y,
-                    subs_used, subsarray_y, &ret_value, status);
+        status = ydb_subscript_next_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_value);
     }
     /* check status for Errors and Raise Exception */
     if (0 > status) {
@@ -1245,7 +1221,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
 
 /* Wrapper for ydb_subscript_previous_s() and ydb_subscript_previous_st() */
 static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded, copy_success;
+    bool copy_success;
     bool return_NULL = false;
     int status, return_length, varname_len, subs_used;
     char *varname;
@@ -1258,8 +1234,8 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
     tp_token = YDB_NOTTP;
 
     /* Setup for Call */
-    static char* kwlist[] = {"threaded", "varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|OK", kwlist, &threaded, &varname, &varname_len, &subsarray, &tp_token))
+    static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
         return NULL;
 
     if (!validate_subsarray_object(subsarray))
@@ -1277,16 +1253,14 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
     YDB_MALLOC_BUFFER(&ret_value, 1024);
 
     /* Call the wrapped function */
-    CALL_WRAP_4(threaded, ydb_subscript_previous_s, ydb_subscript_previous_st, tp_token, &error_string_buffer, &varname_y,
-                subs_used, subsarray_y, &ret_value, status);
+    status = ydb_subscript_previous_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_value);
 
     /* check to see if length of string was longer than 1024 is so, try again with proper length */
     if (YDB_ERR_INVSTRLEN == status) {
         return_length = ret_value.len_used;
         YDB_FREE_BUFFER(&ret_value);
         YDB_MALLOC_BUFFER(&ret_value, return_length);
-        CALL_WRAP_4(threaded, ydb_subscript_previous_s, ydb_subscript_previous_st, tp_token, &error_string_buffer, &varname_y,
-                    subs_used, subsarray_y, &ret_value, status);
+        status = ydb_subscript_previous_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_value);
     }
 
     /* check status for Errors and Raise Exception */
@@ -1321,7 +1295,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
  *    6) if a function raises an exception then this function returns -2 as a way of indicating an error.
  *            (note) the PyErr String is already set so the the function receiving the return value (tp) just needs to return NULL.
  */
-static int callback_wrapper_st(uint64_t tp_token, ydb_buffer_t*errstr, void *function_with_arguments) {
+static int callback_wrapper(uint64_t tp_token, ydb_buffer_t*errstr, void *function_with_arguments) {
     /* this should only ever be called by ydb_tp_st c api via tp below.
      * It assumes that everything passed to it was validated.
      */
@@ -1344,32 +1318,9 @@ static int callback_wrapper_st(uint64_t tp_token, ydb_buffer_t*errstr, void *fun
     Py_DECREF(return_value);
     return return_val;
 }
-/* Callback Wrapper used by tp_st. The aproach of calling a Python function is a bit of a hack.
- * See notes in 'callback_wrapper_st above
- */
-static int callback_wrapper_s(void *function_with_arguments) {
-    /* this should only ever be called by ydb_tp_s c api via tp below.
-     * It assumes that everything passed to it was validated.
-     */
-    int return_val;
-    PyObject *function, *args, *kwargs, *return_value;
-
-    function = PyTuple_GetItem(function_with_arguments, 0);
-    args = PyTuple_GetItem(function_with_arguments, 1);
-    kwargs = PyTuple_GetItem(function_with_arguments, 2);
-    return_value = PyObject_Call(function, args, kwargs);
-    if (NULL == return_value) {
-        /* function raised an exception */
-        return -2; /* MAGIC NUMBER flag to raise exception at the next level up */
-    }
-    return_val = (int)PyLong_AsLong(return_value);
-    Py_DECREF(return_value);
-    return return_val;
-}
 
 /* Wrapper for ydb_tp_s() / ydb_tp_st() */
 static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded;
     bool return_NULL = false;
     int namecount, status;
     uint64_t tp_token;
@@ -1390,8 +1341,8 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-    static char *kwlist[] = {"threaded", "callback", "args", "kwargs", "transid", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "pO|OOsK", kwlist, &threaded, &callback, &callback_args, &callback_kwargs, &transid, &tp_token))
+    static char *kwlist[] = {"callback", "args", "kwargs", "transid", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOsK", kwlist, &callback, &callback_args, &callback_kwargs, &transid, &tp_token))
         return NULL; // raise exception
 
     /* validate input */
@@ -1417,11 +1368,8 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     Py_DECREF(varnames);
 
     /* Call the wrapped function */
-    if (threaded)
-        status = ydb_tp_st(tp_token, &error_string_buffer, callback_wrapper_st, function_with_arguments, transid,
-                            namecount, varname_buffers);
-    else if (!threaded)
-        status = ydb_tp_s(callback_wrapper_s, function_with_arguments, transid, namecount, varname_buffers);
+    status = ydb_tp_st(tp_token, &error_string_buffer, callback_wrapper, function_with_arguments, transid,
+                        namecount, varname_buffers);
 
     /* check status for Errors and Raise Exception */
     if (-2 == status) {/* MAGIC VALUE to indicate that the callback
@@ -1443,7 +1391,6 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
 
 /* Wrapper for ydb_zwr2str_s() and ydb_zwr2str_st() */
 static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
-    bool threaded;
     bool return_NULL = false;
     int zwr_len, status, return_length;
     uint64_t tp_token;
@@ -1457,8 +1404,8 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-    static char* kwlist[] = {"threaded", "input", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "py#|K", kwlist, &threaded, &zwr, &zwr_len, &tp_token))
+    static char* kwlist[] = {"input", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &zwr, &zwr_len, &tp_token))
         return NULL;
 
     /* Setup for Call */
@@ -1467,7 +1414,7 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&str_buf, 1024);
 
     /* Call the wrapped function */
-    CALL_WRAP_2(threaded, ydb_zwr2str_s, ydb_zwr2str_st, tp_token, &error_string_buf, &zwr_buf, &str_buf, status);
+    status = ydb_zwr2str_st(tp_token, &error_string_buf, &zwr_buf, &str_buf);
 
     /* recall with properly sized buffer if zwr_buf is not long enough */
     if (YDB_ERR_INVSTRLEN == status) {
@@ -1475,7 +1422,7 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
         YDB_FREE_BUFFER(&str_buf);
         YDB_MALLOC_BUFFER(&str_buf, return_length);
         /* recall the wrapped function */
-        CALL_WRAP_2(threaded, ydb_zwr2str_s, ydb_zwr2str_st, tp_token, &error_string_buf, &zwr_buf, &str_buf, status);
+        status = ydb_zwr2str_st(tp_token, &error_string_buf, &zwr_buf, &str_buf);
     }
 
     /* check status for Errors and Raise Exception */

@@ -32,19 +32,7 @@ def execute(command: str, stdin: str = "") -> str:
     return process.communicate(stdin.encode())[0].decode().strip()
 
 @pytest.fixture(scope="session")
-def threaded():
-    try:
-        if os.environ['test_ydb_api'] == "SIMPLE":
-            yield False
-        elif os.environ['test_ydb_api'] == "SIMPLE_THREADED":
-            yield True
-    except KeyError as e:
-        raise KeyError('test_ydb_api envionment valiable must be set to either "SIMPLE" OR "SIMPLE THREADED".')
-
-
-
-@pytest.fixture(scope="session")
-def ydb(threaded):
+def ydb():
     #setup
 
     # for some strange reason ydb will not want to run with
@@ -63,11 +51,7 @@ def ydb(threaded):
     execute(f'{YDB_INSTALL_DIR}/mupip create')
 
 
-    yield yottadb.Context(threaded = threaded)
-    if threaded:
-        print(f'\nTesting was done using using simple threaded api')
-    else:
-        print(f'\nTesting was done using using simple api')
+    yield yottadb.Context()
 
     #teardown
     execute(f'rm {TEST_GLD}')

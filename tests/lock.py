@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     has_lock = False
     try:
-        _yottadb.lock_incr(True, varname, subsarray_bytes, timeout_nsec=(args.locktimeout * 1_000_000_000))
+        _yottadb.lock_incr(varname, subsarray_bytes, timeout_nsec=(args.locktimeout * 1_000_000_000))
     except _yottadb.YottaDBLockTimeout as e:
         print('Lock Failed')
     except Exception as e:
@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     if (has_lock):
         time.sleep(args.time)
-        _yottadb.lock_decr(True, varname, subsarray_bytes)
+        _yottadb.lock_decr(varname, subsarray_bytes)
         if args.locktimeout != 0 or args.time != 0:
             print('Lock Released')
 
