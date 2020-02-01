@@ -5,46 +5,6 @@ typedef struct {
     ydb_buffer_t *subsarray;
 } YDBKey;
 
-/* CALL_WRAP_2 through CALL_WRAP_5 are macros to set up the call to the 2 similar api functions. The number at the end
- * represents the number of elements that the simple api call has and that the 2 have in common.
- *
- *    Parameters:
- *        API            -    the variable that containes the SIMPLE/SIMPLE_THREADED flag for the unified function (usually 'api')
- *        SFUNC        -    the function for the simple api
- *        STFUNC        -    the function for the simple threaded api
- *        TPTOKEN        -    the variable containing the TPTOKEN value (usually 'tp_token')
- *        ERRBUF        -    the variable containing the error buffer ydb_buffer_t (usually 'error_string_buffer')
- *        ONE - FIVE    -    the ordered arguments that the simple and simple threaded api's share
- *        RETSTATUS    -    the variable that the return status will be assigned to
- */
-#define CALL_WRAP_2(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF,  ONE, TWO, RETSTATUS) {                        \
-    if ((THREADED))                                                                                          \
-        (RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO));                                           \
-    else                                                                                                     \
-        (RETSTATUS) = (SFUNC)((ONE), (TWO));                                                                 \
-}
-
-#define CALL_WRAP_3(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, RETSTATUS) {                  \
-    if (THREADED)                                                                                            \
-        (RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO), (THREE));                                  \
-    else                                                                                                     \
-        (RETSTATUS) = (SFUNC)((ONE), (TWO), (THREE));                                                        \
-}
-
-#define CALL_WRAP_4(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, FOUR, RETSTATUS) {            \
-    if (THREADED)                                                                                            \
-        (RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO), (THREE), (FOUR));                          \
-    else                                                                                                     \
-        (RETSTATUS) = (SFUNC)((ONE), (TWO), (THREE), (FOUR));                                                \
-}
-
-#define CALL_WRAP_5(THREADED, SFUNC, STFUNC, TPTOKEN, ERRBUF, ONE, TWO, THREE, FOUR, FIVE,  RETSTATUS) {     \
-    if (THREADED)                                                                                            \
-        (RETSTATUS) = (STFUNC)((TPTOKEN), (ERRBUF), (ONE), (TWO), (THREE), (FOUR), (FIVE));                  \
-    else                                                                                                     \
-        (RETSTATUS) = (SFUNC)((ONE), (TWO), (THREE), (FOUR), (FIVE));                                        \
-}
-
 #define SETUP_SUBS(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB) {                              \
     SUBSUSED = 0;                                                                        \
     SUBSARRAY_YDB = NULL;                                                                \
@@ -62,8 +22,6 @@ typedef struct {
  * to accept both. Use raise_YottaDBError function to raise
  */
 static PyObject *YottaDBError;
-
-
 
 /* YottaDBLockTimeout is a simple exception to indicate that a lock failed due to timeout. */
 static PyObject *YottaDBLockTimeout;
