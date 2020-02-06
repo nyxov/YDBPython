@@ -157,7 +157,7 @@ ydb_buffer_t* convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence) 
         bytes_len = PyBytes_Size(bytes);
         bytes_c = PyBytes_AsString(bytes);
         YDB_MALLOC_BUFFER(&return_buffer_array[i], bytes_len);
-        YDB_COPY_STRING_TO_BUFFER(bytes_c, &return_buffer_array[i], done);
+        YDB_COPY_BYTES_TO_BUFFER(bytes_c, bytes_len, &return_buffer_array[i], done);
         // figure out how to handle error case (done == false)
     }
     return return_buffer_array;
@@ -201,7 +201,7 @@ static void load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
 
     varanme_y = (ydb_buffer_t*)calloc(1, sizeof(ydb_buffer_t));
     YDB_MALLOC_BUFFER(varanme_y, len);
-    YDB_COPY_STRING_TO_BUFFER(bytes_c, varanme_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(bytes_c, len, varanme_y, copy_success);
     // raise error on !copy_success
 
     dest->varname = varanme_y;
@@ -395,9 +395,9 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
 
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
-    YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in data()");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in data()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -460,9 +460,9 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
 
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
-    YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in delete_wrapper()");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in delete_wrapper()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -559,9 +559,9 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
-    YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in get()");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in get()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -627,18 +627,18 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
-    YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in incr() for varname");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in incr() for varname");
         return_NULL = true;
     }
 
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
 
     YDB_MALLOC_BUFFER(&increment_y, increment_len);
-    YDB_COPY_STRING_TO_BUFFER(increment, &increment_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(increment, increment_len, &increment_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in incr() for increment");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in incr() for increment");
         return_NULL = true;
     }
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
@@ -785,9 +785,9 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
-    YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in lock_decr()");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in lock_decr()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -838,9 +838,9 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
         return NULL;
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
-    YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in lock_incr()");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in lock_incr()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -892,9 +892,9 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
-    YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in node_next()");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in node_next()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -976,9 +976,9 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
-    YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in node_previous()");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in node_previous()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -1056,17 +1056,17 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
-    YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in set() for varname");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in set() for varname");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
     YDB_MALLOC_BUFFER(&value_buffer, value_len);
-    YDB_COPY_STRING_TO_BUFFER(value, &value_buffer, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(value, value_len, &value_buffer, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in set() for value");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in set() for value");
         return_NULL = true;
     }
 
@@ -1169,9 +1169,9 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
 
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
-    YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in subscript_next()");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in subscript_next()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -1235,9 +1235,9 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
-    YDB_COPY_STRING_TO_BUFFER(varname, &varname_y, copy_success);
+    YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_STRING_TO_BUFFER failed in subscript_previous()");
+        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in subscript_previous()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);

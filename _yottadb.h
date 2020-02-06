@@ -5,6 +5,18 @@ typedef struct {
     ydb_buffer_t *subsarray;
 } YDBKey;
 
+#define YDB_COPY_BYTES_TO_BUFFER(BYTES, BYTES_LEN, BUFFERP, COPY_DONE)	                 \
+{					                                                                     \
+	if (BYTES_LEN <= (BUFFERP)->len_alloc)			                                     \
+	{							                                                         \
+		memcpy((BUFFERP)->buf_addr, BYTES, BYTES_LEN);	                                 \
+		(BUFFERP)->len_used = BYTES_LEN;			                                     \
+		COPY_DONE = TRUE;				                                                 \
+	} else							                                                     \
+		COPY_DONE = FALSE;				                                                 \
+}
+
+
 #define SETUP_SUBS(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB) {                              \
     SUBSUSED = 0;                                                                        \
     SUBSARRAY_YDB = NULL;                                                                \
