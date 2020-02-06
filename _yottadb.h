@@ -33,10 +33,10 @@ typedef struct {
  * the choice was to preserve both in the python exception. This means we need to extend the exception
  * to accept both. Use raise_YottaDBError function to raise
  */
-static PyObject *YottaDBError;
+static PyObject *YDBError;
 
 /* YottaDBLockTimeout is a simple exception to indicate that a lock failed due to timeout. */
 static PyObject *YottaDBLockTimeout;
 
-/* YDBPythonBugError is to be raised when there is a posobility for an error to occur but that we believe that it should never happen. */
-static PyObject *YDBPythonBugError;
+/* YDBPythonError is to be raised when there is a posobility for an error to occur but that we believe that it should never happen. */
+static PyObject *YDBPythonError;

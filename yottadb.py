@@ -17,7 +17,7 @@ from builtins import property
 
 import _yottadb
 
-from _yottadb import YottaDBError
+from _yottadb import YDBError
 from _yottadb import YottaDBLockTimeout
 
 from _yottadb import YDB_NOTTP as NOTTP
@@ -169,7 +169,7 @@ class Context:
             try:
                 var_next = self.subscript_next(var_next)
                 yield var_next
-            except YottaDBError as e:
+            except YDBError as e:
                 if e.code == NODEEND:
                     return
 
@@ -328,7 +328,7 @@ class Key:
                 return cast(Optional[str], self.context.get(self.varname_bytes, self.subsarray_bytes))
             else:
                 return cast(Optional[str], self.context.get(self.varname_bytes, self.subsarray_bytes, val_encoding=self.val_encoding))
-        except YottaDBError as e:
+        except YDBError as e:
             if e.code == GLOBAL_VAR_UNDEF or e.code == LOCAL_VAR_UNDEF:
                 return None
             else:
@@ -353,7 +353,7 @@ class Key:
     def value_bytes(self) -> Optional[bytes]:
         try:
             return cast(Optional[bytes], self.context.get(self.varname_bytes, self.subsarray_bytes, val_encoding=None))
-        except YottaDBError as e:
+        except YError as e:
             if e.code == GLOBAL_VAR_UNDEF or e.code == LOCAL_VAR_UNDEF:
                 return None
             else:
@@ -395,7 +395,7 @@ class Key:
                 sub_next = self.context.subscript_next(self.varname_bytes, subscript_subsarray)
                 subscript_subsarray[-1] = sub_next
                 yield sub_next
-            except YottaDBError as e:
+            except YDBError as e:
                 if e.code == NODEEND:
                     return
 

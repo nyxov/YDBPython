@@ -321,14 +321,14 @@ static void free_YDBKey_array(YDBKey* keysarray, int len) {
     free(keysarray);
 }
 
-/* Routine to help raise a YottaDBError. The caller still needs to return NULL for the Exception to be raised.
+/* Routine to help raise a YDBError. The caller still needs to return NULL for the Exception to be raised.
  * This routine will check if the message has been set in the error_string_buffer and look it up if not.
  *
  * Parameters:
  *    status                - the error code that is returned by the wrapped ydb_ function.
  *    error_string_buffer    - a ydb_buffer_t that may or may not contain the error message.
  */
-static void raise_YottaDBError(int status, ydb_buffer_t* error_string_buffer) {
+static void raise_YDBError(int status, ydb_buffer_t* error_string_buffer) {
     int msg_status;
     ydb_buffer_t ignored_buffer;
     PyObject *tuple;
@@ -343,7 +343,7 @@ static void raise_YottaDBError(int status, ydb_buffer_t* error_string_buffer) {
     tuple = PyTuple_New(2);
     PyTuple_SetItem(tuple, 0, PyLong_FromLong(status));
     PyTuple_SetItem(tuple, 1, Py_BuildValue("s#", error_string_buffer->buf_addr, error_string_buffer->len_used));
-    PyErr_SetObject(YottaDBError, tuple);
+    PyErr_SetObject(YDBError, tuple);
 }
 
 
@@ -397,7 +397,7 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in data()");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in data()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -409,7 +409,7 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     }
 
@@ -462,7 +462,7 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in delete_wrapper()");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in delete_wrapper()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -474,7 +474,7 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     }
 
@@ -521,7 +521,7 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         /* free allocated memory */
         return_NULL = true;
     }
@@ -561,7 +561,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in get()");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in get()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -581,7 +581,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
 
     }
@@ -629,7 +629,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in incr() for varname");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in incr() for varname");
         return_NULL = true;
     }
 
@@ -638,7 +638,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&increment_y, increment_len);
     YDB_COPY_BYTES_TO_BUFFER(increment, increment_len, &increment_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in incr() for increment");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in incr() for increment");
         return_NULL = true;
     }
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
@@ -649,7 +649,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     }
 
@@ -742,7 +742,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* check for errors */
     if (0 > status) {
-        raise_YottaDBError(status, error_string_buffer);
+        raise_YDBError(status, error_string_buffer);
         return_NULL = true;
         return NULL;
     } else if (YDB_LOCK_TIMEOUT == status) {
@@ -787,7 +787,7 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in lock_decr()");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in lock_decr()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -798,7 +798,7 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     }
 
@@ -840,7 +840,7 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in lock_incr()");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in lock_incr()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -850,7 +850,7 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     } else if (YDB_LOCK_TIMEOUT == status) {
         PyErr_SetString(YottaDBLockTimeout, "Not able to acquire all requested locks in the specified time.");
@@ -894,7 +894,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in node_next()");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in node_next()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -933,7 +933,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     }
     /* Create Python object to return */
@@ -978,7 +978,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in node_previous()");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in node_previous()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -1009,7 +1009,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
     }
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     }
 
@@ -1058,7 +1058,7 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in set() for varname");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in set() for varname");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -1066,7 +1066,7 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
     YDB_MALLOC_BUFFER(&value_buffer, value_len);
     YDB_COPY_BYTES_TO_BUFFER(value, value_len, &value_buffer, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in set() for value");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in set() for value");
         return_NULL = true;
     }
 
@@ -1075,7 +1075,7 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     }
     /* free allocated memory */
@@ -1128,7 +1128,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buf);
+        raise_YDBError(status, &error_string_buf);
         return_NULL = true;
     }
 
@@ -1171,7 +1171,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in subscript_next()");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in subscript_next()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -1191,7 +1191,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
     }
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     }
 
@@ -1237,7 +1237,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
     YDB_MALLOC_BUFFER(&varname_y, varname_len);
     YDB_COPY_BYTES_TO_BUFFER(varname, varname_len, &varname_y, copy_success);
     if (!copy_success) {
-        PyErr_SetString(YDBPythonBugError, "YDB_COPY_BYTES_TO_BUFFER failed in subscript_previous()");
+        PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in subscript_previous()");
         return_NULL = true;
     }
     SETUP_SUBS(subsarray, subs_used, subsarray_y);
@@ -1257,7 +1257,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     }
 
@@ -1369,7 +1369,7 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
                      */
         return_NULL = true;
     } else if (0 > status) {
-        raise_YottaDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     }
     /* free allocated memory */
@@ -1419,7 +1419,7 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* check status for Errors and Raise Exception */
     if (0 > status) {
-        raise_YottaDBError(status, &error_string_buf);
+        raise_YDBError(status, &error_string_buf);
         return_NULL = true;
     }
 
@@ -1554,15 +1554,15 @@ PyMODINIT_FUNC PyInit__yottadb_wrapper(void) {
 
 
     /* Exceptions */
-    /* setting up YottaDBError */
+    /* setting up YDBError */
     PyObject* exc_dict = make_getter_code();
     if (NULL == exc_dict)
         return NULL;
     
-    YottaDBError = PyErr_NewException("_yottadb.YottaDBError",
+    YDBError = PyErr_NewException("_yottadb.YDBError",
                                         NULL, // use to pick base class
                                         exc_dict);
-    PyModule_AddObject(module,"YottaDBError", YottaDBError);
+    PyModule_AddObject(module,"YDBError", YDBError);
 
     /* setting up YottaDBLockTimeout */
     YottaDBLockTimeout = PyErr_NewException("_yottadb.YottaDBLockTimeout",
@@ -1570,10 +1570,10 @@ PyMODINIT_FUNC PyInit__yottadb_wrapper(void) {
                                         NULL);
     PyModule_AddObject(module,"YottaDBLockTimeout", YottaDBLockTimeout);
 
-    /* setting up YDBPythonBugError */
-    YDBPythonBugError = PyErr_NewException("_yottadb.YDBPythonBugError",
+    /* setting up YDBPythonError */
+    YDBPythonError = PyErr_NewException("_yottadb.YDBPythonError",
                                         NULL, // use to pick base class
                                         NULL);
-    PyModule_AddObject(module,"YDBPythonBugError", YDBPythonBugError);
+    PyModule_AddObject(module,"YDBPythonError", YDBPythonError);
     return module;
 }

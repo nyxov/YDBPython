@@ -70,12 +70,12 @@ def test_get_3_keywords(simple_data):
     assert _yottadb.get(varname=b'^test3', subsarray=[b'sub1']) == b'test3value2'
     assert _yottadb.get(varname=b'^test3', subsarray=[b'sub1', b'sub2']) == b'test3value3'
     
-def test_get_YottaDBErrors(simple_data):
-    with pytest.raises(_yottadb.YottaDBError):
+def test_get_YDBErrors(simple_data):
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.get(b'^testerror')
-    with pytest.raises(_yottadb.YottaDBError):
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.get(b'testerror')
-    with pytest.raises(_yottadb.YottaDBError):
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.get(b'^testerror', [b'sub1'])
 
 def test_get_long_value():
@@ -98,8 +98,8 @@ def test_set_2_keywords():
     _yottadb.set(varname=b'test7', subsarray=(b'sub1',), value=b'test7value')
     assert _yottadb.get(b'test7', (b'sub1',)) == b'test7value'
 
-def test_set_YottaDBErrors():
-    with pytest.raises(_yottadb.YottaDBError):
+def test_set_YDBErrors():
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.set(b'a'*32, value=b"some_value")
 
 def test_set_i18n():
@@ -110,28 +110,28 @@ def test_delete_1_positional():
     _yottadb.set(varname=b'test8', value=b'test8value')
     assert _yottadb.get(b'test8') == b'test8value'
     _yottadb.delete(b'test8')
-    with pytest.raises(_yottadb.YottaDBError):
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.get(b'test8')
 
 def test_delete_1_keywords():
     _yottadb.set(varname=b'test9', value=b'test9value')
     assert _yottadb.get(b'test9') == b'test9value'
     _yottadb.delete(varname=b'test9', delete_type=_yottadb.YDB_DEL_NODE)
-    with pytest.raises(_yottadb.YottaDBError):
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.get(b'test9')
 
 def test_delete_2_positional():
     _yottadb.set(varname=b'test10', subsarray=(b'sub1',), value=b'test10value')
     assert _yottadb.get(b'test10', (b'sub1',)) == b'test10value'
     _yottadb.delete(b'test10', (b'sub1',))
-    with pytest.raises(_yottadb.YottaDBError):
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.get(b'test10', (b'sub1',))
 
 def test_delete_2_keywords():
     _yottadb.set(varname=b'test11', subsarray=(b'sub1',),  value=b'test11value')
     assert _yottadb.get(b'test11', (b'sub1',)) == b'test11value'
     _yottadb.delete(varname=b'test11', subsarray=(b'sub1',), delete_type=_yottadb.YDB_DEL_NODE)
-    with pytest.raises(_yottadb.YottaDBError):
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.get(b'test11', (b'sub1',))
 
 def test_delete_3_positional():
@@ -142,9 +142,9 @@ def test_delete_3_positional():
 
     _yottadb.delete(b'test12', (), _yottadb.YDB_DEL_TREE)
 
-    with pytest.raises(_yottadb.YottaDBError):
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.get(b'test12')
-    with pytest.raises(_yottadb.YottaDBError):
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.get(b'test12', (b'sub1',))
 
 def test_delete_3_keywords():
@@ -155,9 +155,9 @@ def test_delete_3_keywords():
 
     _yottadb.delete(varname=b'test13', delete_type=_yottadb.YDB_DEL_TREE)
 
-    with pytest.raises(_yottadb.YottaDBError):
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.get(b'test13')
-    with pytest.raises(_yottadb.YottaDBError):
+    with pytest.raises(_yottadb.YDBError):
         _yottadb.get(b'test13', (b'sub1',))
 
 
@@ -294,21 +294,21 @@ def test_subscript_next_1(simple_data):
     assert _yottadb.subscript_next(varname=b'^test1') == b'^test2'
     assert _yottadb.subscript_next(varname=b'^test2') == b'^test3'
     assert _yottadb.subscript_next(varname=b'^test3') == b'^test4'
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         _yottadb.subscript_next(varname=b'^test6')
         assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
     assert _yottadb.subscript_next(varname=b'^test4', subsarray=(b'',)) == b'sub1'
     assert _yottadb.subscript_next(varname=b'^test4', subsarray=(b'sub1',)) == b'sub2'
     assert _yottadb.subscript_next(varname=b'^test4', subsarray=(b'sub2',)) == b'sub3'
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         _yottadb.subscript_next(varname=b'^test4', subsarray=(b'sub3',))
         assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
     assert _yottadb.subscript_next(varname=b'^test4', subsarray=(b'sub1', b'')) == b'subsub1'
     assert _yottadb.subscript_next(varname=b'^test4', subsarray=(b'sub1',b'subsub1')) == b'subsub2'
     assert _yottadb.subscript_next(varname=b'^test4', subsarray=(b'sub1', b'subsub2')) == b'subsub3'
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         _yottadb.subscript_next(varname=b'^test4', subsarray=(b'sub3', b'subsub3'))
         assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
@@ -327,21 +327,21 @@ def test_subscript_previous_1(simple_data):
     assert _yottadb.subscript_previous(varname=b'^test2') == b'^test1'
     assert _yottadb.subscript_previous(varname=b'^test3') == b'^test2'
     assert _yottadb.subscript_previous(varname=b'^test4') == b'^test3'
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         _yottadb.subscript_previous(varname=b'^Test5')
         assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
     assert _yottadb.subscript_previous(varname=b'^test4', subsarray=(b'',)) == b'sub3'
     assert _yottadb.subscript_previous(varname=b'^test4', subsarray=(b'sub2',)) == b'sub1'
     assert _yottadb.subscript_previous(varname=b'^test4', subsarray=(b'sub3',)) == b'sub2'
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         _yottadb.subscript_previous(varname=b'^test4', subsarray=(b'sub1',))
         assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
     assert _yottadb.subscript_previous(varname=b'^test4', subsarray=(b'sub1', b'')) == b'subsub3'
     assert _yottadb.subscript_previous(varname=b'^test4', subsarray=(b'sub1', b'subsub2')) == b'subsub1'
     assert _yottadb.subscript_previous(varname=b'^test4', subsarray=(b'sub1', b'subsub3')) == b'subsub2'
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         _yottadb.subscript_previous(varname=b'^test4', subsarray=(b'sub3', b'subsub1'))
         assert e.code == _yottadb.errors.YDB_ERR_NODEEND
 
@@ -352,7 +352,7 @@ def test_subscript_previous_long():
 def test_node_next_1(simple_data):
     assert _yottadb.node_next(b'^test3') == (b'sub1',)
     assert _yottadb.node_next(b'^test3', subsarray=(b'sub1',)) == (b'sub1', b'sub2')
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         _yottadb.node_next(varname=b'^test3', subsarray=(b'sub1', b'sub2'))
         assert e.code == _yottadb.errors.YDB_ERR_NODEEND
     assert _yottadb.node_next(b'^test6') == (b'sub6', b'subsub6')
@@ -367,7 +367,7 @@ def test_node_next_long_subscripts():
 
 
 def test_node_previous_1(simple_data):
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         _yottadb.node_previous(b'^test3')
         assert e.code == _yottadb.errors.YDB_ERR_NODEEND
     assert _yottadb.node_previous(b'^test3', (b'sub1',)) == ()
@@ -408,7 +408,7 @@ def test_lock_max_names():
         keys.append([bytes(f'^testlock{i}', encoding='utf-8')])
         _yottadb.lock(keys)
     keys.append([b'^JustOneMore'])
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         _yottadb.lock(keys)
         assert e.code == _yottadb.errors.YDB_ERR_NAMECOUNT2HI
 
@@ -418,10 +418,10 @@ def test_delete_excel():
     _yottadb.set(varname=b'testdeleteexcel2', subsarray=(b'sub1',), value=b"2")
     _yottadb.set(varname=b'testdeleteexcelexception', subsarray=(b'sub1',), value=b"3")
     _yottadb.delete_excel(varnames=(b'testdeleteexcelexception',))
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         _yottadb.get(b'testdeleteexcel1')
         assert e.code == _yottadb.errors.YDB_ERR_LVUNDEF
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         print("trying to get 2")
         _yottadb.get(b'testdeleteexcel2', (b'sub1',))
         assert e.code == _yottadb.errors.YDB_ERR_LVUNDEF
@@ -541,7 +541,7 @@ increment_test_ids = [f'"{initial}" | "{type(increment).__name__}({increment})" 
 def test_incr_errors(key, initial, increment, error_number):
     _yottadb.set(*key, value=initial)
 
-    with pytest.raises(_yottadb.YottaDBError) as e:
+    with pytest.raises(_yottadb.YDBError) as e:
         _yottadb.incr(*key, increment=number_to_bytes(increment))
         assert _yottadb.get(*key) == initial
         assert e.code == error_number
