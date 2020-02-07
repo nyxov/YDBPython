@@ -746,7 +746,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
         return_NULL = true;
         return NULL;
     } else if (YDB_LOCK_TIMEOUT == status) {
-        PyErr_SetString(YottaDBLockTimeout, "Not able to acquire all requested locks in the specified time.");
+        PyErr_SetString(YDBTimeoutError, "Not able to acquire all requested locks in the specified time.");
         return_NULL = true;
     }
 
@@ -853,7 +853,7 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
         raise_YDBError(status, &error_string_buffer);
         return_NULL = true;
     } else if (YDB_LOCK_TIMEOUT == status) {
-        PyErr_SetString(YottaDBLockTimeout, "Not able to acquire all requested locks in the specified time.");
+        PyErr_SetString(YDBTimeoutError, "Not able to acquire all requested locks in the specified time.");
         return_NULL = true;
     }
 
@@ -1564,11 +1564,11 @@ PyMODINIT_FUNC PyInit__yottadb_wrapper(void) {
                                         exc_dict);
     PyModule_AddObject(module,"YDBError", YDBError);
 
-    /* setting up YottaDBLockTimeout */
-    YottaDBLockTimeout = PyErr_NewException("_yottadb.YottaDBLockTimeout",
+    /* setting up YDBTimeoutError */
+    YDBTimeoutError = PyErr_NewException("_yottadb.YDBTimeoutError",
                                         NULL, // use to pick base class
                                         NULL);
-    PyModule_AddObject(module,"YottaDBLockTimeout", YottaDBLockTimeout);
+    PyModule_AddObject(module,"YDBTimeoutError", YDBTimeoutError);
 
     /* setting up YDBPythonError */
     YDBPythonError = PyErr_NewException("_yottadb.YDBPythonError",

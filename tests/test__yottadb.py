@@ -189,21 +189,21 @@ def test_lock_incr_2():
 def test_lock_incr_timeout_1():
     subprocess.Popen(shlex.split('python YDBPython/tests/lock.py -t 2 ^test1'))
     time.sleep(1)
-    with pytest.raises(_yottadb.YottaDBLockTimeout):
+    with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr(b'^test1')
     time.sleep(1)
 
 def test_lock_incr_timeout_2():
     subprocess.Popen(shlex.split('python YDBPython/tests/lock.py -t 2 ^test2 sub1'))
     time.sleep(1)
-    with pytest.raises(_yottadb.YottaDBLockTimeout):
+    with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr(b'^test2', (b'sub1',))
     time.sleep(1)
 
 def test_lock_incr_timeout_3():
     subprocess.Popen(shlex.split('python YDBPython/tests/lock.py -t 2 ^test2'))
     time.sleep(1)
-    with pytest.raises(_yottadb.YottaDBLockTimeout):
+    with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr(b'^test2', (b'sub1',))
     time.sleep(1)
 
@@ -399,7 +399,7 @@ def test_lock_blocking_other(simple_data):
 def test_lock_being_blocked():
     subprocess.Popen(shlex.split('python YDBPython/tests/lock.py ^test1'))
     time.sleep(1)
-    with pytest.raises(_yottadb.YottaDBLockTimeout):
+    with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock([KeyTuple(b'^test1')])
 
 def test_lock_max_names():

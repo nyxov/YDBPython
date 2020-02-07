@@ -45,7 +45,7 @@ if __name__ == '__main__':
     has_lock = False
     try:
         _yottadb.lock_incr(varname, subsarray_bytes, timeout_nsec=(args.locktimeout * 1_000_000_000))
-    except _yottadb.YottaDBLockTimeout as e:
+    except _yottadb.YDBTimeoutError as e:
         print('Lock Failed')
     except Exception as e:
         print(f'Lock Error: {repr(e)}')

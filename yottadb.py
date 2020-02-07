@@ -18,7 +18,7 @@ from builtins import property
 import _yottadb
 
 from _yottadb import YDBError
-from _yottadb import YottaDBLockTimeout
+from _yottadb import YDBTimeoutError
 
 from _yottadb import YDB_NOTTP as NOTTP
 from _yottadb.errors import YDB_ERR_NODEEND as NODEEND
