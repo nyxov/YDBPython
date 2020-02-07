@@ -101,6 +101,7 @@ static void free_buffer_array(ydb_buffer_t *array, int len) {
  *   sequence    - the python object to check.
  */
 static bool validate_sequence_of_bytes(PyObject *sequence) {
+    bool ret = true;
     int i, len_seq;
     PyObject *item, *seq;
 
@@ -112,9 +113,12 @@ static bool validate_sequence_of_bytes(PyObject *sequence) {
     for (i=0; i < len_seq; i++) { /* check each item for a bytes object */
         item = PySequence_Fast_GET_ITEM(seq, i);
         if (!PyBytes_Check(item))
-            return false;
+            ret = false;
+        if (!ret)
+            break;
     }
-    return true;
+    Py_DECREF(seq);
+    return ret;
 }
 
 /* Routine to validate a 'subsarray' argument in many of the wrapped functions. The 'subsarray' argument must be a sequence
@@ -160,6 +164,7 @@ ydb_buffer_t* convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence) 
         YDB_COPY_BYTES_TO_BUFFER(bytes_c, bytes_len, &return_buffer_array[i], done);
         // figure out how to handle error case (done == false)
     }
+    Py_DECREF(seq);
     return return_buffer_array;
 }
 
@@ -239,6 +244,7 @@ static void free_YDBKey(YDBKey* key) {
  *    keys_sequence        - a Python object that is to be validated.
  */
 static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence) {
+    bool ret = true;
     int i, len_keys, len_key_seq;
     PyObject *key, *varname, *subsarray, *seq, *key_seq;
 
@@ -252,18 +258,20 @@ static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence) {
         key_seq = PySequence_Fast(key, "");
         if (!key_seq) {
             PyErr_Format(PyExc_TypeError, "item %d in 'keys' sequence is not a sequence", i);
-            return false;
+            ret = false;
+            break;
         }
+
         len_key_seq = PySequence_Fast_GET_SIZE(key_seq);
         if ((1 != len_key_seq) && (2 != len_key_seq)) {
             PyErr_Format(PyExc_TypeError, "item %d in 'keys' sequence is not a sequence of 1 or 2 items", i);
-            return false;
+            ret = false;
         }
 
         varname = PySequence_Fast_GET_ITEM(key_seq, 0);
         if (!PyBytes_Check(varname)) {
             PyErr_Format(PyExc_TypeError, "the first value in item %d of 'keys' sequence must be a bytes object", i);
-            return false;
+            ret = false;
         }
 
         if (2 == len_key_seq) {
@@ -272,10 +280,14 @@ static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence) {
                 /* overwrite Exception string set by 'validate_subsarray_object' to be appropriate for lock context */
                 PyErr_Format(PyExc_TypeError,
                                 "the second value in item %d of 'keys' sequence must be a sequence of bytes or None", i);
-                return false;
+                ret = false;
             }
         }
+        Py_DECREF(key_seq);
+        if (!ret)
+            break;
     }
+    Py_DECREF(seq);
     return true;
 }
 
@@ -303,8 +315,10 @@ static YDBKey* convert_key_sequence_to_YDBKey_array(PyObject* sequence) {
         if (2 == PySequence_Fast_GET_SIZE(key_seq))
             subsarray = PySequence_Fast_GET_ITEM(key_seq, 1);
         load_YDBKey(&ret_keys[i], varname, subsarray);
+        Py_DECREF(key_seq);
 
     }
+    Py_DECREF(seq);
     return ret_keys;
 }
 
