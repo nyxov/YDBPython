@@ -129,3 +129,11 @@ def tree_data(ydb):
 
     for key, value in TREE_DATA:
         ydb.delete_tree(*key)
+
+@pytest.fixture
+def simple_reset_test_data(ydb):
+    ydb.set('resetattempt', value='0')
+    ydb.set('resetvalue', value='0')
+    yield
+    ydb.delete_node('resetattempt')
+    ydb.delete_node('resetvalue')

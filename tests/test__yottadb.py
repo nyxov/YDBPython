@@ -288,6 +288,46 @@ def test_tp_3_python_exception_raised_in_callback():
     with pytest.raises(ZeroDivisionError):
         _yottadb.tp(callback_that_raises_exception)
 
+def callback_for_tp_simple_restart(start_time, tp_token=NOTTP):
+    now = datetime.datetime.now()
+    #print(start_time)
+    #print(tp_token)
+    _yottadb.incr(b'resetattempt', increment=b'1', tp_token=tp_token)
+    _yottadb.incr(b'resetvalue', increment=b'1', tp_token=tp_token)
+    if _yottadb.get(b'resetattempt', tp_token=tp_token) == b'2':
+        print('standard')
+        return _yottadb.YDB_OK
+    elif (now - start_time) > datetime.timedelta(seconds=0.01):
+        print('timeout')
+        return _yottadb.YDB_OK
+    else:
+        return _yottadb.YDB_TP_RESTART
+
+
+
+    return _yottadb.YDB_TP_RESTART
+
+def test_tp_4a_reset_all(simple_reset_test_data):
+    start_time = datetime.datetime.now()
+    result = _yottadb.tp(callback_for_tp_simple_restart, args=(start_time,), varnames=(b'*',))
+    assert result == _yottadb.YDB_OK
+    assert _yottadb.get(b'resetattempt') == b'1'
+    assert _yottadb.get(b'resetvalue') == b'1'
+
+def test_tp_4b_reset_none(simple_reset_test_data):
+    start_time = datetime.datetime.now()
+    result = _yottadb.tp(callback_for_tp_simple_restart, args=(start_time,), varnames=())
+    assert result == _yottadb.YDB_OK
+    assert _yottadb.get(b'resetattempt') == b'2'
+    assert _yottadb.get(b'resetvalue') == b'2'
+
+def test_tp_4c_reset_some(simple_reset_test_data):
+    start_time = datetime.datetime.now()
+    result = _yottadb.tp(callback_for_tp_simple_restart, args=(start_time,), varnames=(b'resetvalue',))
+    assert result == _yottadb.YDB_OK
+    assert _yottadb.get(b'resetattempt') == b'2'
+    assert _yottadb.get(b'resetvalue') == b'1'
+
 def test_subscript_next_1(simple_data):
     assert _yottadb.subscript_next(varname=b'^%') == b'^Test5'
     assert _yottadb.subscript_next(varname=b'^a') == b'^test1'

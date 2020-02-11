@@ -1342,7 +1342,7 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     callback_kwargs = PyDict_New();
     transid = "BATCH";
     namecount = 1;
-    varnames = PyList_New(1); /* place holder. TODO: expose to python call */
+    varnames = PyList_New(1); /* place holder. */
     default_varnames_item = Py_BuildValue("y", "*");
     PyList_SetItem(varnames, 0, default_varnames_item); /* default set to special case when all local variables
                                                          * are restored on a restart. */
@@ -1350,25 +1350,36 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     tp_token = YDB_NOTTP;
 
     /* parse and validate */
-    static char *kwlist[] = {"callback", "args", "kwargs", "transid", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOsK", kwlist, &callback, &callback_args, &callback_kwargs, &transid, &tp_token))
-        return NULL; // raise exception
+    static char *kwlist[] = {"callback", "args", "kwargs", "transid", "varnames", "tp_token", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOsOK", kwlist, &callback, &callback_args, &callback_kwargs, &transid, &varnames, &tp_token))
+        return_NULL = true;
 
     /* validate input */
     if (!PyCallable_Check(callback)) {
         PyErr_SetString(PyExc_TypeError, "'callback' must be a callable.");
-        return NULL;
+        return_NULL = true;
     }
     if (!PyTuple_Check(callback_args)) {
         PyErr_SetString(PyExc_TypeError, "'args' must be a tuple. "
                                         "(It will be passed to the callback function as positional arguments.)");
-        return NULL;
+        return_NULL = true;
     }
     if (!PyDict_Check(callback_kwargs)) {
         PyErr_SetString(PyExc_TypeError, "'kwargs' must be a dictionary. "
                                         "(It will be passed to the callback function as keyword arguments.)");
+        return_NULL = true;
+    }
+
+    if(!validate_sequence_of_bytes(varnames)) {
+        PyErr_SetString(PyExc_TypeError, "'varname' must be a sequence of bytes. ");
+        return_NULL = true;
+    }
+
+    if (return_NULL) {
+        Py_DECREF(varnames);
         return NULL;
     }
+
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
     function_with_arguments = Py_BuildValue("(OOO)", callback, callback_args, callback_kwargs);
