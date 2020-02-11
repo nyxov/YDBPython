@@ -692,30 +692,33 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
     unsigned long long timeout_nsec;
     ffi_cif call_interface;
     ffi_type *ret_type;
-    PyObject *keys, *keys_default;
+    PyObject *keys;
     ydb_buffer_t *error_string_buffer;
-    YDBKey *keys_ydb;
+    YDBKey *keys_ydb = NULL;
 
     /* Defaults for non-required arguments */
     timeout_nsec = 0;
     tp_token = YDB_NOTTP;
-    keys_default = PyTuple_New(0);
-    keys = keys_default;
+    keys = Py_None;
 
     /* parse and validate */
     static char* kwlist[] = {"keys", "timeout_nsec", "tp_token", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OKK", kwlist, &keys, &timeout_nsec, &tp_token))
         return NULL;
 
-    if (!validate_py_keys_sequence_bytes(keys))
+    if (Py_None !=keys && !validate_py_keys_sequence_bytes(keys))
         return NULL;
-    len_keys = PySequence_Length(keys);
+    if (Py_None == keys)
+        len_keys = 0;
+    else
+        len_keys = PySequence_Length(keys);
 
     /* Setup for Call */
     error_string_buffer = (ydb_buffer_t*)calloc(1, sizeof(ydb_buffer_t));
     YDB_MALLOC_BUFFER(error_string_buffer, YDB_MAX_ERRORMSG);
-    keys_ydb = convert_key_sequence_to_YDBKey_array(keys);
-    Py_DECREF(keys_default);
+    if (Py_None != keys)
+        keys_ydb = convert_key_sequence_to_YDBKey_array(keys);
+
 
     /* build ffi call */
     ret_type = &ffi_type_sint;
@@ -1297,7 +1300,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
  *    2) the actual Python function to be called is passed to this function as the first element in a Python tuple.
  *    3) the positional arguments are passed as the second element and the keyword args are passed as the third.
  *    4) the new tp_token that ydb_tp_st passes to this function as an argument is added to the kwargs dictionary.
- *    5) this function calls calls the python callback funciton with the args and kwargs arguments.
+ *    5) this function calls calls the python callback function with the args and kwargs arguments.
  *    6) if a function raises an exception then this function returns -2 as a way of indicating an error.
  *            (note) the PyErr String is already set so the the function receiving the return value (tp) just needs to return NULL.
  */
