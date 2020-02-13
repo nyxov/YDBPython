@@ -1331,6 +1331,7 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t*errstr, void *functi
 /* Wrapper for ydb_tp_s() / ydb_tp_st() */
 static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
+    bool decref_args, decref_kwargs, decref_varnames;
     int namecount, status;
     uint64_t tp_token;
     char *transid;
@@ -1338,14 +1339,14 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     ydb_buffer_t error_string_buffer, *varname_buffers;
 
     /* Defaults for non-required arguments */
-    callback_args = PyTuple_New(0);
-    callback_kwargs = PyDict_New();
+    callback_args = Py_None;
+    decref_args = false;
+    callback_kwargs = Py_None;
+    decref_kwargs = false;
     transid = "BATCH";
-    namecount = 1;
-    varnames = PyList_New(1); /* place holder. */
-    default_varnames_item = Py_BuildValue("y", "*");
-    PyList_SetItem(varnames, 0, default_varnames_item); /* default set to special case when all local variables
-                                                         * are restored on a restart. */
+    namecount = 0;
+    varnames = Py_None;
+    decref_varnames = false;
 
     tp_token = YDB_NOTTP;
 
@@ -1353,6 +1354,21 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     static char *kwlist[] = {"callback", "args", "kwargs", "transid", "varnames", "tp_token", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOsOK", kwlist, &callback, &callback_args, &callback_kwargs, &transid, &varnames, &tp_token))
         return_NULL = true;
+
+    if (Py_None == callback_args) {
+        callback_args = PyTuple_New(0);
+        decref_args = true;
+    }
+
+    if (Py_None == callback_kwargs) {
+        callback_kwargs = PyDict_New();
+        decref_kwargs = true;
+    }
+
+    if (Py_None == varnames) {
+        varnames = PyTuple_New(0);
+        decref_varnames = true;
+    }
 
     /* validate input */
     if (!PyCallable_Check(callback)) {
@@ -1371,38 +1387,43 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     }
 
     if(!validate_sequence_of_bytes(varnames)) {
-        PyErr_SetString(PyExc_TypeError, "'varname' must be a sequence of bytes. ");
+        PyErr_SetString(PyExc_TypeError, "'varnames' must be a sequence of bytes. ");
         return_NULL = true;
     }
 
-    if (return_NULL) {
+    if (!return_NULL) {
+        /* Setup for Call */
+        YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
+        function_with_arguments = Py_BuildValue("(OOO)", callback, callback_args, callback_kwargs);
+        namecount = PySequence_Length(varnames);
+        varname_buffers = convert_py_bytes_sequence_to_ydb_buffer_array(varnames);
+
+        /* Call the wrapped function */
+        status = ydb_tp_st(tp_token, &error_string_buffer, callback_wrapper, function_with_arguments, transid,
+                            namecount, varname_buffers);
+
+        /* check status for Errors and Raise Exception */
+        if (-2 == status) {/* MAGIC VALUE to indicate that the callback
+                         * function raised an exception and should be raised
+                         */
+            return_NULL = true;
+        } else if (0 > status) {
+            raise_YDBError(status, &error_string_buffer);
+            return_NULL = true;
+        }
+        /* free allocated memory */
+        YDB_FREE_BUFFER(&error_string_buffer);
+        free(varname_buffers);
+    }
+
+    /* decrement references for python default values that were created. */
+    if (decref_args)
+        Py_DECREF(callback_args);
+    if (decref_kwargs)
+        Py_DECREF(callback_kwargs);
+    if (decref_varnames)
         Py_DECREF(varnames);
-        return NULL;
-    }
 
-    /* Setup for Call */
-    YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
-    function_with_arguments = Py_BuildValue("(OOO)", callback, callback_args, callback_kwargs);
-    namecount = PySequence_Length(varnames);
-    varname_buffers = convert_py_bytes_sequence_to_ydb_buffer_array(varnames);
-    Py_DECREF(varnames);
-
-    /* Call the wrapped function */
-    status = ydb_tp_st(tp_token, &error_string_buffer, callback_wrapper, function_with_arguments, transid,
-                        namecount, varname_buffers);
-
-    /* check status for Errors and Raise Exception */
-    if (-2 == status) {/* MAGIC VALUE to indicate that the callback
-                     * function raised an exception and should be raised
-                     */
-        return_NULL = true;
-    } else if (0 > status) {
-        raise_YDBError(status, &error_string_buffer);
-        return_NULL = true;
-    }
-    /* free allocated memory */
-    YDB_FREE_BUFFER(&error_string_buffer);
-    free(varname_buffers);
     if (return_NULL)
         return NULL;
     else

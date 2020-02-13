@@ -328,6 +328,13 @@ def test_tp_4c_reset_some(simple_reset_test_data):
     assert _yottadb.get(b'resetattempt') == b'2'
     assert _yottadb.get(b'resetvalue') == b'1'
 
+def test_tp_4d_reset_default_none(simple_reset_test_data):
+    start_time = datetime.datetime.now()
+    result = _yottadb.tp(callback_for_tp_simple_restart, args=(start_time,))
+    assert result == _yottadb.YDB_OK
+    assert _yottadb.get(b'resetattempt') == b'2'
+    assert _yottadb.get(b'resetvalue') == b'2'
+
 def test_subscript_next_1(simple_data):
     assert _yottadb.subscript_next(varname=b'^%') == b'^Test5'
     assert _yottadb.subscript_next(varname=b'^a') == b'^test1'
