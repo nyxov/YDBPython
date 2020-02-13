@@ -588,6 +588,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
     /* check to see if length of string was longer than 1024 is so, try again with proper length */
     if (YDB_ERR_INVSTRLEN == status) {
         return_length = ret_value.len_used;
+        YDB_FREE_BUFFER(&ret_value);
         YDB_MALLOC_BUFFER(&ret_value, return_length);
         /* Call the wrapped function */
         status = ydb_get_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_value);
@@ -939,10 +940,8 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
     /* if a buffer is not long enough */
     while(YDB_ERR_INVSTRLEN == status) {
         max_subscript_string = ret_subsarray[ret_subs_used].len_used;
-        free(ret_subsarray[ret_subs_used].buf_addr);
-        ret_subsarray[ret_subs_used].buf_addr = (char*)malloc(ret_subsarray[ret_subs_used].len_used*sizeof(char));
-        ret_subsarray[ret_subs_used].len_alloc = ret_subsarray[ret_subs_used].len_used;
-        ret_subsarray[ret_subs_used].len_used = 0;
+        YDB_FREE_BUFFER(&ret_subsarray[ret_subs_used])
+        YDB_MALLOC_BUFFER(&ret_subsarray[ret_subs_used], max_subscript_string);
         ret_subs_used = real_ret_subs_used;
         /* recall the wrapped function */
         status = ydb_node_next_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_subs_used, ret_subsarray);
@@ -1015,10 +1014,8 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
     /* if a buffer is not long enough */
     while(YDB_ERR_INVSTRLEN == status) {
         max_subscript_string = ret_subsarray[ret_subs_used].len_used;
-        free(ret_subsarray[ret_subs_used].buf_addr);
-        ret_subsarray[ret_subs_used].buf_addr = (char*) malloc(ret_subsarray[ret_subs_used].len_used*sizeof(char));
-        ret_subsarray[ret_subs_used].len_alloc = ret_subsarray[ret_subs_used].len_used;
-        ret_subsarray[ret_subs_used].len_used = 0;
+        YDB_FREE_BUFFER(&ret_subsarray[ret_subs_used])
+        YDB_MALLOC_BUFFER(&ret_subsarray[ret_subs_used], max_subscript_string);
         ret_subs_used = real_ret_subs_used;
         /* recall the wrapped function */
         status = ydb_node_previous_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y,
