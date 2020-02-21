@@ -16,13 +16,22 @@ typedef struct {
 }
 
 
-#define SETUP_SUBS(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB) {                              \
-    SUBSUSED = 0;                                                                        \
-    SUBSARRAY_YDB = NULL;                                                                \
-    if (Py_None != SUBSARRAY_PY) {                                                       \
-        SUBSUSED = PySequence_Length(SUBSARRAY_PY);                                      \
-        SUBSARRAY_YDB = convert_py_bytes_sequence_to_ydb_buffer_array(SUBSARRAY_PY);     \
-    }                                                                                    \
+#define SETUP_SUBS(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB, RETURN_NULL) {                                    \
+    bool success = true;                                                                                    \
+    SUBSUSED = 0;                                                                                           \
+    SUBSARRAY_YDB = NULL;                                                                                   \
+    if (Py_None != SUBSARRAY_PY) {                                                                          \
+        SUBSUSED = PySequence_Length(SUBSARRAY_PY);                                                         \
+        SUBSARRAY_YDB = (ydb_buffer_t*)calloc(SUBSUSED, sizeof(ydb_buffer_t));                              \
+        success = convert_py_bytes_sequence_to_ydb_buffer_array(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB);    \
+        if (!success)                                                                                       \
+            RETURN_NULL = true;                                                                             \
+    }                                                                                                       \
+}
+
+#define FREE_BUFFER_ARRAY(ARRAY, LEN) {                                                  \
+    for(int i = 0; i < (LEN); i++)                                                       \
+        YDB_FREE_BUFFER(&((ydb_buffer_t*)ARRAY)[i]);                                     \
 }
 
 /* PYTHON EXCEPTION DECLAIRATIONS */

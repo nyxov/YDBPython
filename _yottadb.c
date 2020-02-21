@@ -67,13 +67,13 @@ PyObject* make_getter_code() {
  *   num    - the number of buffers to allocate in the array
  *   len    - the length of the string to allocate for each of the the ydb_buffer_ts
  *
- * free with free_buffer_array function below
+ * free with FREE_BUFFER_ARRAY macro
  */
 static ydb_buffer_t* empty_buffer_array(int num, int len) {
     int i;
     ydb_buffer_t *return_buffer_array;
 
-    return_buffer_array = (ydb_buffer_t*)malloc((num) * sizeof(ydb_buffer_t));
+    return_buffer_array = (ydb_buffer_t*)calloc(num, sizeof(ydb_buffer_t));
     for(i = 0; i < num; i++)
         YDB_MALLOC_BUFFER(&return_buffer_array[i], len);
 
@@ -87,10 +87,10 @@ static ydb_buffer_t* empty_buffer_array(int num, int len) {
  *     len    - number of elements in the array to be freed
  *
  */
-static void free_buffer_array(ydb_buffer_t *array, int len) {
-    for(int i = 0; i < len; i++)
-        YDB_FREE_BUFFER(&((ydb_buffer_t*)array)[0]);
-}
+//static void FREE_BUFFER_ARRAY(ydb_buffer_t *array, int len) {
+//    for(int i = 0; i < len; i++)
+//        YDB_FREE_BUFFER(&((ydb_buffer_t*)array)[i]);
+//}
 
 
 /* UTILITIES TO CONVERT BETWEEN SEQUENCES OF PYUNICODE STRING OBJECTS AND AN ARRAY OF YDB_BUFFER_TS */
@@ -141,31 +141,40 @@ static bool validate_subsarray_object(PyObject *subsarray) {
 
 /* Routine to convert a sequence of Python bytes into a C array of ydb_buffer_ts. Routine assumes sequence was already
  * validated with 'validate_sequence_of_bytes' function. The function creates a copy of each Python bytes' data so
- * the resulting array should be freed by using the 'free_buffer_array' function.
+ * the resulting array should be freed by using the 'FREE_BUFFER_ARRAY' function.
  *
  * Parameters:
  *    sequence    - a Python Object that is expected to be a Python Sequence containing Strings.
  */
-ydb_buffer_t* convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence) {
+bool convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence, int sequence_len, ydb_buffer_t *buffer_array) {
     bool done;
-    int sequence_len, bytes_len;
+    int bytes_len;
     char *bytes_c;
     PyObject *bytes, *seq;
-    ydb_buffer_t *return_buffer_array;
 
     seq = PySequence_Fast(sequence, "argument must be iterable");
-    sequence_len = PySequence_Fast_GET_SIZE(seq);
-    return_buffer_array = (ydb_buffer_t*)malloc((sequence_len) * sizeof(ydb_buffer_t));
+    if (!seq) {
+        PyErr_SetString(YDBPythonError, "Can't cunvert none sequence to buffer array.");
+        return false;
+    }
+
     for(int i = 0; i < sequence_len; i++) {
         bytes = PySequence_Fast_GET_ITEM(seq, i);
         bytes_len = PyBytes_Size(bytes);
         bytes_c = PyBytes_AsString(bytes);
-        YDB_MALLOC_BUFFER(&return_buffer_array[i], bytes_len);
-        YDB_COPY_BYTES_TO_BUFFER(bytes_c, bytes_len, &return_buffer_array[i], done);
-        // figure out how to handle error case (done == false)
+        YDB_MALLOC_BUFFER(&buffer_array[i], bytes_len);
+        YDB_COPY_BYTES_TO_BUFFER(bytes_c, bytes_len, &buffer_array[i], done);
+        if (false == done) {
+            for (int j = 0; j < i; j ++)
+                YDB_FREE_BUFFER(&buffer_array[j])
+            Py_DECREF(seq);
+            PyErr_SetString(YDBPythonError, "failed to copy bytes object to buffer array");
+            return false;
+        }
     }
+
     Py_DECREF(seq);
-    return return_buffer_array;
+    return true;
 }
 
 /* converts an array of ydb_buffer_ts into a sequence (Tuple) of Python strings.
@@ -195,27 +204,42 @@ PyObject* convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
  *    subsarray    - array of python Bytes objects representing the array of subcripts
  */
 
-static void load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
-    bool copy_success;
+static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
+    bool copy_success, convert_success;
     int len;
     char* bytes_c;
-    ydb_buffer_t *varanme_y;
+    ydb_buffer_t *varname_y, *subsarray_y;
 
     len = PyBytes_Size(varname);
     bytes_c = PyBytes_AsString(varname);
 
-    varanme_y = (ydb_buffer_t*)calloc(1, sizeof(ydb_buffer_t));
-    YDB_MALLOC_BUFFER(varanme_y, len);
-    YDB_COPY_BYTES_TO_BUFFER(bytes_c, len, varanme_y, copy_success);
-    // raise error on !copy_success
+    varname_y = (ydb_buffer_t*)calloc(1, sizeof(ydb_buffer_t));
+    YDB_MALLOC_BUFFER(varname_y, len);
+    YDB_COPY_BYTES_TO_BUFFER(bytes_c, len, varname_y, copy_success);
+    if (!copy_success) {
+        YDB_FREE_BUFFER(varname_y);
+        free(varname_y);
+        PyErr_SetString(YDBPythonError, "failed to copy bytes object to buffer");
+        return false;
+    }
 
-    dest->varname = varanme_y;
+    dest->varname = varname_y;
     if (Py_None != subsarray) {
         dest->subs_used = PySequence_Length(subsarray);
-        dest->subsarray = convert_py_bytes_sequence_to_ydb_buffer_array(subsarray);
+        subsarray_y = (ydb_buffer_t*)calloc(dest->subs_used, sizeof(ydb_buffer_t));
+        convert_success = convert_py_bytes_sequence_to_ydb_buffer_array(subsarray, dest->subs_used, subsarray_y);
+        if (convert_success) {
+            dest->subsarray = subsarray_y;
+        } else {
+            YDB_FREE_BUFFER(varname_y);
+            FREE_BUFFER_ARRAY(varname_y, dest->subs_used);
+            PyErr_SetString(YDBPythonError, "failed to covert sequence to buffer array");
+            return false;
+        }
     } else {
         dest->subs_used = 0;
     }
+    return true;
 }
 
 /* Routine to free a YDBKey structure.
@@ -298,14 +322,14 @@ static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence) {
  * Parameters:
  *    sequence    - a Python object that has already been validated with 'validate_py_keys_sequence' or equivalent.
  */
-static YDBKey* convert_key_sequence_to_YDBKey_array(PyObject* sequence) {
-    //TODO: change to use fast sequence
+static bool convert_key_sequence_to_YDBKey_array(PyObject* sequence, YDBKey* ret_keys) {
+    bool success = true;
     int i, len_keys;
     PyObject *key, *varname, *subsarray, *seq, *key_seq;
-    YDBKey *ret_keys;
+
     seq = PySequence_Fast(sequence, "argument must be iterable");
     len_keys = PySequence_Fast_GET_SIZE(seq);
-    ret_keys = (YDBKey*)calloc(len_keys, sizeof(YDBKey));
+
     for (i=0; i < len_keys; i++) {
         key = PySequence_Fast_GET_ITEM(seq, i);
         key_seq = PySequence_Fast(key, "argument must be iterable");
@@ -314,12 +338,14 @@ static YDBKey* convert_key_sequence_to_YDBKey_array(PyObject* sequence) {
 
         if (2 == PySequence_Fast_GET_SIZE(key_seq))
             subsarray = PySequence_Fast_GET_ITEM(key_seq, 1);
-        load_YDBKey(&ret_keys[i], varname, subsarray);
+        success = load_YDBKey(&ret_keys[i], varname, subsarray);
         Py_DECREF(key_seq);
+        if (!success)
+            break;
 
     }
     Py_DECREF(seq);
-    return ret_keys;
+    return success;
 }
 
 /* Routine to free an array of YDBKeys as returned by above 'convert_key_sequence_to_YDBKey_array'.
@@ -414,9 +440,9 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
         PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in data()");
         return_NULL = true;
     }
-    SETUP_SUBS(subsarray, subs_used, subsarray_y);
+    SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
-    ret_value = (unsigned int*) malloc(sizeof(unsigned int));
+    ret_value = (unsigned int*) calloc(1, sizeof(unsigned int));
 
     /* Call the wrapped function */
     status = ydb_data_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, ret_value);
@@ -433,7 +459,7 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
 
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
-    free_buffer_array(subsarray_y, subs_used);
+    FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     free(ret_value);
     YDB_FREE_BUFFER(&error_string_buffer);
 
@@ -479,7 +505,7 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
         PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in delete_wrapper()");
         return_NULL = true;
     }
-    SETUP_SUBS(subsarray, subs_used, subsarray_y);
+    SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 
     /* Call the wrapped function */
@@ -494,7 +520,7 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
 
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
-    free_buffer_array(subsarray_y, subs_used);
+    FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer)
     if (return_NULL)
         return NULL;
@@ -505,6 +531,7 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
 /* Wrapper for ydb_delete_excl_s() and ydb_delete_excl_st() */
 static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
+    bool success;
     int namecount, status;
     uint64_t tp_token;
     PyObject *varnames;
@@ -519,17 +546,22 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OK", kwlist, &varnames, &tp_token))
         return NULL;
 
-    if((varnames != NULL) && (!validate_sequence_of_bytes(varnames))) {
-        PyErr_SetString(PyExc_TypeError, "'varnames' must be an sequence of bytes.");
-        return NULL;
-    }
+    //if((varnames != NULL) && (!validate_sequence_of_bytes(varnames))) {
+    //    PyErr_SetString(PyExc_TypeError, "'varnames' must be an sequence of bytes.");
+    //    return NULL;
+    //}
 
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
     namecount = 0;
-    if (varnames != Py_None)
+    if (Py_None != varnames)
         namecount = PySequence_Length(varnames);
-    ydb_buffer_t* varnames_ydb = convert_py_bytes_sequence_to_ydb_buffer_array(varnames);
+    ydb_buffer_t varnames_ydb[namecount];
+    if (0 < namecount) {
+        success = convert_py_bytes_sequence_to_ydb_buffer_array(varnames, namecount, varnames_ydb);
+        if (!success)
+            return NULL;
+    }
 
     status = ydb_delete_excl_st(tp_token, &error_string_buffer, namecount, varnames_ydb);
 
@@ -541,7 +573,7 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
     }
 
     /* free allocated memory */
-    free_buffer_array(varnames_ydb, namecount);
+    FREE_BUFFER_ARRAY(varnames_ydb, namecount);
     YDB_FREE_BUFFER(&error_string_buffer);
     if (return_NULL)
         return NULL;
@@ -578,7 +610,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
         PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in get()");
         return_NULL = true;
     }
-    SETUP_SUBS(subsarray, subs_used, subsarray_y);
+    SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
     YDB_MALLOC_BUFFER(&ret_value, 1024);
 
@@ -606,7 +638,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
-    free_buffer_array(subsarray_y, subs_used);
+    FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer);
     YDB_FREE_BUFFER(&ret_value);
     if (return_NULL)
@@ -648,7 +680,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
         return_NULL = true;
     }
 
-    SETUP_SUBS(subsarray, subs_used, subsarray_y);
+    SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 
     YDB_MALLOC_BUFFER(&increment_y, increment_len);
     YDB_COPY_BYTES_TO_BUFFER(increment, increment_len, &increment_y, copy_success);
@@ -674,7 +706,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
-    free_buffer_array(subsarray_y, subs_used);
+    FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&increment_y);
     YDB_FREE_BUFFER(&error_string_buffer);
     YDB_FREE_BUFFER(&ret_value);
@@ -688,6 +720,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
 /* Wrapper for ydb_lock_s() and ydb_lock_st() */
 static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
+    bool success = true;
     int len_keys, initial_arguments, number_of_arguments;
     uint64_t tp_token;
     unsigned long long timeout_nsec;
@@ -717,55 +750,60 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
     /* Setup for Call */
     error_string_buffer = (ydb_buffer_t*)calloc(1, sizeof(ydb_buffer_t));
     YDB_MALLOC_BUFFER(error_string_buffer, YDB_MAX_ERRORMSG);
-    if (Py_None != keys)
-        keys_ydb = convert_key_sequence_to_YDBKey_array(keys);
-
-
-    /* build ffi call */
-    ret_type = &ffi_type_sint;
-    initial_arguments = 4;
-
-    number_of_arguments = initial_arguments + (len_keys * 3);
-    ffi_type *arg_types[number_of_arguments];
-    void *arg_values[number_of_arguments];
-    /* ffi signature */
-    arg_types[0] = &ffi_type_uint64; // tptoken
-    arg_values[0] = &tp_token; // tptoken
-    arg_types[1] = &ffi_type_pointer;// errstr
-    arg_values[1] = &error_string_buffer; // errstr
-    arg_types[2] = &ffi_type_uint64; // timout_nsec
-    arg_values[2] = &timeout_nsec; // timout_nsec
-    arg_types[3] = &ffi_type_sint; // namecount
-    arg_values[3] = &len_keys; // namecount
-
-
-    for (int i = 0; i < len_keys; i++) {
-        int first = initial_arguments + 3*i;
-        arg_types[first] = &ffi_type_pointer;// varname
-        arg_values[first] = &keys_ydb[i].varname; // varname
-        arg_types[first + 1] = &ffi_type_sint; // subs_used
-        arg_values[first + 1] = &keys_ydb[i].subs_used; // subs_used
-        arg_types[first + 2] = &ffi_type_pointer;// subsarray
-        arg_values[first + 2] = &keys_ydb[i].subsarray;// subsarray
+    if (Py_None != keys) {
+        keys_ydb = (YDBKey*)calloc(len_keys, sizeof(YDBKey));
+        success = convert_key_sequence_to_YDBKey_array(keys, keys_ydb);
+        if (!success)
+            return_NULL = true;
     }
 
-    int status; // return value
-    if (ffi_prep_cif(&call_interface, FFI_DEFAULT_ABI, number_of_arguments, ret_type, arg_types) == FFI_OK) {
-        /* Call the wrapped function */
-        ffi_call(&call_interface, FFI_FN(ydb_lock_st), &status, arg_values);
-    } else {
-        PyErr_SetString(PyExc_SystemError, "ffi_prep_cif failed ");
-        return_NULL = true;
-    }
+    if (!return_NULL) {
+        /* build ffi call */
+        ret_type = &ffi_type_sint;
+        initial_arguments = 4;
 
-    /* check for errors */
-    if (0 > status) {
-        raise_YDBError(status, error_string_buffer);
-        return_NULL = true;
-        return NULL;
-    } else if (YDB_LOCK_TIMEOUT == status) {
-        PyErr_SetString(YDBTimeoutError, "Not able to acquire all requested locks in the specified time.");
-        return_NULL = true;
+        number_of_arguments = initial_arguments + (len_keys * 3);
+        ffi_type *arg_types[number_of_arguments];
+        void *arg_values[number_of_arguments];
+        /* ffi signature */
+        arg_types[0] = &ffi_type_uint64; // tptoken
+        arg_values[0] = &tp_token; // tptoken
+        arg_types[1] = &ffi_type_pointer;// errstr
+        arg_values[1] = &error_string_buffer; // errstr
+        arg_types[2] = &ffi_type_uint64; // timout_nsec
+        arg_values[2] = &timeout_nsec; // timout_nsec
+        arg_types[3] = &ffi_type_sint; // namecount
+        arg_values[3] = &len_keys; // namecount
+
+
+        for (int i = 0; i < len_keys; i++) {
+            int first = initial_arguments + 3*i;
+            arg_types[first] = &ffi_type_pointer;// varname
+            arg_values[first] = &keys_ydb[i].varname; // varname
+            arg_types[first + 1] = &ffi_type_sint; // subs_used
+            arg_values[first + 1] = &keys_ydb[i].subs_used; // subs_used
+            arg_types[first + 2] = &ffi_type_pointer;// subsarray
+            arg_values[first + 2] = &keys_ydb[i].subsarray;// subsarray
+        }
+
+        int status; // return value
+        if (ffi_prep_cif(&call_interface, FFI_DEFAULT_ABI, number_of_arguments, ret_type, arg_types) == FFI_OK) {
+            /* Call the wrapped function */
+            ffi_call(&call_interface, FFI_FN(ydb_lock_st), &status, arg_values);
+        } else {
+            PyErr_SetString(PyExc_SystemError, "ffi_prep_cif failed ");
+            return_NULL = true;
+        }
+
+        /* check for errors */
+        if (0 > status) {
+            raise_YDBError(status, error_string_buffer);
+            return_NULL = true;
+            return NULL;
+        } else if (YDB_LOCK_TIMEOUT == status) {
+            PyErr_SetString(YDBTimeoutError, "Not able to acquire all requested locks in the specified time.");
+            return_NULL = true;
+        }
     }
 
     /* free allocated memory */
@@ -808,7 +846,7 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
         PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in lock_decr()");
         return_NULL = true;
     }
-    SETUP_SUBS(subsarray, subs_used, subsarray_y);
+    SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 
     /* Call the wrapped function */
@@ -822,7 +860,7 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
-    free_buffer_array(subsarray_y, subs_used);
+    FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer);
 
     if (return_NULL)
@@ -861,7 +899,7 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
         PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in lock_incr()");
         return_NULL = true;
     }
-    SETUP_SUBS(subsarray, subs_used, subsarray_y);
+    SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
     /* Call the wrapped function */
     status = ydb_lock_incr_st(tp_token, &error_string_buffer, timeout_nsec, &varname_y, subs_used, subsarray_y);
@@ -877,7 +915,7 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
-    free_buffer_array(subsarray_y, subs_used);
+    FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer);
 
     if (return_NULL)
@@ -915,7 +953,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
         PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in node_next()");
         return_NULL = true;
     }
-    SETUP_SUBS(subsarray, subs_used, subsarray_y);
+    SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
     max_subscript_string = 1024;
     default_ret_subs_used = subs_used + 5;
@@ -930,7 +968,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* If not enough buffers in ret_subsarray */
     if (YDB_ERR_INSUFFSUBS == status) {
-        free_buffer_array(ret_subsarray, default_ret_subs_used);
+        FREE_BUFFER_ARRAY(ret_subsarray, default_ret_subs_used);
         real_ret_subs_used = ret_subs_used;
         ret_subsarray = empty_buffer_array(real_ret_subs_used, max_subscript_string);
         /* recall the wrapped function */
@@ -957,9 +995,9 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
-    free_buffer_array(subsarray_y, subs_used);
+    FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer);
-    free_buffer_array(ret_subsarray, real_ret_subs_used);
+    FREE_BUFFER_ARRAY(ret_subsarray, real_ret_subs_used);
 
     if (return_NULL)
         return NULL;
@@ -997,7 +1035,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
         PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in node_previous()");
         return_NULL = true;
     }
-    SETUP_SUBS(subsarray, subs_used, subsarray_y);
+    SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 
     max_subscript_string = 1024;
@@ -1033,9 +1071,9 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
-    free_buffer_array(subsarray_y, subs_used);
+    FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer);
-    free_buffer_array(ret_subsarray, real_ret_subs_used);
+    FREE_BUFFER_ARRAY(ret_subsarray, real_ret_subs_used);
 
     if (return_NULL)
         return NULL;
@@ -1075,7 +1113,7 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
         PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in set() for varname");
         return_NULL = true;
     }
-    SETUP_SUBS(subsarray, subs_used, subsarray_y);
+    SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
     YDB_MALLOC_BUFFER(&value_buffer, value_len);
     YDB_COPY_BYTES_TO_BUFFER(value, value_len, &value_buffer, copy_success);
@@ -1095,7 +1133,7 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
     YDB_FREE_BUFFER(&value_buffer);
-    free_buffer_array(subsarray_y, subs_used);
+    FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer);
 
     if (return_NULL)
@@ -1188,7 +1226,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
         PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in subscript_next()");
         return_NULL = true;
     }
-    SETUP_SUBS(subsarray, subs_used, subsarray_y);
+    SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
     YDB_MALLOC_BUFFER(&ret_value, 1024);
 
@@ -1215,7 +1253,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
 
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
-    free_buffer_array(subsarray_y, subs_used);
+    FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer);
     YDB_FREE_BUFFER(&ret_value);
 
@@ -1254,7 +1292,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
         PyErr_SetString(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in subscript_previous()");
         return_NULL = true;
     }
-    SETUP_SUBS(subsarray, subs_used, subsarray_y);
+    SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
     YDB_MALLOC_BUFFER(&ret_value, 1024);
 
@@ -1281,7 +1319,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
-    free_buffer_array(subsarray_y, subs_used);
+    FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer);
     YDB_FREE_BUFFER(&ret_value);
     if (return_NULL)
@@ -1328,11 +1366,11 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t*errstr, void *functi
 /* Wrapper for ydb_tp_s() / ydb_tp_st() */
 static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    bool decref_args, decref_kwargs, decref_varnames;
+    bool decref_args, decref_kwargs, decref_varnames, success;
     int namecount, status;
     uint64_t tp_token;
     char *transid;
-    PyObject *callback, *callback_args, *callback_kwargs, *varnames, *default_varnames_item,*function_with_arguments;
+    PyObject *callback, *callback_args, *callback_kwargs, *varnames, *function_with_arguments;
     ydb_buffer_t error_string_buffer, *varname_buffers;
 
     /* Defaults for non-required arguments */
@@ -1392,8 +1430,16 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
         /* Setup for Call */
         YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
         function_with_arguments = Py_BuildValue("(OOO)", callback, callback_args, callback_kwargs);
-        namecount = PySequence_Length(varnames);
-        varname_buffers = convert_py_bytes_sequence_to_ydb_buffer_array(varnames);
+        namecount = 0;
+        if (Py_None != varnames)
+            namecount = PySequence_Length(varnames);
+
+        varname_buffers = (ydb_buffer_t*)calloc(namecount, sizeof(ydb_buffer_t));
+        if (0 < namecount) {
+            success = convert_py_bytes_sequence_to_ydb_buffer_array(varnames, namecount, varname_buffers);
+            if (!success)
+                return NULL;
+        }
 
         /* Call the wrapped function */
         status = ydb_tp_st(tp_token, &error_string_buffer, callback_wrapper, function_with_arguments, transid,
