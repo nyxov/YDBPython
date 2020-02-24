@@ -15,6 +15,15 @@ typedef struct {
     }                                                                                    \
 }
 
+#define SETUP_BUFFER(PYVARNAME, YDBVARNAME, VARNAMELEN, FUNCTIONNAME, RETURN_NULL) {           \
+    bool copy_success;                                                                          \
+    YDB_MALLOC_BUFFER(&(YDBVARNAME), (VARNAMELEN));                                             \
+    YDB_COPY_BYTES_TO_BUFFER((PYVARNAME), (VARNAMELEN), &(YDBVARNAME), copy_success);           \
+    if (!copy_success) {                                                                        \
+        PyErr_Format(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in %s", (FUNCTIONNAME));  \
+        (RETURN_NULL) = true;                                                                   \
+    }                                                                                           \
+}
 
 #define SETUP_SUBS(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB, RETURN_NULL) {                                    \
     bool success = true;                                                                                    \
@@ -28,6 +37,7 @@ typedef struct {
             RETURN_NULL = true;                                                                             \
     }                                                                                                       \
 }
+
 
 #define FREE_BUFFER_ARRAY(ARRAY, LEN) {                                                  \
     for(int i = 0; i < (LEN); i++)                                                       \
