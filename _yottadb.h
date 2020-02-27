@@ -15,7 +15,7 @@ typedef struct {
     }                                                                                    \
 }
 
-#define SETUP_BUFFER(PYVARNAME, YDBVARNAME, VARNAMELEN, FUNCTIONNAME, RETURN_NULL) {           \
+#define SETUP_BUFFER(PYVARNAME, YDBVARNAME, VARNAMELEN, FUNCTIONNAME, RETURN_NULL) {            \
     bool copy_success;                                                                          \
     YDB_MALLOC_BUFFER(&(YDBVARNAME), (VARNAMELEN));                                             \
     YDB_COPY_BYTES_TO_BUFFER((PYVARNAME), (VARNAMELEN), &(YDBVARNAME), copy_success);           \
@@ -32,7 +32,7 @@ typedef struct {
     if (Py_None != SUBSARRAY_PY) {                                                                          \
         SUBSUSED = PySequence_Length(SUBSARRAY_PY);                                                         \
         SUBSARRAY_YDB = (ydb_buffer_t*)calloc(SUBSUSED, sizeof(ydb_buffer_t));                              \
-        success = convert_py_bytes_sequence_to_ydb_buffer_array(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB);    \
+        success = convert_py_bytes_sequence_to_ydb_buffer_array(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB);     \
         if (!success)                                                                                       \
             RETURN_NULL = true;                                                                             \
     }                                                                                                       \
