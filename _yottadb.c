@@ -1312,7 +1312,7 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t*errstr, void *functi
 /* Wrapper for ydb_tp_s() / ydb_tp_st() */
 static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    bool decref_args, decref_kwargs, decref_varnames, success;
+    bool decref_args, decref_kwargs, success;
     int namecount, status;
     uint64_t tp_token;
     char *transid;
@@ -1327,7 +1327,6 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     transid = "BATCH";
     namecount = 0;
     varnames = Py_None;
-    decref_varnames = false;
 
     tp_token = YDB_NOTTP;
 
@@ -1346,17 +1345,12 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
         decref_kwargs = true;
     }
 
-    if (Py_None == varnames) {
-        varnames = PyTuple_New(0);
-        decref_varnames = true;
-    }
-
     /* validate input */
     if (!PyCallable_Check(callback)) {
         PyErr_SetString(PyExc_TypeError, "'callback' must be a callable.");
         return_NULL = true;
     }
-    if (!PyTuple_Check(callback_args)) {
+    if (Py_None != callback_args && !PyTuple_Check(callback_args)) {
         PyErr_SetString(PyExc_TypeError, "'args' must be a tuple. "
                                         "(It will be passed to the callback function as positional arguments.)");
         return_NULL = true;
@@ -1367,7 +1361,7 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
         return_NULL = true;
     }
 
-    if(!validate_sequence_of_bytes(varnames)) {
+    if(Py_None != varnames && !validate_sequence_of_bytes(varnames)) {
         PyErr_SetString(PyExc_TypeError, "'varnames' must be a sequence of bytes. ");
         return_NULL = true;
     }
@@ -1410,8 +1404,6 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
         Py_DECREF(callback_args);
     if (decref_kwargs)
         Py_DECREF(callback_kwargs);
-    if (decref_varnames)
-        Py_DECREF(varnames);
 
     if (return_NULL)
         return NULL;
