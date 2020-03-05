@@ -1,4 +1,6 @@
 /* A structure that represents a key using ydb c types. used internally for converting between python and ydb c types */
+#define TEMP_YDB_RAISE_PYTHON_EXCEPTION -2
+
 typedef struct {
     ydb_buffer_t *varname;
     int subs_used;

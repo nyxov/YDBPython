@@ -289,6 +289,14 @@ def test_tp_3_python_exception_raised_in_callback():
     with pytest.raises(ZeroDivisionError):
         _yottadb.tp(callback_that_raises_exception)
 
+def callback_that_returns_wrong_type(tp_token=None):
+    return "not an int"
+
+def test_tp_callback_return_wrong_type():
+    with pytest.raises(TypeError):
+        _yottadb.tp(callback_that_returns_wrong_type)
+
+
 def callback_for_tp_simple_restart(start_time, tp_token=NOTTP):
     now = datetime.datetime.now()
     #print(start_time)

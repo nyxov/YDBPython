@@ -540,11 +540,6 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OK", kwlist, &varnames, &tp_token))
         return NULL;
 
-    //if((varnames != NULL) && (!validate_sequence_of_bytes(varnames))) {
-    //    PyErr_SetString(PyExc_TypeError, "'varnames' must be an sequence of bytes.");
-    //    return NULL;
-    //}
-
     /* Setup for Call */
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
     namecount = 0;
@@ -1286,7 +1281,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
  *    3) the positional arguments are passed as the second element and the keyword args are passed as the third.
  *    4) the new tp_token that ydb_tp_st passes to this function as an argument is added to the kwargs dictionary.
  *    5) this function calls calls the python callback function with the args and kwargs arguments.
- *    6) if a function raises an exception then this function returns -2 as a way of indicating an error.
+ *    6) if a function raises an exception then this function returns TEMP_YDB_RAISE_PYTHON_EXCEPTION as a way of indicating an error.
  *            (note) the PyErr String is already set so the the function receiving the return value (tp) just needs to return NULL.
  */
 static int callback_wrapper(uint64_t tp_token, ydb_buffer_t*errstr, void *function_with_arguments) {
@@ -1306,7 +1301,10 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t*errstr, void *functi
     return_value = PyObject_Call(function, args, kwargs);
     if (NULL == return_value) {
         /* function raised an exception */
-        return -2; /* MAGIC NUMBER flag to raise exception at the next level up */
+        return TEMP_YDB_RAISE_PYTHON_EXCEPTION;
+    } else if (!PyLong_Check(return_value)){
+        PyErr_SetString(PyExc_TypeError, "Callback function must return value of type int.");
+        return TEMP_YDB_RAISE_PYTHON_EXCEPTION;
     }
     return_val = (int)PyLong_AsLong(return_value);
     Py_DECREF(return_value);
@@ -1390,9 +1388,7 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
                             namecount, varname_buffers);
 
         /* check status for Errors and Raise Exception */
-        if (-2 == status) {/* MAGIC VALUE to indicate that the callback
-                         * function raised an exception and should be raised
-                         */
+        if (TEMP_YDB_RAISE_PYTHON_EXCEPTION == status) {
             return_NULL = true;
         } else if (YDB_OK != status) {
             raise_YDBError(status, &error_string_buffer);
