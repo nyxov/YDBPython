@@ -383,7 +383,11 @@ static void raise_YDBError(int status, ydb_buffer_t* error_string_buffer) {
     tuple = PyTuple_New(2);
     PyTuple_SetItem(tuple, 0, PyLong_FromLong(status));
     PyTuple_SetItem(tuple, 1, Py_BuildValue("s#", error_string_buffer->buf_addr, error_string_buffer->len_used));
-    PyErr_SetObject(YDBError, tuple);
+
+    if (YDB_TP_ROLLBACK == status)
+        PyErr_SetObject(YDBTPRollbackError, tuple);
+    else
+        PyErr_SetObject(YDBError, tuple);
 }
 
 
@@ -1390,7 +1394,7 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
                          * function raised an exception and should be raised
                          */
             return_NULL = true;
-        } else if (YDB_OK != status && YDB_TP_ROLLBACK != status) {
+        } else if (YDB_OK != status) {
             raise_YDBError(status, &error_string_buffer);
             return_NULL = true;
         }
@@ -1595,6 +1599,11 @@ PyMODINIT_FUNC PyInit__yottadb_wrapper(void) {
                                         NULL, // use to pick base class
                                         exc_dict);
     PyModule_AddObject(module,"YDBError", YDBError);
+
+    YDBTPRollbackError = PyErr_NewException("_yottadb.YDBTPRollbackError",
+                                        YDBError, // use to pick base class
+                                        NULL);
+    PyModule_AddObject(module,"YDBTPRollbackError", YDBTPRollbackError);
 
     /* setting up YDBTimeoutError */
     YDBTimeoutError = PyErr_NewException("_yottadb.YDBTimeoutError",

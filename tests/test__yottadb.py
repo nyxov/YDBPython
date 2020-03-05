@@ -273,10 +273,11 @@ def test_tp_2_rollback(bank):
     transfer_amount = account1_balance + 1
     _yottadb.set(varname=b'account', subsarray=(account1, b'balance'), value=bytes(str(account1_balance), encoding='utf-8'))
     _yottadb.set(varname=b'account', subsarray=(account2, b'balance'), value=bytes(str(account2_balance), encoding='utf-8'))
+    try:
+        result = _yottadb.tp(transfer_transaction, args=(account1, account2, transfer_amount), kwargs={})
+    except _yottadb.YDBTPRollbackError as e:
+        assert e.code == _yottadb.YDB_TP_ROLLBACK
 
-    result = _yottadb.tp(transfer_transaction, args=(account1, account2, transfer_amount), kwargs={})
-
-    assert result == _yottadb.YDB_TP_ROLLBACK
     assert int(_yottadb.get(varname=b'account', subsarray=(account1, b'balance'))) == account1_balance
     assert int(_yottadb.get(varname=b'account', subsarray=(account2, b'balance'))) == account2_balance
 

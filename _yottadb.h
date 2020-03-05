@@ -52,6 +52,7 @@ typedef struct {
  * to accept both. Use raise_YottaDBError function to raise
  */
 static PyObject *YDBError;
+static PyObject *YDBTPRollbackError;
 
 /* YottaDBLockTimeout is a simple exception to indicate that a lock failed due to timeout. */
 static PyObject *YDBTimeoutError;
