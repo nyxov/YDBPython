@@ -1290,16 +1290,39 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t*errstr, void *functi
      * It assumes that everything passed to it was validated.
      */
     int return_val;
+    bool decref_args = false;
+    bool decref_kwargs = false;
     PyObject *function, *args, *kwargs, *return_value, *tp_token_py;
+
 
     function = PyTuple_GetItem(function_with_arguments, 0);
     args = PyTuple_GetItem(function_with_arguments, 1);
     kwargs = PyTuple_GetItem(function_with_arguments, 2);
+
+    if (Py_None == args) {
+        args = PyTuple_New(0);
+        decref_args = true;
+    }
+
+    if (Py_None == kwargs) {
+        kwargs = PyDict_New();
+        decref_kwargs = true;
+    }
+
     tp_token_py = Py_BuildValue("K", tp_token);
     PyDict_SetItemString(kwargs, "tp_token", tp_token_py);
     Py_DECREF(tp_token_py);
 
     return_value = PyObject_Call(function, args, kwargs);
+
+    if (decref_args)
+        Py_DECREF(args);
+
+    if (decref_kwargs)
+        Py_DECREF(kwargs);
+
+
+
     if (NULL == return_value) {
         /* function raised an exception */
         return TEMP_YDB_RAISE_PYTHON_EXCEPTION; // TODO: replace after resolution of YDB issue #548
@@ -1315,7 +1338,7 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t*errstr, void *functi
 /* Wrapper for ydb_tp_s() / ydb_tp_st() */
 static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    bool decref_args, decref_kwargs, success;
+    bool success;
     int namecount, status;
     uint64_t tp_token;
     char *transid;
@@ -1324,9 +1347,7 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* Defaults for non-required arguments */
     callback_args = Py_None;
-    decref_args = false;
     callback_kwargs = Py_None;
-    decref_kwargs = false;
     transid = "BATCH";
     namecount = 0;
     varnames = Py_None;
@@ -1338,16 +1359,6 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOsOK", kwlist, &callback, &callback_args, &callback_kwargs, &transid, &varnames, &tp_token))
         return_NULL = true;
 
-    if (Py_None == callback_args) {
-        callback_args = PyTuple_New(0);
-        decref_args = true;
-    }
-
-    if (Py_None == callback_kwargs) {
-        callback_kwargs = PyDict_New();
-        decref_kwargs = true;
-    }
-
     /* validate input */
     if (!PyCallable_Check(callback)) {
         PyErr_SetString(PyExc_TypeError, "'callback' must be a callable.");
@@ -1358,7 +1369,7 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
                                         "(It will be passed to the callback function as positional arguments.)");
         return_NULL = true;
     }
-    if (!PyDict_Check(callback_kwargs)) {
+    if (Py_None != callback_kwargs && !PyDict_Check(callback_kwargs)) {
         PyErr_SetString(PyExc_TypeError, "'kwargs' must be a dictionary. "
                                         "(It will be passed to the callback function as keyword arguments.)");
         return_NULL = true;
@@ -1399,12 +1410,6 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
         YDB_FREE_BUFFER(&error_string_buffer);
         free(varname_buffers);
     }
-
-    /* decrement references for python default values that were created. */
-    if (decref_args)
-        Py_DECREF(callback_args);
-    if (decref_kwargs)
-        Py_DECREF(callback_kwargs);
 
     if (return_NULL)
         return NULL;
