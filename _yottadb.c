@@ -1303,7 +1303,6 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t*errstr, void *functi
         args = PyTuple_New(0);
         decref_args = true;
     }
-
     if (Py_None == kwargs) {
         kwargs = PyDict_New();
         decref_kwargs = true;
@@ -1317,11 +1316,8 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t*errstr, void *functi
 
     if (decref_args)
         Py_DECREF(args);
-
     if (decref_kwargs)
         Py_DECREF(kwargs);
-
-
 
     if (NULL == return_value) {
         /* function raised an exception */
