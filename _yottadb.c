@@ -19,43 +19,8 @@
 #include <ffi.h>
 
 #include "_yottadb.h"
+#include "_yottadbexceptions.h"
 
-
-
-
-
-/* function that sets up Exception to have both a code and a message */
-PyObject* make_getter_code() {
-    const char *code;
-    PyObject *dict, *output;
-
-    code =
-    "@property\n"
-    "def code(self):\n"
-    "  try:\n"
-    "    return self.args[0]\n"
-    "  except IndexError:\n"
-    "    return -1\n"
-    "@property\n"
-    "def message(self):\n"
-    "  try:\n"
-    "    return self.args[1]\n"
-    "  except IndexError:\n"
-    "    return ''\n"
-    "\n";
-
-    dict = PyDict_New();
-    PyDict_SetItemString(dict, "__builtins__", PyEval_GetBuiltins());
-    output = PyRun_String(code,Py_file_input,dict,dict);
-    if (NULL == output) {
-        Py_DECREF(dict);
-        return NULL;
-    }
-    Py_DECREF(output);
-    PyDict_DelItemString(dict,"__builtins__"); /* __builtins__ should not be an attribute of the exception */
-
-    return dict;
-}
 
 /* LOCAL UTILITY FUNCTIONS */
 
@@ -369,25 +334,53 @@ static void free_YDBKey_array(YDBKey* keysarray, int len) {
  *    error_string_buffer    - a ydb_buffer_t that may or may not contain the error message.
  */
 static void raise_YDBError(int status, ydb_buffer_t* error_string_buffer) {
-    int msg_status;
     ydb_buffer_t ignored_buffer;
-    PyObject *tuple;
+    PyObject *message;
+    int len_status_string;
+    char c_message[YDB_MAX_ERRORMSG];
+    char *error_name, *error_message, *first, *second, *third, *forth;
+    char *delim = ",";
+
+    len_status_string = snprintf(NULL, 0, "%d", status);
+    char status_string[len_status_string+1];
+    snprintf(status_string, len_status_string + 1, "%d", status);
 
     if (0 == error_string_buffer->len_used) {
-        msg_status = ydb_message(status, error_string_buffer);
-        if (YDB_ERR_SIMPLEAPINOTALLOWED == msg_status) {
-            YDB_MALLOC_BUFFER(&ignored_buffer, YDB_MAX_ERRORMSG)
-            ydb_message_t(YDB_NOTTP, &ignored_buffer, status, error_string_buffer);
-        }
+        YDB_MALLOC_BUFFER(&ignored_buffer, YDB_MAX_ERRORMSG);
+        ydb_message_t(YDB_NOTTP, &ignored_buffer, status, error_string_buffer);
     }
-    tuple = PyTuple_New(2);
-    PyTuple_SetItem(tuple, 0, PyLong_FromLong(status));
-    PyTuple_SetItem(tuple, 1, Py_BuildValue("s#", error_string_buffer->buf_addr, error_string_buffer->len_used));
 
-    if (YDB_TP_ROLLBACK == status)
-        PyErr_SetObject(YDBTPRollbackError, tuple);
-    else
-        PyErr_SetObject(YDBError, tuple);
+    if (0 != error_string_buffer->len_used) {
+        error_string_buffer->buf_addr[error_string_buffer->len_used] = '\0';
+        first = strtok(error_string_buffer->buf_addr, delim);
+        second = strtok(NULL, delim);
+        third = strtok(NULL, delim);
+        forth = strtok(NULL, delim);
+        if (NULL != forth) {
+            error_name = third;
+            error_message = forth;
+        } else  {
+            error_name = first;
+            error_message = second;
+        }
+
+        if (NULL != error_name)
+            strcpy(c_message, error_name+1);
+        strcat(c_message, " (");
+        strcat(c_message, status_string);
+        strcat(c_message, "):");
+        if (NULL != error_message)
+            strcat(c_message, error_message);
+        else
+            strcat(c_message, error_string_buffer->buf_addr);
+    } else {
+        strcpy(c_message, "UNKNOWN (");
+        strcat(c_message, status_string);
+        strcat(c_message, ")");
+    }
+    message = Py_BuildValue("s", c_message);
+
+    RAISE_SPECIFIC_ERRER(status, message);
 }
 
 
@@ -1549,7 +1542,7 @@ static struct PyModuleDef _yottadbmodule = {
     methods
 };
 
-PyMODINIT_FUNC PyInit__yottadb_wrapper(void) {
+PyMODINIT_FUNC PyInit__yottadb(void) {
     PyObject *module = PyModule_Create(&_yottadbmodule);
     if (NULL == module)
         return NULL;
@@ -1588,20 +1581,17 @@ PyMODINIT_FUNC PyInit__yottadb_wrapper(void) {
 
 
     /* Exceptions */
-    /* setting up YDBError */
-    PyObject* exc_dict = make_getter_code();
-    if (NULL == exc_dict)
-        return NULL;
-    
     YDBError = PyErr_NewException("_yottadb.YDBError",
                                         NULL, // use to pick base class
-                                        exc_dict);
+                                        NULL);
     PyModule_AddObject(module,"YDBError", YDBError);
 
     YDBTPRollbackError = PyErr_NewException("_yottadb.YDBTPRollbackError",
                                         YDBError, // use to pick base class
                                         NULL);
     PyModule_AddObject(module,"YDBTPRollbackError", YDBTPRollbackError);
+
+    ADD_YDBERRORS();
 
     /* setting up YDBTimeoutError */
     YDBTimeoutError = PyErr_NewException("_yottadb.YDBTimeoutError",

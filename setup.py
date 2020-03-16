@@ -18,29 +18,57 @@ import pathlib
 YDB_DIST = os.environ['ydb_dist']
 ERROR_DEF_FILES = ['libydberrors.h',  'libydberrors2.h']
 
-
-def create_error_code_module():
+def create_exceptions_from_error_codes():
     YDB_Dir = pathlib.Path(YDB_DIST)
-    py_error_file = pathlib.Path('.') / "_yottadb" / "errors.py"
-    with py_error_file.open('w') as py_file:
-        for filename in ERROR_DEF_FILES:
-            file_path = YDB_Dir / filename
-            with file_path.open() as file:
-                for line in file.readlines():
-                    if line[0:7] == "#define":
-                        parts = line.split()
-                        py_file.write(f'{parts[1]} = {parts[2]}\n')
+    exceptions_header = pathlib.Path('.') / "_yottadbexceptions.h"
+    exception_data = []
+    for filename in ERROR_DEF_FILES:
+        file_path = YDB_Dir / filename
+        with file_path.open() as file:
+            for line in file.readlines():
+                if line[0:7] == "#define":
+                    exception_info = {}
+                    parts = line.split()
+                    exception_info["c_name"] = parts[1]
+                    exception_info["python_name"] = f'YDB{exception_info["c_name"].split("_")[2]}Error'
+                    exception_data.append(exception_info)
 
+    with exceptions_header.open('w') as header_file:
+        # define exceptions
+        for exception_info in exception_data:
+            header_file.write(f'static PyObject *{exception_info["python_name"]};\n')
+        header_file.write('\n')
+        # create macro to add exceptions to module
+        header_file.write('#define ADD_YDBERRORS() { \\\n')
+        add_exception_template = ('    {python_name} = PyErr_NewException("_yottadb.{python_name}", YDBError, NULL); \\\n' +
+                                  '    PyModule_AddObject(module, "{python_name}", {python_name}); \\\n')
+        for exception_info in exception_data:
+            header_file.write(add_exception_template.replace('{python_name}', exception_info['python_name']))
+        header_file.write('}\n')
+        header_file.write('\n')
+        # create macro to test for and raise exception
+        header_file.write('#define RAISE_SPECIFIC_ERRER(STATUS, MESSAGE) { \\\n')
+        header_file.write("    if (YDB_TP_ROLLBACK == STATUS) \\\n")
+        header_file.write("        PyErr_SetObject(YDBTPRollbackError, MESSAGE); \\\n")
+        test_status_template = ('    else if ({c_name} == STATUS) \\\n' +
+                                '        PyErr_SetObject({python_name}, MESSAGE); \\\n')
+        for exception_info in exception_data:
+            test_status = test_status_template.replace('{python_name}', exception_info['python_name'])
+            test_status = test_status.replace('{c_name}', exception_info['c_name'])
+            header_file.write(test_status)
+        header_file.write('    else \\\n')
+        header_file.write('        PyErr_SetObject(YDBError, MESSAGE); \\\n')
+        header_file.write('}\n')
 
-create_error_code_module()
+create_exceptions_from_error_codes()
 
 setup(name = 'yottadb',
       version = '0.0.1',
-      ext_modules = [Extension("_yottadb_wrapper", sources = ['_yottadb.c'],
+      ext_modules = [Extension("_yottadb", sources = ['_yottadb.c'],
                                include_dirs=[YDB_DIST], library_dirs=[YDB_DIST],
                                extra_link_args= ["-l", "yottadb", "-l", "ffi"])],
       py_modules = ['_yottadb', 'yottadb'],
-      packages=find_packages(include=['_yottadb', '_yottadb.*', 'yottadb', 'yottadb.*']),
+      packages=find_packages(include=['_yottadb', '_yottadb.*', 'yottadb']),
       package_data={'': ['_yottadb.pyi']},
       include_package_data=True,
       setup_requires=['pytest-runner'],

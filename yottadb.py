@@ -21,10 +21,6 @@ from _yottadb import YDBError
 from _yottadb import YDBTimeoutError
 
 from _yottadb import YDB_NOTTP as NOTTP
-from _yottadb.errors import YDB_ERR_NODEEND as NODEEND
-
-from _yottadb.errors import YDB_ERR_GVUNDEF as GLOBAL_VAR_UNDEF
-from _yottadb.errors import YDB_ERR_LVUNDEF as LOCAL_VAR_UNDEF
 
 from _yottadb import YDB_DEL_NODE as DEL_NODE
 from _yottadb import YDB_DEL_TREE as DEL_TREE
@@ -169,9 +165,8 @@ class Context:
             try:
                 var_next = self.subscript_next(var_next)
                 yield var_next
-            except YDBError as e:
-                if e.code == NODEEND:
-                    return
+            except _yottadb.YDBNODEENDError as e:
+                return
 
     @property
     def local_varnames(self) -> Generator[Data, None, None]:
@@ -328,11 +323,8 @@ class Key:
                 return cast(Optional[str], self.context.get(self.varname_bytes, self.subsarray_bytes))
             else:
                 return cast(Optional[str], self.context.get(self.varname_bytes, self.subsarray_bytes, val_encoding=self.val_encoding))
-        except YDBError as e:
-            if e.code == GLOBAL_VAR_UNDEF or e.code == LOCAL_VAR_UNDEF:
-                return None
-            else:
-                raise e
+        except (_yottadb.YDBGVUNDEFError, _yottadb.YDBLVUNDEFError):
+            return None
 
     @value.setter
     def value(self, value: Union[str, bytes]) -> None:
@@ -353,11 +345,8 @@ class Key:
     def value_bytes(self) -> Optional[bytes]:
         try:
             return cast(Optional[bytes], self.context.get(self.varname_bytes, self.subsarray_bytes, val_encoding=None))
-        except YError as e:
-            if e.code == GLOBAL_VAR_UNDEF or e.code == LOCAL_VAR_UNDEF:
-                return None
-            else:
-                raise e
+        except (_yottadb.YDBGVUNDEFError, _yottadb.YDBLVUNDEFError):
+            return None
 
     def delete_node(self):
         self.context.delete_node(self.varname_bytes, self.subsarray_bytes)
@@ -395,9 +384,8 @@ class Key:
                 sub_next = self.context.subscript_next(self.varname_bytes, subscript_subsarray)
                 subscript_subsarray[-1] = sub_next
                 yield sub_next
-            except YDBError as e:
-                if e.code == NODEEND:
-                    return
+            except _yottadb.YDBNODEENDError:
+                return
 
     @property
     def subscript_keys(self) -> Generator:

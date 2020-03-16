@@ -112,13 +112,13 @@ def test_Key_delete_tree(ydb):
     testkey.value = 'test7value'
     subkey.value = 'test7 subvalue'
 
-    assert testkey.value =='test7value'
-    assert subkey.value =='test7 subvalue'
+    assert testkey.value == 'test7value'
+    assert subkey.value == 'test7 subvalue'
 
     testkey.delete_tree()
 
-    assert testkey.value ==None
-    assert subkey.value ==None
+    assert testkey.value == None
+    assert subkey.value == None
 
 
 def test_Key_data(ydb, simple_data):
