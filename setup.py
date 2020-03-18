@@ -47,9 +47,9 @@ def create_exceptions_from_error_codes():
         header_file.write('}\n')
         header_file.write('\n')
         # create macro to test for and raise exception
-        header_file.write('#define RAISE_SPECIFIC_ERRER(STATUS, MESSAGE) { \\\n')
+        header_file.write('#define RAISE_SPECIFIC_ERROR(STATUS, MESSAGE) { \\\n')
         header_file.write("    if (YDB_TP_ROLLBACK == STATUS) \\\n")
-        header_file.write("        PyErr_SetObject(YDBTPRollbackError, MESSAGE); \\\n")
+        header_file.write("        PyErr_SetObject(YDBTPRollback, MESSAGE); \\\n")
         test_status_template = ('    else if ({c_name} == STATUS) \\\n' +
                                 '        PyErr_SetObject({python_name}, MESSAGE); \\\n')
         for exception_info in exception_data:

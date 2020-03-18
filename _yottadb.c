@@ -380,7 +380,7 @@ static void raise_YDBError(int status, ydb_buffer_t* error_string_buffer) {
     }
     message = Py_BuildValue("s", c_message);
 
-    RAISE_SPECIFIC_ERRER(status, message);
+    RAISE_SPECIFIC_ERROR(status, message);
 }
 
 
@@ -509,10 +509,12 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
     YDB_FREE_BUFFER(&varname_y);
     FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer)
-    if (return_NULL)
+    if (return_NULL) {
         return NULL;
-    else
+    } else {
+        Py_INCREF(Py_None);
         return Py_None;
+    }
 }
 
 /* Wrapper for ydb_delete_excl_s() and ydb_delete_excl_st() */
@@ -557,10 +559,12 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
     /* free allocated memory */
     FREE_BUFFER_ARRAY(varnames_ydb, namecount);
     YDB_FREE_BUFFER(&error_string_buffer);
-    if (return_NULL)
+    if (return_NULL) {
         return NULL;
-    else
+    } else {
+        Py_INCREF(Py_None);
         return Py_None;
+    }
 }
 
 /* Wrapper for ydb_get_s() and ydb_get_st() */
@@ -778,10 +782,12 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
     free(error_string_buffer);
     free_YDBKey_array(keys_ydb, len_keys);
 
-    if (return_NULL)
+    if (return_NULL) {
         return NULL;
-    else
+    } else {
+        Py_INCREF(Py_None);
         return Py_None;
+    }
 }
 
 /* Wrapper for ydb_lock_decr_s() and ydb_lock_decr_st() */
@@ -826,10 +832,12 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
     FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer);
 
-    if (return_NULL)
+    if (return_NULL) {
         return NULL;
-    else
+    } else {
+        Py_INCREF(Py_None);
         return Py_None;
+    }
 }
 
 /* Wrapper for ydb_lock_incr_s() and ydb_lock_incr_st() */
@@ -878,10 +886,12 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
     FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer);
 
-    if (return_NULL)
+    if (return_NULL) {
         return NULL;
-    else
+    } else {
+        Py_INCREF(Py_None);
         return Py_None;
+    }
 }
 
 /* Wrapper for ydb_node_next_s() and ydb_node_next_st() */
@@ -1080,10 +1090,12 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
     FREE_BUFFER_ARRAY(subsarray_y, subs_used);
     YDB_FREE_BUFFER(&error_string_buffer);
 
-    if (return_NULL)
+    if (return_NULL) {
         return NULL;
-    else
+    } else {
+        Py_INCREF(Py_None);
         return Py_None;
+    }
 }
 
 /* Wrapper for ydb_str2zwr_s() and ydb_str2zwr_st() */
@@ -1586,10 +1598,10 @@ PyMODINIT_FUNC PyInit__yottadb(void) {
                                         NULL);
     PyModule_AddObject(module,"YDBError", YDBError);
 
-    YDBTPRollbackError = PyErr_NewException("_yottadb.YDBTPRollbackError",
+    YDBTPRollback = PyErr_NewException("_yottadb.YDBTPRollback",
                                         YDBError, // use to pick base class
                                         NULL);
-    PyModule_AddObject(module,"YDBTPRollbackError", YDBTPRollbackError);
+    PyModule_AddObject(module,"YDBTPRollback", YDBTPRollback);
 
     ADD_YDBERRORS();
 
