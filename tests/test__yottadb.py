@@ -223,6 +223,77 @@ def simple_function(param, tp_token=NOTTP):
     print(param)
     return _yottadb.YDB_OK
 
+# new tp() tests
+def return_YDB_OK_transaction(key:KeyTuple, value:bytes, tp_token:int = NOTTP) -> int:
+    _yottadb.set(*key, value, tp_token=tp_token)
+    return _yottadb.YDB_OK
+
+
+def test_tp_return_YDB_OK():
+    key = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_return_YDB_OK',))
+    value = b'return YDB_OK'
+    _yottadb.delete(*key)
+    assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
+
+    _yottadb.tp(return_YDB_OK_transaction, args=(key, value))
+
+    assert _yottadb.get(*key) == value
+    _yottadb.delete(*key)
+
+
+def return_YDB_ROLLBACK_transaction(key:KeyTuple, value:bytes, tp_token:int = NOTTP) -> int:
+    _yottadb.set(*key, value, tp_token=tp_token)
+    return _yottadb.YDB_TP_ROLLBACK
+
+
+def test_tp_return_YDB_ROLLBACK():
+    key = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_return_YDB_ROLLBACK',))
+    value = b'return YDB_ROLLBACK'
+    _yottadb.delete(*key)
+    assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
+
+    with pytest.raises(_yottadb.YDBTPRollback):
+        _yottadb.tp(return_YDB_ROLLBACK_transaction, args=(key, value))
+
+    assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
+
+
+def return_YDB_TP_RESTART_transaction(key1: KeyTuple, key2: KeyTuple, value:bytes, tracker:KeyTuple, tp_token:int = NOTTP) -> int:
+    if int(_yottadb.get(*tracker, tp_token=tp_token)) == 0:
+        _yottadb.set(*key1, value=value, tp_token = tp_token)
+    else:
+        _yottadb.set(*key2, value=value, tp_token=tp_token)
+
+    if int(_yottadb.get(*tracker, tp_token=tp_token)) == 0:
+        _yottadb.incr(*tracker, tp_token=tp_token)
+        return _yottadb.YDB_TP_RESTART
+    else:
+        return _yottadb.YDB_OK
+
+
+def test_tp_return_YDB_TP_RESTART():
+    # Given:
+    key1 = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_return_YDB_TP_RESTART', b'key1'))
+    _yottadb.delete(*key1)
+    key2 = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_return_YDB_TP_RESTART', b'key2'))
+    _yottadb.delete(*key2)
+    value = b'restart once'
+    tracker = KeyTuple(varname=b'tptests', subsarray=(b'test_tp_return_YDB_RESET', b'reset count'))
+    _yottadb.set(*tracker, value=b'0')
+    # When:
+    _yottadb.tp(return_YDB_TP_RESTART_transaction, args=(key1, key2, value, tracker))
+    # Then:
+    with pytest.raises(_yottadb.YDBGVUNDEFError):
+        _yottadb.get(*key1)
+    assert _yottadb.get(*key2) == value
+    assert int(_yottadb.get(*tracker)) == 1
+    # clean up
+    _yottadb.delete(*key1)
+    _yottadb.delete(*key2)
+    _yottadb.delete(*tracker)
+
+
+# old tp() tests
 def test_tp_0():
     _yottadb.tp(simple_function, args=('test0',))
 
@@ -273,7 +344,7 @@ def test_tp_2_rollback(bank):
     transfer_amount = account1_balance + 1
     _yottadb.set(varname=b'account', subsarray=(account1, b'balance'), value=bytes(str(account1_balance), encoding='utf-8'))
     _yottadb.set(varname=b'account', subsarray=(account2, b'balance'), value=bytes(str(account2_balance), encoding='utf-8'))
-    with pytest.raises(_yottadb.YDBTPRollbackError):
+    with pytest.raises(_yottadb.YDBTPRollback):
         result = _yottadb.tp(transfer_transaction, args=(account1, account2, transfer_amount), kwargs={})
 
     assert int(_yottadb.get(varname=b'account', subsarray=(account1, b'balance'))) == account1_balance
