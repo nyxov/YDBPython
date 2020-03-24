@@ -12,8 +12,8 @@
  *                                                              *
  ****************************************************************/
 
-
 #include <stdbool.h>
+
 #include <Python.h>
 #include <libyottadb.h>
 #include <ffi.h>
@@ -336,14 +336,10 @@ static void free_YDBKey_array(YDBKey* keysarray, int len) {
 static void raise_YDBError(int status, ydb_buffer_t* error_string_buffer) {
     ydb_buffer_t ignored_buffer;
     PyObject *message;
-    int len_status_string;
-    char c_message[YDB_MAX_ERRORMSG];
-    char *error_name, *error_message, *first, *second, *third, *forth;
-    char *delim = ",";
-
-    len_status_string = snprintf(NULL, 0, "%d", status);
-    char status_string[len_status_string+1];
-    snprintf(status_string, len_status_string + 1, "%d", status);
+    char full_error_message[YDB_MAX_ERRORMSG];
+    char *error_name, *error_message, *err_field1, *err_field2, *err_field3, *err_field4;
+    char *next_field = NULL;
+    const char *delim = ",";
 
     if (0 == error_string_buffer->len_used) {
         YDB_MALLOC_BUFFER(&ignored_buffer, YDB_MAX_ERRORMSG);
@@ -352,33 +348,31 @@ static void raise_YDBError(int status, ydb_buffer_t* error_string_buffer) {
 
     if (0 != error_string_buffer->len_used) {
         error_string_buffer->buf_addr[error_string_buffer->len_used] = '\0';
-        first = strtok(error_string_buffer->buf_addr, delim);
-        second = strtok(NULL, delim);
-        third = strtok(NULL, delim);
-        forth = strtok(NULL, delim);
-        if (NULL != forth) {
-            error_name = third;
-            error_message = forth;
+        err_field1 = strtok_r(error_string_buffer->buf_addr, delim, &next_field);
+        err_field2 = strtok_r(NULL, delim, &next_field);
+        err_field3 = strtok_r(NULL, delim, &next_field);
+        err_field4 = strtok_r(NULL, delim, &next_field);
+        if (NULL != err_field4) {
+            error_name = err_field3;
+            error_message = err_field4;
         } else  {
-            error_name = first;
-            error_message = second;
+            error_name = err_field1;
+            error_message = err_field2;
         }
-
-        if (NULL != error_name)
-            strcpy(c_message, error_name+1);
-        strcat(c_message, " (");
-        strcat(c_message, status_string);
-        strcat(c_message, "):");
-        if (NULL != error_message)
-            strcat(c_message, error_message);
-        else
-            strcat(c_message, error_string_buffer->buf_addr);
+        if (NULL == error_name)
+            error_name = "UNKNOWN";
+        if (NULL == error_message)
+            error_message = "";
+    } else if (YDB_TP_ROLLBACK == status){
+        error_name = "%YDB-TP-ROLLBACK";
+        error_message = " Transaction callback function returned YDB_TP_ROLLBACK.";
     } else {
-        strcpy(c_message, "UNKNOWN (");
-        strcat(c_message, status_string);
-        strcat(c_message, ")");
+        error_name = "UNKNOWN";
+        error_message = "";
     }
-    message = Py_BuildValue("s", c_message);
+
+    snprintf(full_error_message, YDB_MAX_ERRORMSG, "%s (%d):%s", error_name, status, error_message);
+    message = Py_BuildValue("s", full_error_message);
 
     RAISE_SPECIFIC_ERROR(status, message);
 }

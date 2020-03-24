@@ -1,5 +1,6 @@
 /* A structure that represents a key using ydb c types. used internally for converting between python and ydb c types */
 #define TEMP_YDB_RAISE_PYTHON_EXCEPTION -2 // TODO: remove after resolution of YDB issue #548
+#define INT32_TO_STRING_MAX 12
 
 typedef struct {
     ydb_buffer_t *varname;

@@ -644,13 +644,13 @@ def test_incr(key, initial, increment, result):
     assert _yottadb.get(*key) == result
     _yottadb.delete(*key, _yottadb.YDB_DEL_TREE)
 
-incerement_error_test = [
+incerment_error_test = [
     (b"0", "1E47", _yottadb.YDBNUMOFLOWError),
     (b"0", "-1E47", _yottadb.YDBNUMOFLOWError),
     #("0", "1E-47", _yottadb.YDBNUMOFLOWError),
 ]
-increment_test_ids = [f'"{initial}" | "{type(increment).__name__}({increment})" | {error_type}' for initial, increment, error_type in incerement_error_test]
-@pytest.mark.parametrize('initial, increment, error_type', incerement_error_test, ids=increment_test_ids)
+increment_test_ids = [f'"{initial}" | "{type(increment).__name__}({increment})" | {error_type}' for initial, increment, error_type in incerment_error_test]
+@pytest.mark.parametrize('initial, increment, error_type', incerment_error_test, ids=increment_test_ids)
 @pytest.mark.parametrize('key', increment_keys, ids=increment_key_test_ids)
 def test_incr_errors(key, initial, increment, error_type):
     _yottadb.set(*key, value=initial)

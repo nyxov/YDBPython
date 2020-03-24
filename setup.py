@@ -33,32 +33,36 @@ def create_exceptions_from_error_codes():
                     exception_info["python_name"] = f'YDB{exception_info["c_name"].split("_")[2]}Error'
                     exception_data.append(exception_info)
 
+
+    header_file_text = ""
+    # define exceptions
+    for exception_info in exception_data:
+        header_file_text += f'static PyObject *{exception_info["python_name"]};\n'
+    header_file_text += '\n'
+    # create macro to add exceptions to module
+    header_file_text += '#define ADD_YDBERRORS() { \\\n'
+    add_exception_template = ('    {python_name} = PyErr_NewException("_yottadb.{python_name}", YDBError, NULL); \\\n' +
+                              '    PyModule_AddObject(module, "{python_name}", {python_name}); \\\n')
+    for exception_info in exception_data:
+        header_file_text += add_exception_template.replace('{python_name}', exception_info['python_name'])
+    header_file_text += '}\n'
+    header_file_text += '\n'
+    # create macro to test for and raise exception
+    header_file_text += '#define RAISE_SPECIFIC_ERROR(STATUS, MESSAGE) { \\\n'
+    header_file_text += "    if (YDB_TP_ROLLBACK == STATUS) \\\n"
+    header_file_text += "        PyErr_SetObject(YDBTPRollback, MESSAGE); \\\n"
+    test_status_template = ('    else if ({c_name} == STATUS) \\\n' +
+                            '        PyErr_SetObject({python_name}, MESSAGE); \\\n')
+    for exception_info in exception_data:
+        test_status = test_status_template.replace('{python_name}', exception_info['python_name'])
+        test_status = test_status.replace('{c_name}', exception_info['c_name'])
+        header_file_text += test_status
+    header_file_text += '    else \\\n'
+    header_file_text += '        PyErr_SetObject(YDBError, MESSAGE); \\\n'
+    header_file_text += '}\n'
+
     with exceptions_header.open('w') as header_file:
-        # define exceptions
-        for exception_info in exception_data:
-            header_file.write(f'static PyObject *{exception_info["python_name"]};\n')
-        header_file.write('\n')
-        # create macro to add exceptions to module
-        header_file.write('#define ADD_YDBERRORS() { \\\n')
-        add_exception_template = ('    {python_name} = PyErr_NewException("_yottadb.{python_name}", YDBError, NULL); \\\n' +
-                                  '    PyModule_AddObject(module, "{python_name}", {python_name}); \\\n')
-        for exception_info in exception_data:
-            header_file.write(add_exception_template.replace('{python_name}', exception_info['python_name']))
-        header_file.write('}\n')
-        header_file.write('\n')
-        # create macro to test for and raise exception
-        header_file.write('#define RAISE_SPECIFIC_ERROR(STATUS, MESSAGE) { \\\n')
-        header_file.write("    if (YDB_TP_ROLLBACK == STATUS) \\\n")
-        header_file.write("        PyErr_SetObject(YDBTPRollback, MESSAGE); \\\n")
-        test_status_template = ('    else if ({c_name} == STATUS) \\\n' +
-                                '        PyErr_SetObject({python_name}, MESSAGE); \\\n')
-        for exception_info in exception_data:
-            test_status = test_status_template.replace('{python_name}', exception_info['python_name'])
-            test_status = test_status.replace('{c_name}', exception_info['c_name'])
-            header_file.write(test_status)
-        header_file.write('    else \\\n')
-        header_file.write('        PyErr_SetObject(YDBError, MESSAGE); \\\n')
-        header_file.write('}\n')
+        header_file.write(header_file_text)
 
 create_exceptions_from_error_codes()
 
