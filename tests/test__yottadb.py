@@ -361,7 +361,7 @@ def nested_return_YDB_ERR_TPTIMEOUT_transaction(key1:KeyTuple, value1:bytes, key
         return _yottadb.YDB_ERR_TPTIMEOUT
 
 
-def test_nested_return_YDB_ERR_TPTIMEOUT():
+def test_tp_nested_return_YDB_ERR_TPTIMEOUT():
     key1 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_return_YDB_ERR_TPTIMEOUT', b'outer'))
     value1 = b'return YDB_ERR_TPTIMEOUT'
     key2 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_return_YDB_ERR_TPTIMEOUT', b'nested'))
@@ -373,6 +373,10 @@ def test_nested_return_YDB_ERR_TPTIMEOUT():
 
     assert _yottadb.data(*key1) == _yottadb.YDB_DATA_NO_DATA
     assert _yottadb.data(*key2) == _yottadb.YDB_DATA_NO_DATA
+
+def raise_YDBLVUNDEFError_transaction
+
+def test_tp
 
 # old tp() tests
 def test_tp_0():
