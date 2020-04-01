@@ -240,6 +240,24 @@ def test_tp_return_YDB_OK():
     assert _yottadb.get(*key) == value
     _yottadb.delete(*key)
 
+def nested_return_YDB_OK_transaction(key1:KeyTuple, value1:bytes, key2:KeyTuple, value2:bytes, tp_token:int = NOTTP):
+    _yottadb.set(*key1, value1, tp_token=tp_token)
+    _yottadb.tp(return_YDB_OK_transaction, args=(key2, value2), tp_token=tp_token)
+    return _yottadb.YDB_OK
+
+def test_tp_nested_return_YDB_OK():
+    key1 = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_nested_return_YDB_OK', b'outer'))
+    value1 = b'return_YDB_OK'
+    key2 = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_nested_return_YDB_OK', b'nested'))
+    value2 = b'nested return_YDB_OK'
+
+    _yottadb.tp(nested_return_YDB_OK_transaction, args=(key1, value1, key2, value2))
+
+    assert _yottadb.get(*key1) == value1
+    assert _yottadb.get(*key2) == value2
+    _yottadb.delete(*key1)
+    _yottadb.delete(*key2)
+
 
 def return_YDB_ROLLBACK_transaction(key:KeyTuple, value:bytes, tp_token:int = NOTTP) -> int:
     _yottadb.set(*key, value, tp_token=tp_token)
@@ -256,6 +274,30 @@ def test_tp_return_YDB_ROLLBACK():
         _yottadb.tp(return_YDB_ROLLBACK_transaction, args=(key, value))
 
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
+
+
+def nested_return_YDB_ROLLBACK_transaction(key1:KeyTuple, value1:bytes, key2:KeyTuple, value2:bytes, tp_token:int = NOTTP):
+    _yottadb.set(*key1, value1, tp_token=tp_token)
+
+    try:
+        _yottadb.tp(return_YDB_ROLLBACK_transaction, args=(key2, value2), tp_token=tp_token)
+    except _yottadb.YDBTPRollback:
+        return _yottadb.YDB_TP_ROLLBACK
+
+
+def test_nested_return_YDB_ROLLBACK():
+    key1 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_return_YDB_ROLLBACK', b'outer'))
+    value1 = b'return YDB_ROLLBACK'
+    key2 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_return_YDB_ROLLBACK', b'nested'))
+    value2 = b'nested return YDB_ROLLBACK'
+
+
+    with pytest.raises(_yottadb.YDBTPRollback):
+        _yottadb.tp(nested_return_YDB_ROLLBACK_transaction, args=(key1, value1, key2, value2))
+
+    assert _yottadb.data(*key1) == _yottadb.YDB_DATA_NO_DATA
+    assert _yottadb.data(*key2) == _yottadb.YDB_DATA_NO_DATA
+
 
 
 def return_YDB_TP_RESTART_transaction(key1: KeyTuple, key2: KeyTuple, value:bytes, tracker:KeyTuple, tp_token:int = NOTTP) -> int:
@@ -291,6 +333,9 @@ def test_tp_return_YDB_TP_RESTART():
     _yottadb.delete(*key1)
     _yottadb.delete(*key2)
     _yottadb.delete(*tracker)
+
+
+
 
 
 # old tp() tests

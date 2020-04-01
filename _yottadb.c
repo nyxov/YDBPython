@@ -333,7 +333,7 @@ static void free_YDBKey_array(YDBKey* keysarray, int len) {
  *    status                - the error code that is returned by the wrapped ydb_ function.
  *    error_string_buffer    - a ydb_buffer_t that may or may not contain the error message.
  */
-static void raise_YDBError(int status, ydb_buffer_t* error_string_buffer) {
+static void raise_YDBError(int status, ydb_buffer_t* error_string_buffer, int tp_token) {
     ydb_buffer_t ignored_buffer;
     PyObject *message;
     char full_error_message[YDB_MAX_ERRORMSG];
@@ -343,7 +343,7 @@ static void raise_YDBError(int status, ydb_buffer_t* error_string_buffer) {
 
     if (0 == error_string_buffer->len_used) {
         YDB_MALLOC_BUFFER(&ignored_buffer, YDB_MAX_ERRORMSG);
-        ydb_message_t(YDB_NOTTP, &ignored_buffer, status, error_string_buffer);
+        ydb_message_t(tp_token, &ignored_buffer, status, error_string_buffer);
     }
 
     if (0 != error_string_buffer->len_used) {
@@ -434,7 +434,7 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
 
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
         }
 
@@ -494,7 +494,7 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
 
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
         }
     }
@@ -545,7 +545,7 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* check status for Errors and Raise Exception */
     if (YDB_OK != status) {
-        raise_YDBError(status, &error_string_buffer);
+        raise_YDBError(status, &error_string_buffer, tp_token);
         /* free allocated memory */
         return_NULL = true;
     }
@@ -603,7 +603,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
 
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
 
         }
@@ -660,7 +660,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
 
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
         }
 
@@ -765,7 +765,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
             PyErr_SetString(YDBTimeoutError, "Not able to acquire all requested locks in the specified time.");
             return_NULL = true;
         } else if (YDB_OK != status) {
-            raise_YDBError(status, error_string_buffer);
+            raise_YDBError(status, error_string_buffer, tp_token);
             return_NULL = true;
             return NULL;
         }
@@ -816,7 +816,7 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
 
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
         }
     }
@@ -870,7 +870,7 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
             PyErr_SetString(YDBTimeoutError, "Not able to acquire all requested locks in the specified time.");
             return_NULL = true;
         } else if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
         }
     }
@@ -946,7 +946,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
 
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
         }
         /* Create Python object to return */
@@ -1016,7 +1016,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
         }
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
         }
 
@@ -1073,7 +1073,7 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
 
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
         }
     }
@@ -1132,7 +1132,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
 
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buf);
+            raise_YDBError(status, &error_string_buf, tp_token);
             return_NULL = true;
         }
 
@@ -1192,7 +1192,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
         }
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
         }
 
@@ -1253,7 +1253,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
         }
 
@@ -1398,7 +1398,7 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
         if (TEMP_YDB_RAISE_PYTHON_EXCEPTION == status) { // TODO: replace after resolution of YDB issue #548
             return_NULL = true;
         } else if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buffer);
+            raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
         }
         /* free allocated memory */
@@ -1451,7 +1451,7 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
 
         /* check status for Errors and Raise Exception */
         if (YDB_OK != status) {
-            raise_YDBError(status, &error_string_buf);
+            raise_YDBError(status, &error_string_buf, tp_token);
             return_NULL = true;
         }
 
