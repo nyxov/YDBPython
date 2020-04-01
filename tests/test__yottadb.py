@@ -367,16 +367,36 @@ def test_tp_nested_return_YDB_ERR_TPTIMEOUT():
     key2 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_return_YDB_ERR_TPTIMEOUT', b'nested'))
     value2 = b'nested return YDB_ERR_TPTIMEOUT'
 
-
     with pytest.raises(_yottadb.YDBTPTIMEOUTError):
         _yottadb.tp(nested_return_YDB_ERR_TPTIMEOUT_transaction, args=(key1, value1, key2, value2))
 
     assert _yottadb.data(*key1) == _yottadb.YDB_DATA_NO_DATA
     assert _yottadb.data(*key2) == _yottadb.YDB_DATA_NO_DATA
 
-def raise_YDBLVUNDEFError_transaction
 
-def test_tp
+def raise_YDBError_transaction(key:KeyTuple, tp_token:int = NOTTP) -> int:
+    _yottadb.get(*key, tp_token=tp_token)
+
+
+def test_tp_raise_YDBError():
+    key = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_raise_YDBError',))
+    assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
+
+    with pytest.raises(_yottadb.YDBError):
+        _yottadb.tp(raise_YDBError_transaction, args=(key,))
+
+
+def nested_raise_YDBError_transaction(key:KeyTuple, tp_token:int = NOTTP) -> int:
+    _yottadb.tp(raise_YDBError_transaction, args=(key,), tp_token=tp_token)
+
+
+def test_nested_tp_raise_YDBError():
+    key = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_tp_raise_YDBError',))
+    assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
+
+    with pytest.raises(_yottadb.YDBError):
+        _yottadb.tp(nested_raise_YDBError_transaction, args=(key,))
+
 
 # old tp() tests
 def test_tp_0():
