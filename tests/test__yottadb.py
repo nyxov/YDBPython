@@ -390,13 +390,30 @@ def nested_raise_YDBError_transaction(key:KeyTuple, tp_token:int = NOTTP) -> int
     _yottadb.tp(raise_YDBError_transaction, args=(key,), tp_token=tp_token)
 
 
-def test_nested_tp_raise_YDBError():
+def test_tp_nested_raise_YDBError():
     key = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_tp_raise_YDBError',))
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
 
     with pytest.raises(_yottadb.YDBError):
         _yottadb.tp(nested_raise_YDBError_transaction, args=(key,))
 
+
+def raise_standard_python_exception_transaction(tp_token:int = NOTTP) -> int:
+    1/0
+
+
+def test_tp_raise_standard_python_exception():
+    with pytest.raises(ZeroDivisionError):
+        _yottadb.tp(raise_standard_python_exception_transaction)
+
+
+def nested_raise_standard_python_exception_transaction(tp_token:int = NOTTP) -> int:
+    _yottadb.tp(raise_standard_python_exception_transaction, tp_token=tp_token)
+
+
+def test_tp_nested_raise_standard_python_exception():
+    with pytest.raises(ZeroDivisionError):
+        _yottadb.tp(nested_raise_standard_python_exception_transaction)
 
 # old tp() tests
 def test_tp_0():
@@ -455,13 +472,6 @@ def test_tp_2_rollback(bank):
     assert int(_yottadb.get(varname=b'account', subsarray=(account1, b'balance'))) == account1_balance
     assert int(_yottadb.get(varname=b'account', subsarray=(account2, b'balance'))) == account2_balance
 
-def callback_that_raises_exception(tp_token=None):
-    a = 1/0
-
-
-def test_tp_3_python_exception_raised_in_callback():
-    with pytest.raises(ZeroDivisionError):
-        _yottadb.tp(callback_that_raises_exception)
 
 def callback_that_returns_wrong_type(tp_token=None):
     return "not an int"
