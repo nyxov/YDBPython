@@ -49,8 +49,8 @@ def create_exceptions_from_error_codes():
     header_file_text += '\n'
     # create macro to test for and raise exception
     header_file_text += '#define RAISE_SPECIFIC_ERROR(STATUS, MESSAGE) { \\\n'
-    header_file_text += "    if (YDB_TP_ROLLBACK == STATUS) \\\n"
-    header_file_text += "        PyErr_SetObject(YDBTPRollback, MESSAGE); \\\n"
+    header_file_text += "    if (YDB_OK == STATUS) \\\n"
+    header_file_text += '        PyErr_SetString(YDBPythonError, "YDB_OK incorrectly passed to raise_YDBError() in _yottadb c extention."); \\\n'
     test_status_template = ('    else if ({c_name} == STATUS) \\\n' +
                             '        PyErr_SetObject({python_name}, MESSAGE); \\\n')
     for exception_info in exception_data:

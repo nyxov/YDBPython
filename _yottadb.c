@@ -1397,6 +1397,13 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
         /* check status for Errors and Raise Exception */
         if (TEMP_YDB_RAISE_PYTHON_EXCEPTION == status) { // TODO: replace after resolution of YDB issue #548
             return_NULL = true;
+        } else if (YDB_TP_RESTART == status) {
+            PyErr_SetString(YDBTPRestart, "tp() callback function returned 'YDB_TP_RESTART'.");
+            return_NULL = true;
+        } else if (YDB_TP_ROLLBACK == status) {
+            PyErr_SetString(YDBTPRollback, "tp() callback function returned 'YDB_TP_ROLLBACK'.");
+            return_NULL = true;
+
         } else if (YDB_OK != status) {
             raise_YDBError(status, &error_string_buffer, tp_token);
             return_NULL = true;
@@ -1588,28 +1595,44 @@ PyMODINIT_FUNC PyInit__yottadb(void) {
 
 
     /* Exceptions */
-    YDBError = PyErr_NewException("_yottadb.YDBError",
+    YDBException = PyErr_NewException("_yottadb.YDBException",
                                         NULL, // use to pick base class
                                         NULL);
-    PyModule_AddObject(module,"YDBError", YDBError);
+    PyModule_AddObject(module,"YDBException", YDBException);
+
+    YDBTPException = PyErr_NewException("_yottadb.YDBTPException",
+                                        YDBException, // use to pick base class
+                                        NULL);
+    PyModule_AddObject(module,"YDBTPException", YDBTPException);
 
     YDBTPRollback = PyErr_NewException("_yottadb.YDBTPRollback",
-                                        YDBError, // use to pick base class
+                                        YDBTPException, // use to pick base class
                                         NULL);
     PyModule_AddObject(module,"YDBTPRollback", YDBTPRollback);
 
-    ADD_YDBERRORS();
+    YDBTPRestart = PyErr_NewException("_yottadb.YDBTPRestart",
+                                        YDBTPException, // use to pick base class
+                                        NULL);
+    PyModule_AddObject(module,"YDBTPRestart", YDBTPRestart);
+
 
     /* setting up YDBTimeoutError */
     YDBTimeoutError = PyErr_NewException("_yottadb.YDBTimeoutError",
-                                        NULL, // use to pick base class
+                                        YDBException, // use to pick base class
                                         NULL);
     PyModule_AddObject(module,"YDBTimeoutError", YDBTimeoutError);
 
     /* setting up YDBPythonError */
     YDBPythonError = PyErr_NewException("_yottadb.YDBPythonError",
-                                        NULL, // use to pick base class
+                                        YDBException, // use to pick base class
                                         NULL);
     PyModule_AddObject(module,"YDBPythonError", YDBPythonError);
+
+    YDBError = PyErr_NewException("_yottadb.YDBError",
+                                        YDBException, // use to pick base class
+                                        NULL);
+    PyModule_AddObject(module,"YDBError", YDBError);
+
+    ADD_YDBERRORS();
     return module;
 }
