@@ -400,6 +400,7 @@ def test_tp_nested_raise_YDBError():
 
 def raise_standard_python_exception_transaction(tp_token:int = NOTTP) -> int:
     1/0
+    return _yottadb.YDB_OK  # this line shouldn't execute
 
 
 def test_tp_raise_standard_python_exception():
@@ -409,6 +410,7 @@ def test_tp_raise_standard_python_exception():
 
 def nested_raise_standard_python_exception_transaction(tp_token:int = NOTTP) -> int:
     _yottadb.tp(raise_standard_python_exception_transaction, tp_token=tp_token)
+    return _yottadb.YDB_OK  # this line shouldn't execute
 
 
 def test_tp_nested_raise_standard_python_exception():
