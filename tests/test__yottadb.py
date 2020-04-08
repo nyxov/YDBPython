@@ -19,7 +19,7 @@ import shlex
 import datetime
 import time
 from decimal import Decimal
-from typing import NamedTuple, Sequence, Optional
+from typing import NamedTuple, Sequence, Tuple, Optional, Callable
 
 from conftest import execute
 from lock import key_tuple_to_str
@@ -224,34 +224,78 @@ def simple_function(param, tp_token=NOTTP):
     return _yottadb.YDB_OK
 
 # new tp() tests
-def return_YDB_OK_transaction(key:KeyTuple, value:bytes, tp_token:int = NOTTP) -> int:
-    _yottadb.set(*key, value, tp_token=tp_token)
-    return _yottadb.YDB_OK
 
+# generic recursive transaction tools
+def no_action(tp_token:int) -> None:
+    pass
 
+def set_key(key:KeyTuple, value:bytes, tp_token:int) -> None:
+    _yottadb.set(*key, value=value, tp_token=tp_token)
+
+def conditional_set_key(key1:KeyTuple, key2:KeyTuple, value:bytes, traker_key:KeyTuple, tp_token:int) -> None:
+    if _yottadb.data(*traker_key, tp_token) == _yottadb.YDB_DATA_NO_DATA:
+        _yottadb.set(*key1, value=value, tp_token=tp_token)
+    else:
+        _yottadb.set(*key2, value=value, tp_token=tp_token)
+
+def raise_YDBError(undefined_key:KeyTuple, tp_token) -> None:
+    _yottadb.get(*undefined_key, tp_token=tp_token)
+
+def raise_standard_python_exception(tp_token) -> None:
+    1/0
+
+class TransactionData(NamedTuple):
+    action: Callable = no_action
+    action_arguments: Tuple = ()
+    restart_key: KeyTuple = KeyTuple(b'tptests', (b'process_transation', b'default'))
+    return_value: int = _yottadb.YDB_OK
+
+def process_transaction(nested_transaction_data: Tuple[TransactionData], tp_token: int = NOTTP) -> int:
+    current_data = nested_transaction_data[0]
+
+    current_data.action(*current_data.action_arguments, tp_token=tp_token)
+
+    sub_data = nested_transaction_data[1:]
+    if len(sub_data) > 0:
+        try:
+            _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": sub_data}, tp_token=tp_token)
+        except _yottadb.YDBTPRestart:
+            return _yottadb.YDB_TP_RESTART
+        except _yottadb.YDBTPRollback:
+            return _yottadb.YDB_TP_ROLLBACK
+
+    if current_data.return_value == _yottadb.YDB_TP_RESTART:
+        if _yottadb.data(*current_data.restart_key, tp_token=tp_token) == _yottadb.YDB_DATA_NO_DATA:
+            _yottadb.incr(*current_data.restart_key, tp_token=tp_token)
+            return _yottadb.YDB_TP_RESTART
+        else:
+            return _yottadb.YDB_OK
+
+    return current_data.return_value
+
+# tests
 def test_tp_return_YDB_OK():
     key = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_return_YDB_OK',))
     value = b'return YDB_OK'
+    transaction_data = TransactionData(action=set_key, action_arguments=(key, value), return_value = _yottadb.YDB_OK)
     _yottadb.delete(*key)
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
 
-    _yottadb.tp(return_YDB_OK_transaction, args=(key, value))
+    _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
 
     assert _yottadb.get(*key) == value
     _yottadb.delete(*key)
 
-def nested_return_YDB_OK_transaction(key1:KeyTuple, value1:bytes, key2:KeyTuple, value2:bytes, tp_token:int = NOTTP):
-    _yottadb.set(*key1, value1, tp_token=tp_token)
-    _yottadb.tp(return_YDB_OK_transaction, args=(key2, value2), tp_token=tp_token)
-    return _yottadb.YDB_OK
 
 def test_tp_nested_return_YDB_OK():
     key1 = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_nested_return_YDB_OK', b'outer'))
     value1 = b'return_YDB_OK'
+    outer_transaction = TransactionData(action=set_key, action_arguments=(key1, value1), return_value=_yottadb.YDB_OK)
     key2 = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_nested_return_YDB_OK', b'nested'))
     value2 = b'nested return_YDB_OK'
+    inner_transaction = TransactionData(action=set_key, action_arguments=(key2, value2), return_value=_yottadb.YDB_OK)
 
-    _yottadb.tp(nested_return_YDB_OK_transaction, args=(key1, value1, key2, value2))
+    _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
 
     assert _yottadb.get(*key1) == value1
     assert _yottadb.get(*key2) == value2
@@ -259,163 +303,158 @@ def test_tp_nested_return_YDB_OK():
     _yottadb.delete(*key2)
 
 
-def return_YDB_ROLLBACK_transaction(key:KeyTuple, value:bytes, tp_token:int = NOTTP) -> int:
-    _yottadb.set(*key, value, tp_token=tp_token)
-    return _yottadb.YDB_TP_ROLLBACK
-
-
 def test_tp_return_YDB_ROLLBACK():
     key = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_return_YDB_ROLLBACK',))
     value = b'return YDB_ROLLBACK'
+    transation_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=_yottadb.YDB_TP_ROLLBACK)
     _yottadb.delete(*key)
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
 
     with pytest.raises(_yottadb.YDBTPRollback):
-        _yottadb.tp(return_YDB_ROLLBACK_transaction, args=(key, value))
+        _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transation_data,)})
 
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
-
-
-def nested_return_YDB_ROLLBACK_transaction(key1:KeyTuple, value1:bytes, key2:KeyTuple, value2:bytes, tp_token:int = NOTTP):
-    _yottadb.set(*key1, value1, tp_token=tp_token)
-
-    try:
-        _yottadb.tp(return_YDB_ROLLBACK_transaction, args=(key2, value2), tp_token=tp_token)
-    except _yottadb.YDBTPRollback:
-        return _yottadb.YDB_TP_ROLLBACK
 
 
 def test_nested_return_YDB_ROLLBACK():
     key1 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_return_YDB_ROLLBACK', b'outer'))
     value1 = b'return YDB_ROLLBACK'
+    outer_transaction = TransactionData(action=set_key, action_arguments=(key1, value1), return_value=_yottadb.YDB_TP_ROLLBACK)
     key2 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_return_YDB_ROLLBACK', b'nested'))
     value2 = b'nested return YDB_ROLLBACK'
-
+    inner_transaction = TransactionData(action=set_key, action_arguments=(key2, value2), return_value=_yottadb.YDB_TP_ROLLBACK)
+    _yottadb.delete(*key1)
+    _yottadb.delete(*key2)
+    assert _yottadb.data(*key1) == _yottadb.YDB_DATA_NO_DATA
+    assert _yottadb.data(*key2) == _yottadb.YDB_DATA_NO_DATA
 
     with pytest.raises(_yottadb.YDBTPRollback):
-        _yottadb.tp(nested_return_YDB_ROLLBACK_transaction, args=(key1, value1, key2, value2))
+        _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
 
     assert _yottadb.data(*key1) == _yottadb.YDB_DATA_NO_DATA
     assert _yottadb.data(*key2) == _yottadb.YDB_DATA_NO_DATA
 
 
-
-def return_YDB_TP_RESTART_transaction(key1: KeyTuple, key2: KeyTuple, value:bytes, tracker:KeyTuple, tp_token:int = NOTTP) -> int:
-    if int(_yottadb.get(*tracker, tp_token=tp_token)) == 0:
-        _yottadb.set(*key1, value=value, tp_token = tp_token)
-    else:
-        _yottadb.set(*key2, value=value, tp_token=tp_token)
-
-    if int(_yottadb.get(*tracker, tp_token=tp_token)) == 0:
-        _yottadb.incr(*tracker, tp_token=tp_token)
-        return _yottadb.YDB_TP_RESTART
-    else:
-        return _yottadb.YDB_OK
-
-
 def test_tp_return_YDB_TP_RESTART():
-    # Given:
     key1 = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_return_YDB_TP_RESTART', b'key1'))
     _yottadb.delete(*key1)
     key2 = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_return_YDB_TP_RESTART', b'key2'))
     _yottadb.delete(*key2)
     value = b'restart once'
     tracker = KeyTuple(varname=b'tptests', subsarray=(b'test_tp_return_YDB_RESET', b'reset count'))
-    _yottadb.set(*tracker, value=b'0')
-    # When:
-    _yottadb.tp(return_YDB_TP_RESTART_transaction, args=(key1, key2, value, tracker))
-    # Then:
+    transaction_data = TransactionData(action=conditional_set_key, action_arguments=(key1, key2, value, tracker),
+                                      restart_key=tracker, return_value=_yottadb.YDB_TP_RESTART)
+
+    _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
+
     with pytest.raises(_yottadb.YDBGVUNDEFError):
         _yottadb.get(*key1)
     assert _yottadb.get(*key2) == value
     assert int(_yottadb.get(*tracker)) == 1
-    # clean up
+
     _yottadb.delete(*key1)
     _yottadb.delete(*key2)
     _yottadb.delete(*tracker)
 
 
-def return_YDB_ERR_TPTIMEOUT_transaction(key:KeyTuple, value:bytes, tp_token:int = NOTTP) -> int:
-    _yottadb.set(*key, value, tp_token=tp_token)
-    return _yottadb.YDB_ERR_TPTIMEOUT
+def test_nested_tp_return_YDB_TP_RESTART():
+    key1_1 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_tp_return_YDB_TP_RESTART', b'outer', b'key1'))
+    _yottadb.delete(*key1_1)
+    key1_2 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_tp_return_YDB_TP_RESTART', b'outer', b'key2'))
+    _yottadb.delete(*key1_2)
+    value1 = b'outer restart once'
+    tracker1 = KeyTuple(varname=b'tptests', subsarray=(b'test_nested_tp_return_YDB_TP_RESTART', b'outer reset count'))
+    outer_transaction = TransactionData(action=conditional_set_key, action_arguments=(key1_1, key1_2, value1, tracker1),
+                                       restart_key=tracker1, return_value=_yottadb.YDB_TP_RESTART)
+
+    key2_1 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_tp_return_YDB_TP_RESTART', b'inner', b'key1'))
+    _yottadb.delete(*key2_1)
+    key2_2 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_tp_return_YDB_TP_RESTART', b'inner', b'key2'))
+    _yottadb.delete(*key2_2)
+    value2 = b'inner restart once'
+    tracker2 = KeyTuple(varname=b'tptests', subsarray=(b'test_nested_tp_return_YDB_TP_RESTART', b'inner reset count'))
+    inner_transaction = TransactionData(action=conditional_set_key, action_arguments=(key2_1, key2_2, value2, tracker2),
+                                        restart_key=tracker2, return_value=_yottadb.YDB_TP_RESTART)
+
+    _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
+
+    with pytest.raises(_yottadb.YDBGVUNDEFError):
+        _yottadb.get(*key1_1)
+    assert _yottadb.get(*key1_2) == value1
+    assert int(_yottadb.get(*tracker1)) == 1
+    with pytest.raises(_yottadb.YDBGVUNDEFError):
+        _yottadb.get(*key2_1)
+    assert _yottadb.get(*key2_2) == value2
+    assert int(_yottadb.get(*tracker2)) == 1
+
+    _yottadb.delete(*key1_1)
+    _yottadb.delete(*key1_2)
+    _yottadb.delete(*tracker1)
+    _yottadb.delete(*key2_1)
+    _yottadb.delete(*key2_2)
+    _yottadb.delete(*tracker2)
 
 
 def test_tp_return_YDB_ERR_TPTIMEOUT():
     key = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_return_YDB_ERR_TPTIMEOUT',))
     value = b'return YDB_ERR_TPTIMEOUT'
+    transaction_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=_yottadb.YDB_ERR_TPTIMEOUT)
     _yottadb.delete(*key)
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
 
     with pytest.raises(_yottadb.YDBTPTIMEOUTError):
-        _yottadb.tp(return_YDB_ERR_TPTIMEOUT_transaction, args=(key, value))
+        _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
 
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
-
-
-def nested_return_YDB_ERR_TPTIMEOUT_transaction(key1:KeyTuple, value1:bytes, key2:KeyTuple, value2:bytes, tp_token:int = NOTTP):
-    _yottadb.set(*key1, value1, tp_token=tp_token)
-
-    try:
-        _yottadb.tp(return_YDB_ERR_TPTIMEOUT_transaction, args=(key2, value2), tp_token=tp_token)
-    except _yottadb.YDBTPTIMEOUTError:
-        return _yottadb.YDB_ERR_TPTIMEOUT
 
 
 def test_tp_nested_return_YDB_ERR_TPTIMEOUT():
     key1 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_return_YDB_ERR_TPTIMEOUT', b'outer'))
     value1 = b'return YDB_ERR_TPTIMEOUT'
+    outer_transaction = TransactionData(action=set_key, action_arguments=(key1, value1), return_value=_yottadb.YDB_ERR_TPTIMEOUT)
     key2 = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_return_YDB_ERR_TPTIMEOUT', b'nested'))
     value2 = b'nested return YDB_ERR_TPTIMEOUT'
+    inner_transaction = TransactionData(action=set_key, action_arguments=(key2, value2), return_value=_yottadb.YDB_ERR_TPTIMEOUT)
 
     with pytest.raises(_yottadb.YDBTPTIMEOUTError):
-        _yottadb.tp(nested_return_YDB_ERR_TPTIMEOUT_transaction, args=(key1, value1, key2, value2))
+        _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
 
     assert _yottadb.data(*key1) == _yottadb.YDB_DATA_NO_DATA
     assert _yottadb.data(*key2) == _yottadb.YDB_DATA_NO_DATA
 
 
-def raise_YDBError_transaction(key:KeyTuple, tp_token:int = NOTTP) -> int:
-    _yottadb.get(*key, tp_token=tp_token)
-
-
 def test_tp_raise_YDBError():
     key = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_raise_YDBError',))
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
+    transaction_data = TransactionData(action=raise_YDBError, action_arguments=(key,))
 
     with pytest.raises(_yottadb.YDBError):
-        _yottadb.tp(raise_YDBError_transaction, args=(key,))
-
-
-def nested_raise_YDBError_transaction(key:KeyTuple, tp_token:int = NOTTP) -> int:
-    _yottadb.tp(raise_YDBError_transaction, args=(key,), tp_token=tp_token)
+        _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
 
 
 def test_tp_nested_raise_YDBError():
+    outer_transaction = TransactionData()
     key = KeyTuple(varname=b'^tptests', subsarray=(b'test_nested_tp_raise_YDBError',))
+    inner_transaction = TransactionData(action=raise_YDBError, action_arguments=(key,))
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
 
     with pytest.raises(_yottadb.YDBError):
-        _yottadb.tp(nested_raise_YDBError_transaction, args=(key,))
-
-
-def raise_standard_python_exception_transaction(tp_token:int = NOTTP) -> int:
-    1/0
-    return _yottadb.YDB_OK  # this line shouldn't execute
+        _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
 
 
 def test_tp_raise_standard_python_exception():
+    transaction_data = TransactionData(action=raise_standard_python_exception)
     with pytest.raises(ZeroDivisionError):
-        _yottadb.tp(raise_standard_python_exception_transaction)
-
-
-def nested_raise_standard_python_exception_transaction(tp_token:int = NOTTP) -> int:
-    _yottadb.tp(raise_standard_python_exception_transaction, tp_token=tp_token)
-    return _yottadb.YDB_OK  # this line shouldn't execute
+        _yottadb.tp(process_transaction, kwargs={'nested_transaction_data': (transaction_data,)})
 
 
 def test_tp_nested_raise_standard_python_exception():
+    outer_transaction = TransactionData()
+    inner_transaction = TransactionData(action=raise_standard_python_exception)
     with pytest.raises(ZeroDivisionError):
-        _yottadb.tp(nested_raise_standard_python_exception_transaction)
+        _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
+
+
 
 # old tp() tests
 def test_tp_0():
