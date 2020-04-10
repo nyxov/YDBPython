@@ -402,7 +402,7 @@ def test_tp_return_YDB_ERR_TPTIMEOUT():
     _yottadb.delete(*key)
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
 
-    with pytest.raises(_yottadb.YDBTPTIMEOUTError):
+    with pytest.raises(_yottadb.YDBTPTimeoutError):
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
 
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_NO_DATA
@@ -416,7 +416,7 @@ def test_tp_nested_return_YDB_ERR_TPTIMEOUT():
     value2 = b'nested return YDB_ERR_TPTIMEOUT'
     inner_transaction = TransactionData(action=set_key, action_arguments=(key2, value2), return_value=_yottadb.YDB_ERR_TPTIMEOUT)
 
-    with pytest.raises(_yottadb.YDBTPTIMEOUTError):
+    with pytest.raises(_yottadb.YDBTPTimeoutError):
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
 
     assert _yottadb.data(*key1) == _yottadb.YDB_DATA_NO_DATA

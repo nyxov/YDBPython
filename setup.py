@@ -14,14 +14,28 @@
 from setuptools import setup, Extension, find_packages
 import os
 import pathlib
+import csv
+from typing import Dict
 
 YDB_DIST = os.environ['ydb_dist']
 ERROR_DEF_FILES = ['libydberrors.h',  'libydberrors2.h']
+ERROR_NAME_ALTERATIONS_FILE = 'error_name_alterations.csv'
+
+def get_alteration_dict(filename:str) -> Dict[str,str]:
+    alterations = {}
+    alterations_file = pathlib.Path('.') / filename
+    with alterations_file.open() as f:
+        reader = csv.reader(f)
+        for row in reader:
+            alterations[row[0]] = row[1]
+    return alterations
+
 
 def create_exceptions_from_error_codes():
     YDB_Dir = pathlib.Path(YDB_DIST)
     exceptions_header = pathlib.Path('.') / "_yottadbexceptions.h"
     exception_data = []
+    alterations = get_alteration_dict(ERROR_NAME_ALTERATIONS_FILE)
     for filename in ERROR_DEF_FILES:
         file_path = YDB_Dir / filename
         with file_path.open() as file:
@@ -30,7 +44,10 @@ def create_exceptions_from_error_codes():
                     exception_info = {}
                     parts = line.split()
                     exception_info["c_name"] = parts[1]
-                    exception_info["python_name"] = f'YDB{exception_info["c_name"].split("_")[2]}Error'
+                    error_id = exception_info["c_name"].split("_")[2]
+                    if error_id in alterations.keys():
+                        error_id = alterations[error_id]
+                    exception_info["python_name"] = f'YDB{error_id}Error'
                     exception_data.append(exception_info)
 
 
