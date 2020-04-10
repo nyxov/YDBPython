@@ -13,7 +13,7 @@
  ****************************************************************/
 
 #include <stdbool.h>
-
+#include <assert.h>
 #include <Python.h>
 #include <libyottadb.h>
 #include <ffi.h>
