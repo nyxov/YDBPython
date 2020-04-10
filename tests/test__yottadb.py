@@ -15,6 +15,7 @@ import pytest # type: ignore
 
 import subprocess
 import os
+import sys
 import shlex
 import datetime
 import time
@@ -454,6 +455,28 @@ def test_tp_nested_raise_standard_python_exception():
     with pytest.raises(ZeroDivisionError):
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
 
+
+YDB_MAX_TP_DEPTH = 126
+@pytest.mark.parametrize('depth', range(1, YDB_MAX_TP_DEPTH+1))
+def test_tp_return_YDB_to_depth(depth):
+    def key_at_level(level: int) -> KeyTuple:
+        return KeyTuple(varname=b'^tptests', subsarray=(bytes(f'test_tp_return_YDB_to_depth{depth}', encoding='ascii'),
+                                                        bytes(f'level{level}', encoding='ascii')))
+
+    def value_at_level(level: int) -> bytes:
+        return bytes(f'level{level} returns YDB_OK', encoding='ascii')
+
+    transaction_data = []
+    for level in range(0, depth):
+        transaction_data.append(TransactionData(action=set_key, action_arguments=(key_at_level(level), value_at_level(level))))
+
+    _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": transaction_data})
+
+    for level in range(0,depth):
+        assert _yottadb.get(*key_at_level(level)) == value_at_level(level)
+
+    for level in range(0, depth):
+        _yottadb.delete(*key_at_level(level))
 
 
 # old tp() tests
