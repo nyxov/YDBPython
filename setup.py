@@ -66,18 +66,18 @@ def create_exceptions_from_error_codes():
     header_file_text += '\n'
     # create macro to test for and raise exception
     header_file_text += '#define RAISE_SPECIFIC_ERROR(STATUS, MESSAGE) { \\\n'
-    header_file_text += "    if (YDB_OK == STATUS) {\\\n"
-    header_file_text += '        assert(false); \\\n'
-    header_file_text += '        return; \\\n'
-    test_status_template = ('    } else if ({c_name} == STATUS) {\\\n' +
-                            '        PyErr_SetObject({python_name}, MESSAGE); \\\n')
+    header_file_text += '    assert(YDB_OK != STATUS); \\\n'
+    header_file_text += '    assert(NULL != MESSAGE); \\\n'
+    header_file_text += '    '
+    test_status_template = ('if ({c_name} == STATUS) \\\n' +
+                            '        PyErr_SetObject({python_name}, MESSAGE); \\\n' +
+                            '    else ')
+
     for exception_info in exception_data:
         test_status = test_status_template.replace('{python_name}', exception_info['python_name'])
         test_status = test_status.replace('{c_name}', exception_info['c_name'])
         header_file_text += test_status
-    header_file_text += '    } else {\\\n'
-    header_file_text += '        PyErr_SetObject(YDBError, MESSAGE); \\\n'
-    header_file_text += '    }\\\n'
+    header_file_text += '\\\n        PyErr_SetObject(YDBError, MESSAGE); \\\n'
     header_file_text += '}\n'
 
     with exceptions_header.open('w') as header_file:
