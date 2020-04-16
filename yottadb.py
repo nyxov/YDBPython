@@ -25,10 +25,10 @@ from _yottadb import YDB_NOTTP as NOTTP
 from _yottadb import YDB_DEL_NODE as DEL_NODE
 from _yottadb import YDB_DEL_TREE as DEL_TREE
 
-from _yottadb import YDB_DATA_NO_DATA as DATA_NO_DATA
-from _yottadb import YDB_DATA_HAS_VALUE_NO_TREE as DATA_HAS_VALUE_NO_TREE
-from _yottadb import YDB_DATA_HAS_VALUE_HAS_TREE as DATA_HAS_VALUE_HAS_TREE
-from _yottadb import YDB_DATA_NO_VALUE_HAS_TREE as DATA_NO_VALUE_HAS_TREE
+from _yottadb import YDB_DATA_UNDEF as DATA_UNDEF
+from _yottadb import YDB_DATA_VALUE_NODESC as DATA_VALUE_NODESC
+from _yottadb import YDB_DATA_NOVALUE_DESC as DATA_NOVALUE_DESC
+from _yottadb import YDB_DATA_VALUE_DESC as DATA_VALUE_DESC
 
 
 Data = Union[bytes, str]
@@ -360,14 +360,14 @@ class Key:
 
     @property
     def has_value(self):
-        if self.data == DATA_HAS_VALUE_NO_TREE or self.data == DATA_HAS_VALUE_HAS_TREE:
+        if self.data == DATA_VALUE_NODESC or self.data == DATA_VALUE_DESC:
             return True
         else:
             return False
 
     @property
     def has_tree(self):
-        if self.data == DATA_NO_VALUE_HAS_TREE or self.data == DATA_HAS_VALUE_HAS_TREE:
+        if self.data == DATA_NOVALUE_DESC or self.data == DATA_VALUE_DESC:
             return True
         else:
             return False

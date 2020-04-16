@@ -122,13 +122,13 @@ def test_Key_delete_tree(ydb):
 
 
 def test_Key_data(ydb, simple_data):
-    assert ydb['nodata'].data == yottadb.DATA_NO_DATA
-    assert ydb['^test1'].data == yottadb.DATA_HAS_VALUE_NO_TREE
-    assert ydb['^test2'].data == yottadb.DATA_NO_VALUE_HAS_TREE
-    assert ydb['^test2']['sub1'].data == yottadb.DATA_HAS_VALUE_NO_TREE
-    assert ydb['^test3'].data == yottadb.DATA_HAS_VALUE_HAS_TREE
-    assert ydb['^test3']['sub1'].data == yottadb.DATA_HAS_VALUE_HAS_TREE
-    assert ydb['^test3']['sub1']['sub2'].data == yottadb.DATA_HAS_VALUE_NO_TREE
+    assert ydb['nodata'].data == yottadb.DATA_UNDEF
+    assert ydb['^test1'].data == yottadb.DATA_VALUE_NODESC
+    assert ydb['^test2'].data == yottadb.DATA_NOVALUE_DESC
+    assert ydb['^test2']['sub1'].data == yottadb.DATA_VALUE_NODESC
+    assert ydb['^test3'].data == yottadb.DATA_VALUE_DESC
+    assert ydb['^test3']['sub1'].data == yottadb.DATA_VALUE_DESC
+    assert ydb['^test3']['sub1']['sub2'].data == yottadb.DATA_VALUE_NODESC
 
 
 def test_Key_has_value(ydb, simple_data):
