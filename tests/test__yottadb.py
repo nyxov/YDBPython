@@ -262,8 +262,6 @@ def process_transaction(nested_transaction_data: Tuple[TransactionData], tp_toke
             _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": sub_data}, tp_token=tp_token)
         except _yottadb.YDBTPRestart:
             return _yottadb.YDB_TP_RESTART
-        except _yottadb.YDBTPRollback:
-            return _yottadb.YDB_TP_ROLLBACK
 
     if current_data.return_value == _yottadb.YDB_TP_RESTART:
         if _yottadb.data(*current_data.restart_key, tp_token=tp_token) == _yottadb.YDB_DATA_UNDEF:

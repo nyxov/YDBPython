@@ -12,7 +12,7 @@
 #                                                               #
 #################################################################
 import pytest # type: ignore
-
+from typing import NamedTuple, Callable, Tuple
 
 import yottadb
 
@@ -148,3 +148,170 @@ def test_Key_has_tree(ydb, simple_data):
     assert ydb['^test3'].has_tree == True
     assert ydb['^test3']['sub1'].has_tree == True
     assert ydb['^test3']['sub1']['sub2'].has_tree == False
+
+# transaction decorator smoke tests
+@yottadb.transaction
+def simple_transaction(key1:yottadb.Key, value1:yottadb.Data, key2:yottadb.Key, value2:yottadb.Data, context:yottadb.Context) -> None:
+    key1.value = value1
+    key2.value = value2
+
+def test_transaction_smoke_test1(ydb) -> None:
+    test_base_key = ydb['^TransactionDecoratorTests']['smoke test 1']
+    test_base_key.delete_tree()
+    key1 = test_base_key['key1']
+    value1 = 'v1'
+    key2 = test_base_key['key2']
+    value2 = 'v2'
+    assert key1.data == yottadb.DATA_UNDEF
+    assert key2.data == yottadb.DATA_UNDEF
+
+    simple_transaction(key1, value1, key2, value2, ydb)
+
+    assert key1.value == value1
+    assert key2.value == value2
+    test_base_key.delete_tree()
+
+@yottadb.transaction
+def simple_rollback_transaction(key1:yottadb.Key, value1:yottadb.Data, key2:yottadb.Key, value2:yottadb.Data, context:yottadb.Context) -> None:
+    key1.value = value1
+    key2.value = value2
+    raise yottadb.YDBTPRollback('rolling back transaction.')
+
+def test_transaction_smoke_test2(ydb) -> None:
+    test_base_key = ydb['^TransactionDecoratorTests']['smoke test 2']
+    test_base_key.delete_tree()
+    key1 = test_base_key['key1']
+    value1 = 'v1'
+    key2 = test_base_key['key2']
+    value2 = 'v2'
+    assert key1.data == yottadb.DATA_UNDEF
+    assert key2.data == yottadb.DATA_UNDEF
+
+    try:
+        simple_rollback_transaction(key1, value1, key2, value2, ydb)
+    except yottadb.YDBTPRollback as e:
+        print(str(e))
+        assert str(e) == 'rolling back transaction.'
+
+    assert key1.data == yottadb.DATA_UNDEF
+    assert key2.data == yottadb.DATA_UNDEF
+    test_base_key.delete_tree()
+
+@yottadb.transaction
+def simple_restart_transaction(key1:yottadb.Key, key2:yottadb.Key, value:yottadb.Data, restart_tracker:yottadb.Key, context:yottadb.Context) -> None:
+    if restart_tracker.data == yottadb.DATA_UNDEF:
+        key1.value = value
+        restart_tracker.value = '1'
+        raise yottadb.YDBTPRestart('restating transaction')
+    else:
+        key2.value = value
+
+def test_transaction_smoke_test3(ydb) -> None:
+    test_base_global_key = ydb['^TransactionDecoratorTests']['smoke test 3']
+    test_base_local_key = ydb['TransactionDecoratorTests']['smoke test 3']
+    test_base_global_key.delete_tree()
+    test_base_local_key.delete_tree()
+
+    key1 = test_base_global_key['key1']
+    key2 = test_base_global_key['key2']
+    value = 'val'
+    restart_tracker = test_base_local_key['restart tracker']
+
+    assert key1.data == yottadb.DATA_UNDEF
+    assert key2.data == yottadb.DATA_UNDEF
+    assert restart_tracker.data == yottadb.DATA_UNDEF
+
+    simple_restart_transaction(key1, key2, value, restart_tracker, ydb)
+
+    assert key1.value == None
+    assert key2.value == value
+    assert restart_tracker.value == '1'
+
+    test_base_global_key.delete_tree()
+    test_base_local_key.delete_tree()
+
+
+def no_action() -> None:
+    pass
+
+def set_key(key:yottadb.Key, value:str) -> None:
+    key.value = value
+
+def conditional_set_key(key1:yottadb.Key, key2:yottadb.Key, value:str, traker_key:yottadb.Key) -> None:
+    if traker_key.data != yottadb.DATA_NO_DATA:
+        key1.value = value
+    else:
+        key2.value = value
+
+def raise_standard_python_exception() -> None:
+    1/0
+
+class TransactionData(NamedTuple):
+    action: Callable = no_action
+    action_arguments: Tuple = ()
+    restart_key: yottadb.Key = None
+    return_value: int = yottadb._yottadb.YDB_OK
+
+@yottadb.transaction
+def process_transaction(nested_transaction_data: Tuple[TransactionData], context:yottadb.Context) -> int:
+    current_data = nested_transaction_data[0]
+    current_data.action(*current_data.action_arguments)
+    sub_data = nested_transaction_data[1:]
+    if len(sub_data) > 0:
+        process_transaction(sub_data, context)
+
+    if current_data.return_value == yottadb._yottadb.YDB_TP_RESTART:
+        if current_data.restart_key.data == yottadb.DATA_NO_DATA:
+            current_data.restart_key.value = 'restarted'
+            return yottadb._yottadb.YDB_TP_RESTART
+        else:
+            return yottadb._yottadb.YDB_OK
+
+    return current_data.return_value
+
+
+def test_transaction_return_YDB_OK(ydb):
+    key = ydb['^transactiontests']['test_transaction_return_YDB_OK']
+    value = 'return YDB_OK'
+    transaction_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=yottadb._yottadb.YDB_OK)
+
+    key.delete_tree()
+    assert key.value == None
+
+    process_transaction((transaction_data,), context=ydb)
+    assert key.value == value
+    key.delete_tree()
+
+def test_nested_transaction_return_YDB_OK(ydb):
+    key1 = ydb['^transactiontests']['test_transaction_return_YDB_OK']['outer']
+    value1 = 'return YDB_OK'
+    outer_transaction = TransactionData(action=set_key, action_arguments=(key1, value1), return_value=yottadb._yottadb.YDB_OK)
+    key2 = ydb['^transactiontests']['test_transaction_return_YDB_OK']['inner']
+    value2 = 'neseted return YDB_OK'
+    inner_transaction = TransactionData(action=set_key, action_arguments=(key2, value2), return_value=yottadb._yottadb.YDB_OK)
+
+    process_transaction((outer_transaction, inner_transaction), context=ydb)
+
+    assert key1.value == value1
+    assert key2.value == value2
+    key1.delete_tree()
+    key2.delete_tree()
+
+YDB_MAX_TP_DEPTH = 126
+@pytest.mark.parametrize('depth', range(1, YDB_MAX_TP_DEPTH+1))
+def test_transaction_return_YDB_OK_to_depth(ydb, depth):
+    def key_at_level(level: int) -> yottadb.Key:
+        return ydb['^tptests'][f'test_transaction_return_YDB_OK_to_depth{depth}'][f'level{level}']
+    def value_at_level(level: int) -> str:
+        return f'level{level} returns YDB_OK'
+
+    transaction_data = []
+    for level in range(1, depth+1):
+        transaction_data.append(TransactionData(action=set_key, action_arguments=(key_at_level(level), value_at_level(level))))
+
+    process_transaction(transaction_data, context=ydb)
+
+    for level in range(1, depth+1):
+        print(key_at_level(level).value)
+        assert key_at_level(level).value == value_at_level(level)
+    ydb['^tptests'][f'test_transaction_return_YDB_OK_to_depth{depth}'].delete_tree()

@@ -30,6 +30,8 @@ from _yottadb import YDB_DATA_VALUE_NODESC as DATA_VALUE_NODESC
 from _yottadb import YDB_DATA_NOVALUE_DESC as DATA_NOVALUE_DESC
 from _yottadb import YDB_DATA_VALUE_DESC as DATA_VALUE_DESC
 
+from _yottadb import YDBTPRollback, YDBTPRestart
+
 
 Data = Union[bytes, str]
 
@@ -413,3 +415,34 @@ class Key:
 '''
 
 
+def transaction(function):
+    def get_context(*args, **kwargs):
+        if 'context' in kwargs.keys():
+            return kwargs['context']
+        else:
+            return args[-1]
+
+    def wrapper(*args, **kwargs):
+        context = get_context(*args, **kwargs)
+
+        def wrapped_transaction(*args, **kwargs):
+            tp_token = kwargs['tp_token']
+            del(kwargs['tp_token'])
+            old_token = None
+            context = get_context(*args, **kwargs)
+            old_token = context.tp_token
+            context.tp_token = tp_token
+            ret_val = _yottadb.YDB_OK
+            try:
+                ret_val = function(*args, **kwargs)
+                if ret_val == None:
+                    ret_val = _yottadb.YDB_OK
+            except _yottadb.YDBTPRestart:
+                ret_val = _yottadb.YDB_TP_RESTART
+            finally:
+                context.tp_token = old_token
+            return ret_val
+
+        return _yottadb.tp(wrapped_transaction, args=args, kwargs=kwargs, tp_token=context.tp_token)
+
+    return wrapper
