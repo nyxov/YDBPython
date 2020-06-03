@@ -12,13 +12,9 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 # Installation
 0. install Ubuntu Server 18.04
 
-1. install YottaDB per the [Quick Start](https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#quick-start) guide instructions.
+1. install YottaDB per the [Quick Start](https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#quick-start) guide instructions or from [source](https://gitlab.com/YottaDB/DB/YDB)
 
-    1. you will need to install the following additional packages:
-
-        1. binutils (for `ld` during `sudo ./ydbinstall.sh --utf8 default --verbose`)
-
-        2. pkg-config (for `source $(pkg-config --variable=prefix yottadb)/ydb_env_set` but probably covers things we will need later)
+    Note: Ubuntu Server 20.04 will require YottaDB 1.29 or later. 
 
 2. Get the code: `git clone https://gitlab.com/gossrock/YDBPython.git`
 3. install code:
@@ -35,17 +31,27 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
             2. create venv: `python3 -m venv .venv`
             3. activate venv: `source .venv/bin/activate`
             4. install into venv: `python setup.py install`
-            5. test: `python setup.py test`
             
         2. option 2: install to user
             1. this method requires setuptools: `sudo apt install python3-setuptools`
             2. install for use by user: `python setup.py install --user`
-            3. test: `python3 setup.py test`
+            
             
         3. install globally (not suggested):
             1. this method also requires setuptools `sudo apt install python3-setuptools`
             2. install package globally: `sudo -E python3 setup.py install`
-            3. test: `python3 setup.py test`
+            
+    5. run tests:
+        1. install `pytest`
+            1. If `pip` for `python3` is not installed do so: `sudo apt install python3-pip`
+            2. use `pip` to install `pytest`
+                1. option 1: install into venv
+                    1. activate `venv` if it is not already: `source .venv/bin/activate`
+                    2. install: `pip install pytest`
+                2. option 2: install for user: `pip3 install --user pytest`
+                3. option 3: install globally (not suggested): `sudo pip3 install pytest`
+                    
+            
     5. TODO: add to pypi
 
 5. enjoy.
