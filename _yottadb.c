@@ -14,6 +14,7 @@
 
 #include <stdbool.h>
 #include <assert.h>
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <libyottadb.h>
 #include <ffi.h>
@@ -67,7 +68,7 @@ static ydb_buffer_t* empty_buffer_array(int num, int len) {
  */
 static bool validate_sequence_of_bytes(PyObject *sequence) {
     bool ret = true;
-    int i, len_seq;
+    Py_ssize_t i, len_seq;
     PyObject *item, *seq;
 
     seq = PySequence_Fast(sequence, "argument must be iterable");
@@ -113,19 +114,21 @@ static bool validate_subsarray_object(PyObject *subsarray) {
  */
 bool convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence, int sequence_len, ydb_buffer_t *buffer_array) {
     bool done;
+    Py_ssize_t bytes_ssize;
     unsigned int bytes_len;
     char *bytes_c;
     PyObject *bytes, *seq;
 
     seq = PySequence_Fast(sequence, "argument must be iterable");
     if (!seq) {
-        PyErr_SetString(YDBPythonError, "Can't cunvert none sequence to buffer array.");
+        PyErr_SetString(YDBPythonError, "Can't convert none sequence to buffer array.");
         return false;
     }
 
     for(int i = 0; i < sequence_len; i++) {
         bytes = PySequence_Fast_GET_ITEM(seq, i);
-        bytes_len = PyBytes_Size(bytes);
+        bytes_ssize = PyBytes_Size(bytes);
+        bytes_len = Py_SAFE_DOWNCAST(bytes_ssize, Py_ssize_t, unsigned int);
         bytes_c = PyBytes_AsString(bytes);
         YDB_MALLOC_BUFFER(&buffer_array[i], bytes_len);
         YDB_COPY_BYTES_TO_BUFFER(bytes_c, bytes_len, &buffer_array[i], done);
@@ -171,11 +174,14 @@ PyObject* convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
 
 static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
     bool copy_success, convert_success;
+    Py_ssize_t len_ssize, sequence_len_ssize;
     unsigned int len;
     char* bytes_c;
     ydb_buffer_t *varname_y, *subsarray_y;
 
-    len = PyBytes_Size(varname);
+    len_ssize = PyBytes_Size(varname);
+    len = Py_SAFE_DOWNCAST(len_ssize, Py_ssize_t, unsigned int);
+
     bytes_c = PyBytes_AsString(varname);
 
     varname_y = (ydb_buffer_t*)calloc(1, sizeof(ydb_buffer_t));
@@ -190,7 +196,8 @@ static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
 
     dest->varname = varname_y;
     if (Py_None != subsarray) {
-        dest->subs_used = PySequence_Length(subsarray);
+        sequence_len_ssize = PySequence_Length(subsarray);
+        dest->subs_used = Py_SAFE_DOWNCAST(sequence_len_ssize, Py_ssize_t, unsigned int);
         subsarray_y = (ydb_buffer_t*)calloc(dest->subs_used, sizeof(ydb_buffer_t));
         convert_success = convert_py_bytes_sequence_to_ydb_buffer_array(subsarray, dest->subs_used, subsarray_y);
         if (convert_success) {
@@ -234,7 +241,7 @@ static void free_YDBKey(YDBKey* key) {
  */
 static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence) {
     bool ret = true;
-    int i, len_keys, len_key_seq;
+    Py_ssize_t i, len_keys, len_key_seq;
     PyObject *key, *varname, *subsarray, *seq, *key_seq;
 
     seq = PySequence_Fast(keys_sequence, "'keys' argument must be a Sequence");
@@ -289,7 +296,7 @@ static bool validate_py_keys_sequence_bytes(PyObject* keys_sequence) {
  */
 static bool convert_key_sequence_to_YDBKey_array(PyObject* sequence, YDBKey* ret_keys) {
     bool success = true;
-    int i, len_keys;
+    Py_ssize_t i, len_keys;
     PyObject *key, *varname, *subsarray, *seq, *key_seq;
 
     seq = PySequence_Fast(sequence, "argument must be iterable");
@@ -406,6 +413,7 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
     bool return_NULL = false;
     char *varname;
     int subs_used, status;
+    Py_ssize_t varname_len_ssize;
     unsigned int varname_len, ret_value;
     uint64_t tp_token;
     PyObject *subsarray, *return_python_int;
@@ -417,8 +425,10 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
 
     /* parse and validate */
     static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
         return NULL;
+
+    varname_len = Py_SAFE_DOWNCAST(varname_len_ssize, Py_ssize_t, unsigned int);
 
     if (!validate_subsarray_object(subsarray))
         return NULL;
@@ -458,6 +468,7 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
 static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int deltype, status, subs_used;
+    Py_ssize_t varname_len_ssize;
     unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
@@ -471,8 +482,10 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
 
     /* parse and validate */
     static char* kwlist[] = {"varname", "subsarray", "delete_type", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OiK", kwlist, &varname, &varname_len, &subsarray, &deltype, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OiK", kwlist, &varname, &varname_len_ssize, &subsarray, &deltype, &tp_token))
         return NULL;
+
+    varname_len = Py_SAFE_DOWNCAST(varname_len_ssize, Py_ssize_t, unsigned int);
 
     if (!validate_subsarray_object(subsarray))
         return NULL;
@@ -567,6 +580,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int subs_used, status, return_length;
     unsigned int varname_len;
+    Py_ssize_t varname_len_ssize;
     char *varname;
     uint64_t tp_token;
     PyObject *subsarray, *return_python_string;
@@ -578,8 +592,10 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* parse and validate */
     static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
         return NULL;
+
+    varname_len = Py_SAFE_DOWNCAST(varname_len_ssize, Py_ssize_t, unsigned int);
 
     if (!validate_subsarray_object(subsarray))
         return NULL;
@@ -611,7 +627,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
         }
         /* Create Python object to return */
         if (!return_NULL)
-            return_python_string = Py_BuildValue("y#", ret_value.buf_addr, ret_value.len_used);
+            return_python_string = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
     }
 
     /* free allocated memory */
@@ -629,6 +645,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
 static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int status, subs_used;
+    Py_ssize_t varname_len_ssize, increment_len_ssize;
     unsigned int varname_len, increment_len;
     uint64_t tp_token;
     char *varname, *increment;
@@ -639,13 +656,16 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
     subsarray = Py_None;
     tp_token = YDB_NOTTP;
     increment = "1";
-    increment_len = 1;
+    increment_len_ssize = 1;
 
     /* parse and validate */
     static char* kwlist[] = {"varname", "subsarray", "increment", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|Oy#K", kwlist, &varname, &varname_len, &subsarray,
-                                        &increment, &increment_len, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|Oy#K", kwlist, &varname, &varname_len_ssize, &subsarray,
+                                        &increment, &increment_len_ssize, &tp_token))
         return NULL;
+
+    varname_len = Py_SAFE_DOWNCAST(varname_len_ssize, Py_ssize_t, unsigned int);
+    increment_len = Py_SAFE_DOWNCAST(increment_len_ssize, Py_ssize_t, unsigned int);
 
     if (!validate_subsarray_object(subsarray))
         return NULL;
@@ -669,7 +689,7 @@ static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
 
         /* Create Python object to return */
         if (!return_NULL)
-            return_python_string = Py_BuildValue("y#", ret_value.buf_addr, ret_value.len_used);
+            return_python_string = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
     }
 
     /* free allocated memory */
@@ -713,7 +733,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
     if (Py_None == keys)
         len_keys = 0;
     else
-        len_keys = PySequence_Length(keys);
+        len_keys = Py_SAFE_DOWNCAST(PySequence_Length(keys), Py_ssize_t, int);
 
     /* Setup for Call */
     error_string_buffer = (ydb_buffer_t*)calloc(1, sizeof(ydb_buffer_t));
@@ -791,6 +811,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
 static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int status, subs_used;
+    Py_ssize_t varname_len_ssize;
     unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
@@ -803,8 +824,10 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* parse and validate */
     static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
         return NULL;
+
+    varname_len = Py_SAFE_DOWNCAST(varname_len_ssize, Py_ssize_t, unsigned int);
 
     if (!validate_subsarray_object(subsarray))
         return NULL;
@@ -842,6 +865,7 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
 static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int status, subs_used;
+    Py_ssize_t varname_len_ssize;
     unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
@@ -856,8 +880,10 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* parse and validate */
     static char* kwlist[] = {"varname", "subsarray","timeout_nsec",  "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OLK", kwlist, &varname, &varname_len, &subsarray, &timeout_nsec, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OLK", kwlist, &varname, &varname_len_ssize, &subsarray, &timeout_nsec, &tp_token))
         return NULL;
+
+    varname_len = Py_SAFE_DOWNCAST(varname_len_ssize, Py_ssize_t, unsigned int);
 
     if (!validate_subsarray_object(subsarray))
         return NULL;
@@ -897,6 +923,7 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
 static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, subs_used;
+    Py_ssize_t varname_len_ssize;
     unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
@@ -909,8 +936,10 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* parse and validate */
     static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
         return NULL;
+
+    varname_len = Py_SAFE_DOWNCAST(varname_len_ssize, Py_ssize_t, unsigned int);
 
     if (!validate_subsarray_object(subsarray))
         return NULL;
@@ -975,6 +1004,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
 static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, subs_used;
+    Py_ssize_t varname_len_ssize;
     unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
@@ -988,8 +1018,11 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* parse and validate */
     static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
         return NULL;
+
+
+    varname_len = Py_SAFE_DOWNCAST(varname_len_ssize, Py_ssize_t, unsigned int);
 
     if (!validate_subsarray_object(subsarray))
         return NULL;
@@ -1048,6 +1081,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
 static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int status, subs_used;
+    Py_ssize_t varname_len_ssize, value_len_ssize;
     unsigned int varname_len, value_len;
     uint64_t tp_token;
     char *varname, *value;
@@ -1062,9 +1096,12 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* parse and validate */
     static char* kwlist[] = {"varname", "subsarray", "value", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|Oy#K", kwlist, &varname, &varname_len, &subsarray,
-                                     &value, &value_len, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|Oy#K", kwlist, &varname, &varname_len_ssize, &subsarray,
+                                     &value, &value_len_ssize, &tp_token))
         return NULL;
+    varname_len = Py_SAFE_DOWNCAST(varname_len_ssize, Py_ssize_t, unsigned int);
+    value_len = Py_SAFE_DOWNCAST(value_len_ssize, Py_ssize_t, unsigned int);
+
 
     if (!validate_subsarray_object(subsarray))
         return NULL;
@@ -1104,6 +1141,7 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
 static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int status, return_length;
+    Py_ssize_t str_len_ssize;
     unsigned int str_len;
     uint64_t tp_token;
     char *str;
@@ -1117,8 +1155,10 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* parse and validate */
     static char* kwlist[] = {"input", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &str, &str_len, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &str, &str_len_ssize, &tp_token))
         return NULL;
+
+    str_len = Py_SAFE_DOWNCAST(str_len_ssize, Py_ssize_t, unsigned int);
 
     /* Setup for Call */
     SETUP_BUFFER(str, str_buf, str_len, "ydb_str2zwr", return_NULL);
@@ -1147,7 +1187,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
 
         /* Create Python object to return */
         if (!return_NULL)
-            return_value =  Py_BuildValue("y#", zwr_buf.buf_addr, zwr_buf.len_used);
+            return_value =  Py_BuildValue("y#", zwr_buf.buf_addr, (Py_ssize_t)zwr_buf.len_used);
     }
     /* free allocated memory */
     YDB_FREE_BUFFER(&str_buf);
@@ -1164,6 +1204,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
 static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int status, return_length, subs_used;
+    Py_ssize_t varname_len_ssize;
     unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
@@ -1176,8 +1217,10 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
 
     /* parse and validate */
         static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-        if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+        if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
             return NULL;
+
+    varname_len = Py_SAFE_DOWNCAST(varname_len_ssize, Py_ssize_t, unsigned int);
 
     if (!validate_subsarray_object(subsarray))
         return NULL;
@@ -1208,7 +1251,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
 
         /* Create Python object to return */
         if (!return_NULL)
-            return_python_string = Py_BuildValue("y#", ret_value.buf_addr, ret_value.len_used);
+            return_python_string = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
     }
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
@@ -1226,6 +1269,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
 static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int status, return_length, subs_used;
+    Py_ssize_t varname_len_ssize;
     unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
@@ -1238,8 +1282,10 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 
     /* Setup for Call */
     static char* kwlist[] = {"varname", "subsarray", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len, &subsarray, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
         return NULL;
+
+    varname_len = Py_SAFE_DOWNCAST(varname_len_ssize, Py_ssize_t, unsigned int);
 
     if (!validate_subsarray_object(subsarray))
         return NULL;
@@ -1270,7 +1316,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
 
         /* Create Python object to return */
         if (!return_NULL)
-            return_python_string = Py_BuildValue("y#", ret_value.buf_addr, ret_value.len_used);
+            return_python_string = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
     }
     /* free allocated memory */
     YDB_FREE_BUFFER(&varname_y);
@@ -1434,6 +1480,7 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
 static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
     int status, return_length;
+    Py_ssize_t zwr_len_ssize;
     unsigned int zwr_len;
     uint64_t tp_token;
     char *zwr;
@@ -1447,8 +1494,10 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
 
     /* parse and validate */
     static char* kwlist[] = {"input", "tp_token", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &zwr, &zwr_len, &tp_token))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &zwr, &zwr_len_ssize, &tp_token))
         return NULL;
+
+    zwr_len = Py_SAFE_DOWNCAST(zwr_len_ssize, Py_ssize_t, unsigned int);
 
     /* Setup for Call */
     SETUP_BUFFER(zwr, zwr_buf, zwr_len, "zwr2str()", return_NULL);
@@ -1475,7 +1524,7 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
         }
 
         if (!return_NULL)
-            return_value =  Py_BuildValue("y#", str_buf.buf_addr, str_buf.len_used);
+            return_value =  Py_BuildValue("y#", str_buf.buf_addr, (Py_ssize_t)str_buf.len_used);
     }
     YDB_FREE_BUFFER(&zwr_buf);
     YDB_FREE_BUFFER(&error_string_buf);
