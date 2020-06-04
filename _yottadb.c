@@ -113,7 +113,7 @@ static bool validate_subsarray_object(PyObject *subsarray) {
  */
 bool convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence, int sequence_len, ydb_buffer_t *buffer_array) {
     bool done;
-    int bytes_len;
+    unsigned int bytes_len;
     char *bytes_c;
     PyObject *bytes, *seq;
 
@@ -171,7 +171,7 @@ PyObject* convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
 
 static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
     bool copy_success, convert_success;
-    int len;
+    unsigned int len;
     char* bytes_c;
     ydb_buffer_t *varname_y, *subsarray_y;
 
@@ -405,8 +405,8 @@ static void raise_YDBError(int status, ydb_buffer_t* error_string_buffer, int tp
 static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
     bool return_NULL = false;
     char *varname;
-    int varname_len, subs_used, status;
-    unsigned int ret_value;
+    int subs_used, status;
+    unsigned int varname_len, ret_value;
     uint64_t tp_token;
     PyObject *subsarray, *return_python_int;
     ydb_buffer_t error_string_buffer, varname_y, *subsarray_y;
@@ -457,7 +457,8 @@ static PyObject* data(PyObject* self, PyObject* args, PyObject* kwds) {
 /* Wrapper for ydb_delete_s() and ydb_delete_st() */
 static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int deltype, status, varname_len, subs_used;
+    int deltype, status, subs_used;
+    unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
     PyObject *subsarray;
@@ -564,7 +565,8 @@ static PyObject* delete_excel(PyObject* self, PyObject* args, PyObject *kwds) {
 /* Wrapper for ydb_get_s() and ydb_get_st() */
 static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int subs_used, status, return_length, varname_len;
+    int subs_used, status, return_length;
+    unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
     PyObject *subsarray, *return_python_string;
@@ -626,7 +628,8 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
 /* Wrapper for ydb_incr_s() and ydb_incr_st() */
 static PyObject* incr(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int status, subs_used, varname_len, increment_len;
+    int status, subs_used;
+    unsigned int varname_len, increment_len;
     uint64_t tp_token;
     char *varname, *increment;
     PyObject *subsarray, *return_python_string;
@@ -787,7 +790,8 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
 /* Wrapper for ydb_lock_decr_s() and ydb_lock_decr_st() */
 static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int status, varname_len, subs_used;
+    int status, subs_used;
+    unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
     PyObject *subsarray;
@@ -837,7 +841,8 @@ static PyObject* lock_decr(PyObject* self, PyObject* args, PyObject *kwds) {
 /* Wrapper for ydb_lock_incr_s() and ydb_lock_incr_st() */
 static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int status, varname_len, subs_used;
+    int status, subs_used;
+    unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
     unsigned long long timeout_nsec;
@@ -891,7 +896,8 @@ static PyObject* lock_incr(PyObject* self, PyObject* args, PyObject *kwds) {
 /* Wrapper for ydb_node_next_s() and ydb_node_next_st() */
 static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, varname_len, subs_used;
+    int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, subs_used;
+    unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
     PyObject *subsarray, *return_tuple;
@@ -968,7 +974,8 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
 /* Wrapper for ydb_node_previous_s() and ydb_node_previous_st() */
 static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, varname_len, subs_used;
+    int max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, subs_used;
+    unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
     PyObject *subsarray, *return_tuple;
@@ -1040,7 +1047,8 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
 /* Wrapper for ydb_set_s() and ydb_set_st() */
 static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int status, varname_len, value_len, subs_used;
+    int status, subs_used;
+    unsigned int varname_len, value_len;
     uint64_t tp_token;
     char *varname, *value;
     PyObject *subsarray;
@@ -1095,7 +1103,8 @@ static PyObject* set(PyObject* self, PyObject* args, PyObject *kwds) {
 /* Wrapper for ydb_str2zwr_s() and ydb_str2zwr_st() */
 static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int str_len, status, return_length;
+    int status, return_length;
+    unsigned int str_len;
     uint64_t tp_token;
     char *str;
     ydb_buffer_t error_string_buf, str_buf, zwr_buf;
@@ -1154,7 +1163,8 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
 /* Wrapper for ydb_subscript_next_s() and ydb_subscript_next_st() */
 static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int status, return_length, varname_len, subs_used;
+    int status, return_length, subs_used;
+    unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
     PyObject *subsarray, *return_python_string;
@@ -1215,7 +1225,8 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
 /* Wrapper for ydb_subscript_previous_s() and ydb_subscript_previous_st() */
 static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int status, return_length, varname_len, subs_used;
+    int status, return_length, subs_used;
+    unsigned int varname_len;
     char *varname;
     uint64_t tp_token;
     PyObject *subsarray, *return_python_string;
@@ -1422,7 +1433,8 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
 /* Wrapper for ydb_zwr2str_s() and ydb_zwr2str_st() */
 static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
     bool return_NULL = false;
-    int zwr_len, status, return_length;
+    int status, return_length;
+    unsigned int zwr_len;
     uint64_t tp_token;
     char *zwr;
     PyObject *return_value;
