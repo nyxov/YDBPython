@@ -1,6 +1,44 @@
 /* A structure that represents a key using ydb c types. used internally for converting between python and ydb c types */
 #define TEMP_YDB_RAISE_PYTHON_EXCEPTION -2 // TODO: remove after resolution of YDB issue #548
-#define INT32_TO_STRING_MAX 12
+
+#define YDBPY_VALID 0
+
+#define YDBPY_MAX_ERRORMSG 1024
+#define YDBPY_MAX_REASON YDBPY_MAX_ERRORMSG / 4
+#define YDBPY_TYPE_ERROR_MAX -100
+#define YDBPY_TYPE_ERROR_MIN -199
+#define YDBPY_VALUE_ERROR_MAX -200
+#define YDBPY_VALUE_ERROR_MIN -299
+
+#define YDBPY_INVALID_NOT_LIST_OR_TUPLE -101
+#define YDBPY_ERRMSG_NOT_LIST_OR_TUPLE "value must be list or tuple."
+
+#define YDBPY_INVALID_ITEM_IN_SEQUENCE_NOT_BYTES -102
+#define YDBPY_ERRMSG_ITEM_IN_SEQUENCE_NOT_BYTES "item %ld is not of type 'bytes'"
+
+#define YDBPY_INVALID_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE -103
+#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE "item %ld is not a list or tuple."
+
+#define YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES -104
+#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES "item %ld in key sequence invalid (first element must be of type 'bytes')"
+
+#define YDBPY_INVALID_VARNAME_TOO_LONG -201
+#define YDBPY_ERRMSG_VARNAME_TOO_LONG "invalid varname length %ld: max %d"
+
+#define YDBPY_INVALID_SEQUENCE_TOO_LONG -202
+#define YDBPY_ERRMSG_SEQUENCE_TOO_LONG "invalid sequence length %ld: max %d"
+
+#define YDBPY_INVALID_BYTES_TOO_LONG -203
+#define YDBPY_ERRMSG_BYTES_TOO_LONG "invalid bytes length %ld: max %d"
+
+#define YDBPY_INVALID_KEY_IN_SEQUENCE_INCORECT_LENGTH -204
+#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_INCORECT_LENGTH "item %ld must be length 1 or 2."
+
+#define YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_TOO_LONG -205
+#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_TOO_LONG "item %ld in key sequence has invalid varname length %ld: max %d."
+
+#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_SUBSARRAY_INVALID "item %ld in key sequence has invalid subsarray (%s)"
+
 
 typedef struct {
     ydb_buffer_t *varname;
@@ -47,7 +85,42 @@ typedef struct {
         YDB_FREE_BUFFER(&((ydb_buffer_t*)ARRAY)[i]);                                     \
 }
 
-/* PYTHON EXCEPTION DECLAIRATIONS */
+#define VALIDATE_AND_CONVERT_BYTES_LEN(ORIGINAL_LEN, CONVERTED_LEN, MAX_LEN, LEN_ERR, LEN_ERR_MSG) {    \
+    if ((MAX_LEN) < (ORIGINAL_LEN)) {                                                                   \
+        char validation_error_message[YDBPY_MAX_ERRORMSG];                                              \
+        snprintf(validation_error_message, YDBPY_MAX_ERRORMSG, LEN_ERR_MSG, ORIGINAL_LEN, MAX_LEN);     \
+        raise_ValidationError(LEN_ERR, validation_error_message);                                       \
+        return NULL;                                                                                    \
+    } else {                                                                                            \
+        CONVERTED_LEN = Py_SAFE_DOWNCAST(ORIGINAL_LEN, Py_ssize_t, unsigned int);                       \
+    }                                                                                                   \
+}
+
+#define VALIDATE_SEQUENCE_OF_BYTES_INPUT(SEQUENCE, MAX_SEQUENCE_LEN, MAX_BYTES_LEN, OUTER_ERROR_MESSAGE) {          \
+    if (Py_None != SEQUENCE) { /* allow None */                                                                     \
+        char validation_reason_message[YDBPY_MAX_REASON];                                                           \
+        int validation_status = validate_sequence_of_bytes(SEQUENCE, MAX_SEQUENCE_LEN,                              \
+                                                            MAX_BYTES_LEN, validation_reason_message);              \
+        if (YDBPY_VALID != validation_status) {                                                                     \
+            char validation_error_message[YDBPY_MAX_ERRORMSG];                                                      \
+            snprintf(validation_error_message, YDBPY_MAX_ERRORMSG, OUTER_ERROR_MESSAGE, validation_reason_message); \
+            raise_ValidationError(validation_status, validation_error_message);                                     \
+            return NULL;                                                                                            \
+        }                                                                                                           \
+    }                                                                                                               \
+}
+
+
+#define VALIDATE_SUBSARRAY(SUBSARRAY) {                                                                         \
+    VALIDATE_SEQUENCE_OF_BYTES_INPUT(SUBSARRAY, YDB_MAX_SUBS, YDB_MAX_STR, "'subsarray' argument invalid(%s)")  \
+}
+
+#define VALIDATE_VARNAMES(VARNAMES) {                                                                               \
+    VALIDATE_SEQUENCE_OF_BYTES_INPUT(VARNAMES, YDB_MAX_NAMES, YDB_MAX_IDENT, "'varnames' argument invalid(%s)")     \
+}
+
+
+/* PYTHON EXCEPTION DECLARATIONS */
 
 /* YottaDBError represents an error return status from any of the libyottadb functions being wrapped.
  * Since YottaDB returns a status that is a number and has a way to create a message from that number
@@ -64,5 +137,6 @@ static PyObject *YDBTPRestart;
 /* YottaDBLockTimeout is a simple exception to indicate that a lock failed due to timeout. */
 static PyObject *YDBTimeoutError;
 
-/* YDBPythonError is to be raised when there is a posobility for an error to occur but that we believe that it should never happen. */
+/* YDBPythonError is to be raised when there is a possibility for an error to occur but that we believe that it
+        should never happen. */
 static PyObject *YDBPythonError;

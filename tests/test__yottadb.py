@@ -48,6 +48,7 @@ def bank():
 
     _yottadb.delete(varname=b'^account', delete_type=_yottadb.YDB_DEL_TREE)
 
+
 def test_get_1_positional(simple_data):
     assert _yottadb.get(b'^test1') == b'test1value'
     
@@ -99,9 +100,6 @@ def test_set_2_keywords():
     _yottadb.set(varname=b'test7', subsarray=(b'sub1',), value=b'test7value')
     assert _yottadb.get(b'test7', (b'sub1',)) == b'test7value'
 
-def test_set_YDBErrors():
-    with pytest.raises(_yottadb.YDBError):
-        _yottadb.set(b'a'*32, value=b"some_value")
 
 def test_set_i18n():
     _yottadb.set(varname=b'testchinese', value=bytes('你好世界', encoding='utf-8'))
@@ -170,6 +168,8 @@ def test_data_positional(simple_data):
     assert _yottadb.data(b'^test3') == _yottadb.YDB_DATA_VALUE_DESC
     assert _yottadb.data(b'^test3', (b'sub1',)) == _yottadb.YDB_DATA_VALUE_DESC
     assert _yottadb.data(b'^test3', (b'sub1', b'sub2')) == _yottadb.YDB_DATA_VALUE_NODESC
+
+
 
 def test_lock_incr_1():
     t1 = datetime.datetime.now()
@@ -695,15 +695,6 @@ def test_lock_being_blocked():
     time.sleep(1)
     with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock([KeyTuple(b'^test1')])
-
-def test_lock_max_names():
-    keys = []
-    for i in range(_yottadb.YDB_MAX_NAMES):
-        keys.append([bytes(f'^testlock{i}', encoding='utf-8')])
-        _yottadb.lock(keys)
-    keys.append([b'^JustOneMore'])
-    with pytest.raises(_yottadb.YDBNAMECOUNT2HIError):
-        _yottadb.lock(keys)
 
 
 def test_delete_excel():
