@@ -1,7 +1,12 @@
 import pytest # type: ignore
 import _yottadb
+import sys
 
-BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = b'1'*(2**31 + 1)
+if sys.version_info < (3, 8):
+    BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = b'1' * (2 ** 31 + 1) # 2**32 +1 crashes python 3.6/Ubuntu 18.04 (OSError: [Errno 12] Cannot allocate memory)
+else:
+    BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = b'1' * (2 ** 32 + 1) # works for python 3.8/Ubuntu 20.04
+
 
 def varname_invalid(function):
     with pytest.raises(TypeError):
@@ -208,6 +213,11 @@ def test_set_value(ydb):
             _yottadb.set(**key, value=BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
 
 # str2zwr()
+@pytest.mark.skipif(sys.version_info < (3, 8), reason="requires python3.8 or higher")
+def test_str2zwr_input(ydb):
+    with pytest.raises(ValueError):
+        _yottadb.str2zwr(BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
+
 # subscript_next()
 def test_subscript_next_varname(ydb):
     varname_invalid(_yottadb.subscript_next)
@@ -255,3 +265,7 @@ def test_delete_excel_varnames(ydb):
         _yottadb.tp(callback=simple_transaction, varnames=[b'b'*(_yottadb.YDB_MAX_IDENT + 1)])
 
 # zwr2str()
+@pytest.mark.skipif(sys.version_info < (3, 8), reason="requires python3.8 or higher")
+def test_zwr2str_input(ydb):
+    with pytest.raises(ValueError):
+        _yottadb.zwr2str(BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)

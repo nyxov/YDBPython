@@ -1214,7 +1214,8 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &str, &str_len_ssize, &tp_token))
         return NULL;
 
-    str_len = Py_SAFE_DOWNCAST(str_len_ssize, Py_ssize_t, unsigned int);
+    VALIDATE_AND_CONVERT_BYTES_LEN(str_len_ssize, str_len, MAX_UNSIGNED_INT,
+                                    YDBPY_INVALID_BYTES_TOO_LONG, YDBPY_ERRMSG_BYTES_TOO_LONG2);
 
     /* Setup for Call */
     SETUP_BUFFER(str, str_buf, str_len, "ydb_str2zwr", return_NULL);
@@ -1552,7 +1553,8 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &zwr, &zwr_len_ssize, &tp_token))
         return NULL;
 
-    zwr_len = Py_SAFE_DOWNCAST(zwr_len_ssize, Py_ssize_t, unsigned int);
+    VALIDATE_AND_CONVERT_BYTES_LEN(zwr_len_ssize, zwr_len, MAX_UNSIGNED_INT,
+                                    YDBPY_INVALID_BYTES_TOO_LONG, YDBPY_ERRMSG_BYTES_TOO_LONG2);
 
     /* Setup for Call */
     SETUP_BUFFER(zwr, zwr_buf, zwr_len, "zwr2str()", return_NULL);

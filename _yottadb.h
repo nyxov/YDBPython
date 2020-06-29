@@ -1,7 +1,9 @@
 /* A structure that represents a key using ydb c types. used internally for converting between python and ydb c types */
 #define TEMP_YDB_RAISE_PYTHON_EXCEPTION -2 // TODO: remove after resolution of YDB issue #548
+#define MAX_UNSIGNED_INT 0xffffffff
 
 #define YDBPY_VALID 0
+
 
 #define YDBPY_MAX_ERRORMSG 1024
 #define YDBPY_MAX_REASON YDBPY_MAX_ERRORMSG / 4
@@ -30,6 +32,7 @@
 
 #define YDBPY_INVALID_BYTES_TOO_LONG -203
 #define YDBPY_ERRMSG_BYTES_TOO_LONG "invalid bytes length %ld: max %d"
+#define YDBPY_ERRMSG_BYTES_TOO_LONG2 "invalid bytes length %ld: max %u"
 
 #define YDBPY_INVALID_KEY_IN_SEQUENCE_INCORECT_LENGTH -204
 #define YDBPY_ERRMSG_KEY_IN_SEQUENCE_INCORECT_LENGTH "item %ld must be length 1 or 2."
