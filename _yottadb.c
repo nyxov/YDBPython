@@ -520,12 +520,6 @@ static PyObject* delete_wrapper(PyObject* self, PyObject* args, PyObject *kwds) 
                                     YDBPY_INVALID_VARNAME_TOO_LONG, YDBPY_ERRMSG_VARNAME_TOO_LONG);
     VALIDATE_SUBSARRAY(subsarray);
 
-    if ((deltype != YDB_DEL_NODE) && (deltype != YDB_DEL_TREE)) {
-        // 'deltype' is being set to something other than the default by 'PyArg_ParseTupleAndKeywords' when 'delete_type' argument
-        // is not used. This seems like a bug.
-        deltype = YDB_DEL_NODE;
-    }
-
     /* Setup for Call */
     SETUP_BUFFER(varname, varname_y, varname_len, "delete_wrapper()", return_NULL);
     SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
