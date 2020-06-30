@@ -213,8 +213,9 @@ def test_set_value(ydb):
             _yottadb.set(**key, value=BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
 
 # str2zwr()
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="requires python3.8 or higher")
 def test_str2zwr_input(ydb):
+    with pytest.raises(ValueError):
+        _yottadb.str2zwr(b'b'*(_yottadb.YDB_MAX_STR + 1))
     with pytest.raises(ValueError):
         _yottadb.str2zwr(BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
 
@@ -265,7 +266,8 @@ def test_delete_excel_varnames(ydb):
         _yottadb.tp(callback=simple_transaction, varnames=[b'b'*(_yottadb.YDB_MAX_IDENT + 1)])
 
 # zwr2str()
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="requires python3.8 or higher")
 def test_zwr2str_input(ydb):
+    with pytest.raises(ValueError):
+        _yottadb.str2zwr(b'b'*(_yottadb.YDB_MAX_STR + 1))
     with pytest.raises(ValueError):
         _yottadb.zwr2str(BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)

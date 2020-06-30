@@ -771,7 +771,7 @@ static PyObject* lock(PyObject* self, PyObject* args, PyObject *kwds) {
     if (Py_None !=keys) {
         validation_status = validate_py_keys_sequence_bytes(keys, validation_error_reason);
         if (YDBPY_VALID != validation_status) {
-            snprintf(validation_error_message, YDBPY_MAX_ERRORMSG, "'keys' argument invalid (%s)", validation_error_reason);
+            snprintf(validation_error_message, YDBPY_MAX_ERRORMSG, YDBPY_ERRMSG_KEYS_INVALID, validation_error_reason);
             raise_ValidationError(validation_status, validation_error_message);
             return NULL;
         }
@@ -1214,7 +1214,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &str, &str_len_ssize, &tp_token))
         return NULL;
 
-    VALIDATE_AND_CONVERT_BYTES_LEN(str_len_ssize, str_len, MAX_UNSIGNED_INT,
+    VALIDATE_AND_CONVERT_BYTES_LEN(str_len_ssize, str_len, YDB_MAX_STR,
                                     YDBPY_INVALID_BYTES_TOO_LONG, YDBPY_ERRMSG_BYTES_TOO_LONG2);
 
     /* Setup for Call */
@@ -1553,7 +1553,7 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &zwr, &zwr_len_ssize, &tp_token))
         return NULL;
 
-    VALIDATE_AND_CONVERT_BYTES_LEN(zwr_len_ssize, zwr_len, MAX_UNSIGNED_INT,
+    VALIDATE_AND_CONVERT_BYTES_LEN(zwr_len_ssize, zwr_len, YDB_MAX_STR,
                                     YDBPY_INVALID_BYTES_TOO_LONG, YDBPY_ERRMSG_BYTES_TOO_LONG2);
 
     /* Setup for Call */

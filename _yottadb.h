@@ -1,9 +1,7 @@
 /* A structure that represents a key using ydb c types. used internally for converting between python and ydb c types */
 #define TEMP_YDB_RAISE_PYTHON_EXCEPTION -2 // TODO: remove after resolution of YDB issue #548
-#define MAX_UNSIGNED_INT 0xffffffff
 
 #define YDBPY_VALID 0
-
 
 #define YDBPY_MAX_ERRORMSG 1024
 #define YDBPY_MAX_REASON YDBPY_MAX_ERRORMSG / 4
@@ -22,7 +20,7 @@
 #define YDBPY_ERRMSG_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE "item %ld is not a list or tuple."
 
 #define YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES -104
-#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES "item %ld in key sequence invalid (first element must be of type 'bytes')"
+#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES "item %ld in key sequence invalid: first element must be of type 'bytes'"
 
 #define YDBPY_INVALID_VARNAME_TOO_LONG -201
 #define YDBPY_ERRMSG_VARNAME_TOO_LONG "invalid varname length %ld: max %d"
@@ -40,8 +38,11 @@
 #define YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_TOO_LONG -205
 #define YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_TOO_LONG "item %ld in key sequence has invalid varname length %ld: max %d."
 
-#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_SUBSARRAY_INVALID "item %ld in key sequence has invalid subsarray (%s)"
+#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_SUBSARRAY_INVALID "item %ld in key sequence has invalid subsarray: %s"
 
+#define YDBPY_ERRMSG_VARNAME_INVALID "'varnames' argument invalid: %s"
+#define YDBPY_ERRMSG_SUBSARRAY_INVALID "'subsarray' argument invalid: %s"
+#define YDBPY_ERRMSG_KEYS_INVALID "'keys' argument invalid: %s"
 
 typedef struct {
     ydb_buffer_t *varname;
@@ -115,11 +116,11 @@ typedef struct {
 
 
 #define VALIDATE_SUBSARRAY(SUBSARRAY) {                                                                         \
-    VALIDATE_SEQUENCE_OF_BYTES_INPUT(SUBSARRAY, YDB_MAX_SUBS, YDB_MAX_STR, "'subsarray' argument invalid(%s)")  \
+    VALIDATE_SEQUENCE_OF_BYTES_INPUT(SUBSARRAY, YDB_MAX_SUBS, YDB_MAX_STR, YDBPY_ERRMSG_SUBSARRAY_INVALID)      \
 }
 
-#define VALIDATE_VARNAMES(VARNAMES) {                                                                               \
-    VALIDATE_SEQUENCE_OF_BYTES_INPUT(VARNAMES, YDB_MAX_NAMES, YDB_MAX_IDENT, "'varnames' argument invalid(%s)")     \
+#define VALIDATE_VARNAMES(VARNAMES) {                                                                       \
+    VALIDATE_SEQUENCE_OF_BYTES_INPUT(VARNAMES, YDB_MAX_NAMES, YDB_MAX_IDENT, YDBPY_ERRMSG_VARNAME_INVALID)  \
 }
 
 
