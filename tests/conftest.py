@@ -13,6 +13,7 @@
 #################################################################
 from typing import Sequence
 import os
+import shutil
 import subprocess
 import shlex
 import pytest # type: ignore
@@ -41,9 +42,7 @@ def ydb():
     os.chdir("..") # so changing to the parent directory to run the tests
 
     if os.path.exists(TEST_DATA_DIRECTORY): # clean up previous test if it failed to do so previously
-        execute(f'rm {TEST_GLD}')
-        execute(f'rm {TEST_DAT}')
-        execute(f'rmdir {TEST_DATA_DIRECTORY}')
+        shutil.rmtree(TEST_DATA_DIRECTORY)
 
     os.mkdir(TEST_DATA_DIRECTORY)
     os.environ["ydb_gbldir"] = TEST_GLD
@@ -54,9 +53,7 @@ def ydb():
     yield yottadb.Context()
 
     #teardown
-    execute(f'rm {TEST_GLD}')
-    execute(f'rm {TEST_DAT}')
-    execute(f'rmdir {TEST_DATA_DIRECTORY}')
+    shutil.rmtree(TEST_DATA_DIRECTORY)
 
 
 SIMPLE_DATA = (

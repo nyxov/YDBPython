@@ -1,12 +1,5 @@
 import pytest # type: ignore
 import _yottadb
-import sys
-
-if sys.version_info < (3, 8):
-    BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = b'1' * (2 ** 31 + 1) # 2**32 +1 crashes python 3.6/Ubuntu 18.04 (OSError: [Errno 12] Cannot allocate memory)
-else:
-    BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = b'1' * (2 ** 32 + 1) # works for python 3.8/Ubuntu 20.04
-
 
 def varname_invalid(function):
     with pytest.raises(TypeError):
@@ -18,9 +11,6 @@ def varname_invalid(function):
         pass
     with pytest.raises(ValueError):
             function(varname=b'b'*(_yottadb.YDB_MAX_IDENT + 1))
-
-    with pytest.raises(ValueError):
-            function(varname=BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
 
 
 def subsarray_invalid(function):
@@ -46,8 +36,7 @@ def subsarray_invalid(function):
     with pytest.raises(ValueError):
             function(b'test', (b'b'*(_yottadb.YDB_MAX_STR + 1),))
 
-    with pytest.raises(ValueError):
-            function(b'test', (BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH,))
+
 
 # data()
 def test_data_varname(ydb):
@@ -106,8 +95,6 @@ def test_incr_increment(ydb):
     with pytest.raises(ValueError):
             _yottadb.incr(**key, increment=b'1'*(_yottadb.YDB_MAX_STR + 1))
 
-    with pytest.raises(ValueError):
-            _yottadb.incr(**key, increment=BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
 
 # lock()
 def test_lock_keys(ydb):
@@ -209,15 +196,12 @@ def test_set_value(ydb):
     with pytest.raises(ValueError):
             _yottadb.set(**key, value=b'b'*(_yottadb.YDB_MAX_STR + 1))
 
-    with pytest.raises(ValueError):
-            _yottadb.set(**key, value=BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
 
 # str2zwr()
 def test_str2zwr_input(ydb):
     with pytest.raises(ValueError):
         _yottadb.str2zwr(b'b'*(_yottadb.YDB_MAX_STR + 1))
-    with pytest.raises(ValueError):
-        _yottadb.str2zwr(BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
+
 
 # subscript_next()
 def test_subscript_next_varname(ydb):
@@ -269,5 +253,37 @@ def test_delete_excel_varnames(ydb):
 def test_zwr2str_input(ydb):
     with pytest.raises(ValueError):
         _yottadb.str2zwr(b'b'*(_yottadb.YDB_MAX_STR + 1))
+
+def test_unsigned_int_length_bytes_overflow(ydb):
+    BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = b'1' * (2 ** 32 + 1)  # works for python 3.8/Ubuntu 20.04
+    varname_subsarray_functions = (_yottadb.data,
+                                   _yottadb.delete,
+                                   _yottadb.get,
+                                   _yottadb.incr,
+                                   _yottadb.lock_decr,
+                                   _yottadb.lock_incr,
+                                   _yottadb.node_next,
+                                   _yottadb.node_previous,
+                                   _yottadb.set,
+                                   _yottadb.subscript_next,
+                                   _yottadb.subscript_previous,
+                                   )
+    for function in varname_subsarray_functions:
+        with pytest.raises(ValueError):
+                function(varname=BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
+
+        with pytest.raises(ValueError):
+                function(b'test', (BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH,))
+
+    key = {'varname': b'test', 'subsarray': (b'b',)}
+    with pytest.raises(ValueError):
+            _yottadb.incr(**key, increment=BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
+
+    with pytest.raises(ValueError):
+            _yottadb.set(**key, value=BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
+
+    with pytest.raises(ValueError):
+        _yottadb.str2zwr(BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
+
     with pytest.raises(ValueError):
         _yottadb.zwr2str(BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
