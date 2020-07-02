@@ -1,5 +1,8 @@
 import pytest # type: ignore
 import _yottadb
+import psutil
+
+
 
 def varname_invalid(function):
     with pytest.raises(TypeError):
@@ -254,6 +257,7 @@ def test_zwr2str_input(ydb):
     with pytest.raises(ValueError):
         _yottadb.str2zwr(b'b'*(_yottadb.YDB_MAX_STR + 1))
 
+@pytest.mark.skipif(psutil.virtual_memory().available < (2**32 + 1), reason="not enough memory for this test.")
 def test_unsigned_int_length_bytes_overflow(ydb):
     BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = b'1' * (2 ** 32 + 1)  # works for python 3.8/Ubuntu 20.04
     varname_subsarray_functions = (_yottadb.data,
