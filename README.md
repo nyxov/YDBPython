@@ -42,12 +42,12 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
             2. install package globally: `sudo -E python3 setup.py install`
             
     5. run tests:
-        1. install `pytest`
+        1. install `pytest` and `psutil`
             1. If `pip` for `python3` is not installed do so: `sudo apt install python3-pip`
-            2. use `pip` to install `pytest`
+            2. use `pip` to install `pytest` and `psutil`
                 1. option 1: install into venv
                     1. activate `venv` if it is not already: `source .venv/bin/activate`
-                    2. install: `pip install pytest`
+                    2. install: `pip install pytest psutil`
                 2. option 2: install for user: `pip3 install --user pytest`
                 3. option 3: install globally (not suggested): `sudo pip3 install pytest`
                     
