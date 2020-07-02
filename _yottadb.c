@@ -631,7 +631,7 @@ static PyObject* get(PyObject* self, PyObject* args, PyObject *kwds) {
     SETUP_BUFFER(varname, varname_y, varname_len, "get()", return_NULL);
     SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
-    YDB_MALLOC_BUFFER(&ret_value, 1024);
+    YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_VALUE_LEN);
 
     if (!return_NULL) {
         /* Call the wrapped function */
@@ -991,7 +991,7 @@ static PyObject* node_next(PyObject* self, PyObject* args, PyObject *kwds) {
     SETUP_BUFFER(varname, varname_y, varname_len, "node_next()", return_NULL);
     SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
-    max_subscript_string = 1024;
+    max_subscript_string = YDBPY_DEFAULT_SUBSCRIPT_LEN;
     default_ret_subs_used = subs_used + 5;
     if (YDB_MAX_SUBS < default_ret_subs_used)
         default_ret_subs_used = YDB_MAX_SUBS;
@@ -1076,7 +1076,7 @@ static PyObject* node_previous(PyObject* self, PyObject* args, PyObject *kwds) {
     SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 
-    max_subscript_string = 1024;
+    max_subscript_string = YDBPY_DEFAULT_SUBSCRIPT_LEN;
     default_ret_subs_used = subs_used - 1;
     if (0 >= default_ret_subs_used)
         default_ret_subs_used = 1;
@@ -1214,7 +1214,7 @@ static PyObject* str2zwr(PyObject* self, PyObject* args, PyObject *kwds) {
     /* Setup for Call */
     SETUP_BUFFER(str, str_buf, str_len, "ydb_str2zwr", return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buf, YDB_MAX_ERRORMSG);
-    YDB_MALLOC_BUFFER(&zwr_buf, 1024);
+    YDB_MALLOC_BUFFER(&zwr_buf, YDBPY_DEFAULT_VALUE_LEN);
 
     if (!return_NULL) {
         /* Call the wrapped function */
@@ -1281,7 +1281,7 @@ static PyObject* subscript_next(PyObject* self, PyObject* args, PyObject *kwds) 
     SETUP_BUFFER(varname, varname_y, varname_len, "subscript_next()", return_NULL);
     SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
-    YDB_MALLOC_BUFFER(&ret_value, 1024);
+    YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_SUBSCRIPT_LEN);
 
     if (!return_NULL) {
         /* Call the wrapped function */
@@ -1347,7 +1347,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
     SETUP_BUFFER(varname, varname_y, varname_len, "subscript_previous()", return_NULL);
     SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
-    YDB_MALLOC_BUFFER(&ret_value, 1024);
+    YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_SUBSCRIPT_LEN);
 
     if (!return_NULL) {
         /* Call the wrapped function */
@@ -1394,7 +1394,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
  *            TODO: replace TEMP_YDB_RAISE_PYTHON_EXCEPTION after resolution of YDB issue #548
  *            (note) the PyErr String is already set so the the function receiving the return value (tp) just needs to return NULL.
  */
-static int callback_wrapper(uint64_t tp_token, ydb_buffer_t*errstr, void *function_with_arguments) {
+static int callback_wrapper(uint64_t tp_token, ydb_buffer_t *errstr, void *function_with_arguments) {
     /* this should only ever be called by ydb_tp_st c api via tp below.
      * It assumes that everything passed to it was validated.
      */
@@ -1553,7 +1553,7 @@ static PyObject* zwr2str(PyObject* self, PyObject* args, PyObject *kwds) {
     /* Setup for Call */
     SETUP_BUFFER(zwr, zwr_buf, zwr_len, "zwr2str()", return_NULL);
     YDB_MALLOC_BUFFER(&error_string_buf, YDB_MAX_ERRORMSG);
-    YDB_MALLOC_BUFFER(&str_buf, 1024);
+    YDB_MALLOC_BUFFER(&str_buf, YDBPY_DEFAULT_VALUE_LEN);
 
     if (!return_NULL) {
         /* Call the wrapped function */
