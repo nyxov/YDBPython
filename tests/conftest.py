@@ -57,26 +57,26 @@ def ydb():
 
 
 SIMPLE_DATA = (
-    (KeyTuple('^test1'), 'test1value'),
-    (KeyTuple('^test2', ('sub1',)), 'test2value'),
-    (KeyTuple('^test3'), 'test3value1'),
-    (KeyTuple('^test3', ('sub1',)), 'test3value2'),
-    (KeyTuple('^test3', ('sub1', 'sub2')), 'test3value3'),
-    (KeyTuple('^test4'), 'test4'),
-    (KeyTuple('^test4', ('sub1',)), 'test4sub1'),
-    (KeyTuple('^test4', ('sub1', 'subsub1')), 'test4sub1subsub1'),
-    (KeyTuple('^test4', ('sub1', 'subsub2')), 'test4sub1subsub2'),
-    (KeyTuple('^test4', ('sub1', 'subsub3')), 'test4sub1subsub3'),
-    (KeyTuple('^test4', ('sub2',)), 'test4sub2'),
-    (KeyTuple('^test4', ('sub2', 'subsub1')), 'test4sub2subsub1'),
-    (KeyTuple('^test4', ('sub2', 'subsub2')), 'test4sub2subsub2'),
-    (KeyTuple('^test4', ('sub2', 'subsub3')), 'test4sub2subsub3'),
-    (KeyTuple('^test4', ('sub3',)), 'test4sub3'),
-    (KeyTuple('^test4', ('sub3', 'subsub1')), 'test4sub3subsub1'),
-    (KeyTuple('^test4', ('sub3', 'subsub2')), 'test4sub3subsub2'),
-    (KeyTuple('^test4', ('sub3', 'subsub3')), 'test4sub3subsub3'),
-    (KeyTuple('^Test5'), 'test5value'),
-    (KeyTuple('^test6', ('sub6', 'subsub6')), 'test6value'),
+    (KeyTuple(b'^test1'), b'test1value'),
+    (KeyTuple(b'^test2', (b'sub1',)), b'test2value'),
+    (KeyTuple(b'^test3'), b'test3value1'),
+    (KeyTuple(b'^test3', (b'sub1',)), b'test3value2'),
+    (KeyTuple(b'^test3', (b'sub1', b'sub2')), b'test3value3'),
+    (KeyTuple(b'^test4'), b'test4'),
+    (KeyTuple(b'^test4', (b'sub1',)), b'test4sub1'),
+    (KeyTuple(b'^test4', (b'sub1', b'subsub1')), b'test4sub1subsub1'),
+    (KeyTuple(b'^test4', (b'sub1', b'subsub2')), b'test4sub1subsub2'),
+    (KeyTuple(b'^test4', (b'sub1', b'subsub3')), b'test4sub1subsub3'),
+    (KeyTuple(b'^test4', (b'sub2',)), b'test4sub2'),
+    (KeyTuple(b'^test4', (b'sub2', b'subsub1')), b'test4sub2subsub1'),
+    (KeyTuple(b'^test4', (b'sub2', b'subsub2')), b'test4sub2subsub2'),
+    (KeyTuple(b'^test4', (b'sub2', b'subsub3')), b'test4sub2subsub3'),
+    (KeyTuple(b'^test4', (b'sub3',)), b'test4sub3'),
+    (KeyTuple(b'^test4', (b'sub3', b'subsub1')), b'test4sub3subsub1'),
+    (KeyTuple(b'^test4', (b'sub3', b'subsub2')), b'test4sub3subsub2'),
+    (KeyTuple(b'^test4', (b'sub3', b'subsub3')), b'test4sub3subsub3'),
+    (KeyTuple(b'^Test5'), b'test5value'),
+    (KeyTuple(b'^test6', (b'sub6', b'subsub6')), b'test6value'),
 )
 
 @pytest.fixture(scope='function')
@@ -91,29 +91,29 @@ def simple_data(ydb):
 
 
 TREE_DATA = (
-    (KeyTuple('^tree1', ('sub1'),), 'tree1.sub1'),
-    (KeyTuple('^tree1', ('sub2'),), 'tree1.sub2'),
-    (KeyTuple('^tree1', ('sub3'),), 'tree1.sub3'),
+    (KeyTuple(b'^tree1', (b'sub1'),), b'tree1.sub1'),
+    (KeyTuple(b'^tree1', (b'sub2'),), b'tree1.sub2'),
+    (KeyTuple(b'^tree1', (b'sub3'),), b'tree1.sub3'),
 
-    (KeyTuple('^tree2', ('sub1', 'sub1sub1')), 'tree2.sub1.sub1sub1'),
-    (KeyTuple('^tree2', ('sub1', 'sub1sub2')), 'tree2.sub1.sub1sub2'),
-    (KeyTuple('^tree2', ('sub1', 'sub1sub3')), 'tree2.sub1.sub1sub3'),
-    (KeyTuple('^tree2', ('sub2', 'sub2sub1')), 'tree2.sub2.sub2sub1'),
-    (KeyTuple('^tree2', ('sub2', 'sub2sub2')), 'tree2.sub2.sub2sub2'),
-    (KeyTuple('^tree2', ('sub2', 'sub2sub3')), 'tree2.sub2.sub2sub3'),
-    (KeyTuple('^tree2', ('sub3', 'sub3sub1')), 'tree2.sub3.sub3sub1'),
-    (KeyTuple('^tree2', ('sub3', 'sub3sub2')), 'tree2.sub3.sub3sub2'),
-    (KeyTuple('^tree2', ('sub3', 'sub3sub3')), 'tree2.sub3.sub3sub3'),
+    (KeyTuple(b'^tree2', (b'sub1', b'sub1sub1')), b'tree2.sub1.sub1sub1'),
+    (KeyTuple(b'^tree2', (b'sub1', b'sub1sub2')), b'tree2.sub1.sub1sub2'),
+    (KeyTuple(b'^tree2', (b'sub1', b'sub1sub3')), b'tree2.sub1.sub1sub3'),
+    (KeyTuple(b'^tree2', (b'sub2', b'sub2sub1')), b'tree2.sub2.sub2sub1'),
+    (KeyTuple(b'^tree2', (b'sub2', b'sub2sub2')), b'tree2.sub2.sub2sub2'),
+    (KeyTuple(b'^tree2', (b'sub2', b'sub2sub3')), b'tree2.sub2.sub2sub3'),
+    (KeyTuple(b'^tree2', (b'sub3', b'sub3sub1')), b'tree2.sub3.sub3sub1'),
+    (KeyTuple(b'^tree2', (b'sub3', b'sub3sub2')), b'tree2.sub3.sub3sub2'),
+    (KeyTuple(b'^tree2', (b'sub3', b'sub3sub3')), b'tree2.sub3.sub3sub3'),
 
-    (KeyTuple('^tree3'), 'tree3'),
-    (KeyTuple('^tree2', ('sub1',)), 'tree3.sub1'),
-    (KeyTuple('^tree2', ('sub1', 'sub1sub1')), 'tree3.sub1.sub1sub1'),
-    (KeyTuple('^tree3'), 'tree3'),
-    (KeyTuple('^tree2', ('sub2',)), 'tree3.sub2'),
-    (KeyTuple('^tree2', ('sub2', 'sub2sub1')), 'tree3.sub2.sub2sub1'),
-    (KeyTuple('^tree3'), 'tree3'),
-    (KeyTuple('^tree2', ('sub3',)), 'tree3.sub3'),
-    (KeyTuple('^tree2', ('sub3', 'sub3sub1')), 'tree3.sub3.sub3sub1'),
+    (KeyTuple(b'^tree3'), b'tree3'),
+    (KeyTuple(b'^tree2', (b'sub1',)), b'tree3.sub1'),
+    (KeyTuple(b'^tree2', (b'sub1', b'sub1sub1')), b'tree3.sub1.sub1sub1'),
+    (KeyTuple(b'^tree3'), b'tree3'),
+    (KeyTuple(b'^tree2', (b'sub2',)), b'tree3.sub2'),
+    (KeyTuple(b'^tree2', (b'sub2', b'sub2sub1')), b'tree3.sub2.sub2sub1'),
+    (KeyTuple(b'^tree3'), b'tree3'),
+    (KeyTuple(b'^tree2', (b'sub3',)), b'tree3.sub3'),
+    (KeyTuple(b'^tree2', (b'sub3', b'sub3sub1')), b'tree3.sub3.sub3sub1'),
 )
 
 @pytest.fixture(scope='function')
@@ -129,8 +129,8 @@ def tree_data(ydb):
 
 @pytest.fixture
 def simple_reset_test_data(ydb):
-    ydb.set('resetattempt', value='0')
-    ydb.set('resetvalue', value='0')
+    ydb.set(b'resetattempt', value=b'0')
+    ydb.set(b'resetvalue', value=b'0')
     yield
-    ydb.delete_node('resetattempt')
-    ydb.delete_node('resetvalue')
+    ydb.delete_node(b'resetattempt')
+    ydb.delete_node(b'resetvalue')

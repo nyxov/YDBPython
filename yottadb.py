@@ -33,13 +33,6 @@ from _yottadb import YDB_DATA_VALUE_DESC as DATA_VALUE_DESC
 from _yottadb import YDBTPRollback, YDBTPRestart
 
 
-Data = Union[bytes, str]
-
-ASCII = 'ascii'
-UTF8 = 'utf-8'
-DEFAULT_ENCODING = UTF8
-CONTEXT_ENCODING = 'CONTEXT'
-
 
 class SearchSpace(enum.Enum):
     LOCAL = enum.auto()
@@ -47,8 +40,8 @@ class SearchSpace(enum.Enum):
     BOTH = enum.auto()
 
 class KeyTuple(NamedTuple):
-    varname:Data
-    subsarray:Sequence[Data] = ()
+    varname:bytes
+    subsarray:Sequence[bytes] = ()
 
     def __str__(self) -> str:
         return_value = str(self.varname)
@@ -60,70 +53,27 @@ class KeyTuple(NamedTuple):
         return return_value
 
 
-def array_str_to_bytes(array:Sequence[Data], encoding:Optional[str]) -> Sequence[bytes]:
-    if encoding is None:
-        for item in array:
-            if not isinstance(item, bytes):
-                raise TypeError("'encoding' not set with sequence of non-bytes")
-        return cast(Sequence[bytes], array)
-
-    ret_array:List[bytes] = list()
-    for item in array:
-        if isinstance(item, bytes):
-            ret_array.append(item)
-        elif isinstance(item, str):
-            ret_array.append(bytes(item, encoding=encoding))
-        else:
-            raise TypeError("'array' must be Sequence[union[data,str]]")
-
-    return ret_array
-
 
 class Context:
     tp_token: int
-    subs_encoding: str
-    val_encoding: str
-    threaded: bool
 
-    def __init__(self, tp_token=NOTTP, subs_encoding=DEFAULT_ENCODING, val_encoding=DEFAULT_ENCODING, threaded:bool = False):
+    def __init__(self, tp_token=NOTTP):
         self.tp_token = tp_token
-        self.subs_encoding = subs_encoding
-        self.val_encoding = val_encoding
-        self.threaded = threaded
 
-    def __getitem__(self, item:Data) -> 'Key':
+    def __getitem__(self, item:bytes) -> 'Key':
         return Key(name=item, context=self)
 
-    def _setup(self, varname, subsarray, subs_encoding=CONTEXT_ENCODING, val_encoding=CONTEXT_ENCODING) -> Tuple[bytes, Sequence[bytes], str, str]:
-        if subs_encoding == CONTEXT_ENCODING:
-            subs_encoding = self.subs_encoding
-        if val_encoding == CONTEXT_ENCODING:
-            val_encoding = self.val_encoding
-        if not isinstance(varname, bytes):
-            varname = bytes(varname, encoding=ASCII)
-        if subsarray is not None:
-            subsarray = array_str_to_bytes(subsarray, subs_encoding)
-        return (varname, subsarray, subs_encoding, val_encoding)
-
-    def data(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> int:
-        varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
+    def data(self, varname:bytes, subsarray:Sequence[bytes]=()) -> int:
         return _yottadb.data(varname, subsarray, self.tp_token)
 
-    def delete_node(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> None:
-        varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
+    def delete_node(self, varname:bytes, subsarray:Sequence[bytes]=()) -> None:
         _yottadb.delete(varname, subsarray, DEL_NODE, self.tp_token)
 
-    def delete_tree(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> None:
-        varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
+    def delete_tree(self, varname:bytes, subsarray:Sequence[bytes]=()) -> None:
         _yottadb.delete(varname, subsarray, DEL_TREE, self.tp_token)
 
-    def get(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING, val_encoding:Optional[str]=CONTEXT_ENCODING) -> Optional[Data]:
-        varname, subsarray, subs_encoding, val_encoding = self._setup(varname, subsarray, subs_encoding, val_encoding)
-        val = _yottadb.get(varname, subsarray, self.tp_token)
-        if val_encoding == None:
-            return val
-        else:
-            return str(val, encoding=val_encoding)
+    def get(self, varname:bytes, subsarray:Sequence[bytes]=()) -> Optional[bytes]:
+        return _yottadb.get(varname, subsarray, self.tp_token)
 
     '''
     def incr(self): ...
@@ -132,20 +82,12 @@ class Context:
     def node_next(self): ...
     def node_previous(self): ...
     '''
-    def set(self, varname:Data, subsarray:Sequence[Data]=(), value:Data='', subs_encoding:Optional[str]=CONTEXT_ENCODING, val_encoding:Optional[str]=CONTEXT_ENCODING) -> None:
-        varname, subsarray, subs_encoding, val_encoding = self._setup(varname, subsarray, subs_encoding, val_encoding)
-        if val_encoding is not None and isinstance(value, str):
-            value = bytes(value, encoding=val_encoding)
+
+    def set(self, varname:bytes, subsarray:Sequence[bytes]=(), value:bytes=b'') -> None:
         _yottadb.set(varname, subsarray, value, self.tp_token)
 
-
-    def subscript_next(self, varname:Data, subsarray:Sequence[Data]=(), subs_encoding:Optional[str]=CONTEXT_ENCODING) -> Data:
-        varname, subsarray, subs_encoding, _ = self._setup(varname, subsarray, subs_encoding)
-        sub = _yottadb.subscript_next(varname, subsarray, self.tp_token)
-        if subs_encoding == None:
-            return sub
-        else:
-            return str(sub, encoding=subs_encoding)
+    def subscript_next(self, varname:bytes, subsarray:Sequence[bytes]=()) -> bytes:
+        return _yottadb.subscript_next(varname, subsarray, self.tp_token)
 
     '''
     def subscript_previous(self): ...
@@ -158,8 +100,8 @@ class Context:
     def zwr2str(self): ...
     '''
 
-    def _varnames(self, first:str = '^') -> Generator[Data, None, None]:
-        var_next:Data = f'{first}%'
+    def _varnames(self, first:bytes = b'^') -> Generator[bytes, None, None]:
+        var_next:bytes = f'{first}%'
         if self.data(var_next) != 0:
             yield var_next
 
@@ -171,8 +113,8 @@ class Context:
                 return
 
     @property
-    def local_varnames(self) -> Generator[Data, None, None]:
-        for var in self._varnames(first=''):
+    def local_varnames(self) -> Generator[bytes, None, None]:
+        for var in self._varnames(first=b''):
             yield var
 
     @property
@@ -181,8 +123,8 @@ class Context:
             yield self[var]
 
     @property
-    def global_varnames(self) -> Generator[Data, None, None]:
-        for var in self._varnames(first='^'):
+    def global_varnames(self) -> Generator[bytes, None, None]:
+        for var in self._varnames(first=b'^'):
             yield var
 
     @property
@@ -191,7 +133,7 @@ class Context:
             yield self[var]
 
     @property
-    def all_varnames(self) -> Generator[Data, None, None]:
+    def all_varnames(self) -> Generator[bytes, None, None]:
         for var in self.global_varnames:
             yield var
         for var in self.local_varnames:
@@ -206,12 +148,10 @@ class Context:
 
 class Key:
     context: Context
-    name_bytes: bytes
+    name: bytes
     parent: Optional["Key"]
-    name_encoding: str
-    val_encoding: str
 
-    def __init__(self, name:Data, parent:Optional['Key']=None, context:Context=None, name_encoding=CONTEXT_ENCODING, val_encoding=CONTEXT_ENCODING) -> None:
+    def __init__(self, name:bytes, parent:Optional['Key']=None, context:Context=None) -> None:
         if isinstance(context, Context):
             self.context = context
         elif context is None:
@@ -219,19 +159,7 @@ class Key:
         else:
             raise TypeError("'context' must be an instance of yottadb.Context")
 
-        self.name_encoding = name_encoding
-        if parent is None:  #if parent is None it is a 'varname' and must be have ASCII encoding.
-            self.name_encoding = ASCII
-
-        self.val_encoding = val_encoding
-
-        if isinstance(name, str):
-            if name_encoding == CONTEXT_ENCODING:
-                self.name_bytes = bytes(name, encoding=self.context.subs_encoding)
-            else:
-               self.name_bytes = bytes(name, encoding=self.name_encoding)
-        elif isinstance(name, bytes):
-            self.name_bytes = name
+        self.name = name
 
         if parent is not None and not isinstance(parent, Key):
             raise TypeError("'parent' must be of type Key")
@@ -256,109 +184,65 @@ class Key:
     def __eq__(self, other) -> bool:
         if not isinstance(other, Key):
             return False
-        if self.varname_bytes == other.varname_bytes and self.subsarray_bytes == other.subsarray_bytes:
+        if self.varname == other.varname and self.subsarray == other.subsarray:
             return True
         else:
             return False
 
     @property
-    def name(self) -> str:
-        if self.name_encoding == CONTEXT_ENCODING:
-            if self.context.subs_encoding == None:
-                raise TypeError("Cannot encode keys name because context's 'subs_encoding' property is set to None.")
-            else:
-                return str(self.name_bytes, encoding=self.context.subs_encoding)
-        if self.name_encoding == None:
-            raise TypeError("Cannot encode keys name because key's 'name_encoding' property is set to None.")
-        else:
-            return str(self.name_bytes, encoding=self.name_encoding)
-
-    @property
     def varname_key(self) -> 'Key':
         if self.parent is None:
             return self
-        ansestor = self.parent
-        while ansestor.parent is not None:
-            ansestor = ansestor.parent
-        return ansestor
+        ancestor = self.parent
+        while ancestor.parent is not None:
+            ancestor = ancestor.parent
+        return ancestor
 
     @property
-    def varname(self) -> str:
+    def varname(self) -> bytes:
         return self.varname_key.name
-
-    @property
-    def varname_bytes(self):
-        return self.varname_key.name_bytes
 
     @property
     def subsarray_keys(self) -> List['Key']:
         if self.parent is None:
             return []
         subs_array = [self]
-        ansestor = self.parent
-        while ansestor.parent is not None:
-            subs_array.insert(0, ansestor)
-            ansestor = ansestor.parent
+        ancestor = self.parent
+        while ancestor.parent is not None:
+            subs_array.insert(0, ancestor)
+            ancestor = ancestor.parent
         return subs_array
 
     @property
-    def subsarray(self) -> List[str]:
+    def subsarray(self) -> List[bytes]:
         ret_list = []
         for key in self.subsarray_keys:
             ret_list.append(key.name)
         return ret_list
 
     @property
-    def subsarray_bytes(self) -> List[bytes]:
-        ret_list = []
-        for key in self.subsarray_keys:
-            ret_list.append(key.name_bytes)
-        return ret_list
-
-    @property
     def value(self) -> Optional[str]:
-        if self.val_encoding == None:
-            raise TypeError("object's 'val_encoding' proprety set to None. Did you mean 'value_bytes'?")
-
         try:
-            if self.val_encoding == CONTEXT_ENCODING:
-                return cast(Optional[str], self.context.get(self.varname_bytes, self.subsarray_bytes))
-            else:
-                return cast(Optional[str], self.context.get(self.varname_bytes, self.subsarray_bytes, val_encoding=self.val_encoding))
-        except (_yottadb.YDBGVUNDEFError, _yottadb.YDBLVUNDEFError):
+            return self.context.get(self.varname, self.subsarray)
+        except (_yottadb.YDBLVUNDEFError, _yottadb.YDBGVUNDEFError):
             return None
+
+
 
     @value.setter
-    def value(self, value: Union[str, bytes]) -> None:
-        bytes_value = b''
-        if not isinstance(value, (str, bytes)):
-            raise TypeError("'value' must be bytes or string")
-        elif isinstance(value, str):
-            if self.val_encoding == CONTEXT_ENCODING:
-                bytes_value = bytes(value, encoding=self.context.val_encoding)
-            else:
-                bytes_value = bytes(value, encoding=self.val_encoding)
-        else:
-            bytes_value = value
+    def value(self, value:bytes) -> None:
+        self.context.set(self.varname, self.subsarray, value)
 
-        self.context.set(self.varname_bytes, self.subsarray_bytes, bytes_value, val_encoding=None)
-
-    @property
-    def value_bytes(self) -> Optional[bytes]:
-        try:
-            return cast(Optional[bytes], self.context.get(self.varname_bytes, self.subsarray_bytes, val_encoding=None))
-        except (_yottadb.YDBGVUNDEFError, _yottadb.YDBLVUNDEFError):
-            return None
 
     def delete_node(self):
-        self.context.delete_node(self.varname_bytes, self.subsarray_bytes)
+        self.context.delete_node(self.varname, self.subsarray)
 
     def delete_tree(self):
-        self.context.delete_tree(self.varname_bytes, self.subsarray_bytes)
+        self.context.delete_tree(self.varname, self.subsarray)
 
     @property
     def data(self):
-        return self.context.data(self.varname_bytes, self.subsarray_bytes)
+        return self.context.data(self.varname, self.subsarray)
 
     @property
     def has_value(self):
@@ -377,13 +261,13 @@ class Key:
 
     @property
     def subscripts(self) -> Generator:
-        subscript_subsarray:List[Data] = []
+        subscript_subsarray:List[bytes] = []
         if len(self.subsarray) > 0:
-            subscript_subsarray = list(self.subsarray_bytes)
+            subscript_subsarray = list(self.subsarray)
         subscript_subsarray.append(b'')
         while True:
             try:
-                sub_next = self.context.subscript_next(self.varname_bytes, subscript_subsarray)
+                sub_next = self.context.subscript_next(self.varname, subscript_subsarray)
                 subscript_subsarray[-1] = sub_next
                 yield sub_next
             except _yottadb.YDBNODEENDError:
@@ -393,26 +277,6 @@ class Key:
     def subscript_keys(self) -> Generator:
         for sub in self.subscripts:
             yield self[sub]
-'''
-    @property
-    def subscript_list(self) -> List[str]:
-        return_value = []
-        for sub in self.subscripts:
-            return_value.append(sub)
-        return return_value
-
-    @property
-    def subkeys(self) -> Generator:
-        for sub in self.subscripts:
-            yield self[sub]
-
-    @property
-    def subkey_list(self) -> List['Key']:
-        return_value = []
-        for key in self.subkeys:
-            return_value.append(key)
-        return return_value
-'''
 
 
 def transaction(function):
