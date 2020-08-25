@@ -227,6 +227,13 @@ def test_tp_callback(ydb):
     with pytest.raises(TypeError):
         _yottadb.tp(callback="not a callable")
 
+def callback_that_returns_wrong_type(tp_token=None):
+    return "not an int"
+
+def test_tp_callback_return_wrong_type():
+    with pytest.raises(TypeError):
+        _yottadb.tp(callback_that_returns_wrong_type)
+
 def test_tp_args(ydb):
     with pytest.raises(TypeError):
         _yottadb.tp(callback=simple_transaction, args="not a sequence of arguments")

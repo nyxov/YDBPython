@@ -33,22 +33,6 @@ TEST_DATA_DIRECTORY = '/tmp/test_yottadb/'
 TEST_GLD = TEST_DATA_DIRECTORY + 'test_db.gld'
 TEST_DAT = TEST_DATA_DIRECTORY + 'test_db.dat'
 
-
-@pytest.fixture(scope="function")
-def bank():
-    account1 = b'acc#1234'
-    account2 = b'acc#5678'
-    account1_balance = 1234
-    account2_balance = 5678
-    transfer_amount = 10
-    _yottadb.set(varname=b'^account', subsarray=(account1, b'balance'), value=bytes(str(account1_balance), encoding='utf-8'))
-    _yottadb.set(varname=b'^account', subsarray=(account2, b'balance'), value=bytes(str(account2_balance), encoding='utf-8'))
-
-    yield [{'account#':account1, 'account_balance':account1_balance}, {'account#':account2, 'account_balance':account2_balance}]
-
-    _yottadb.delete(varname=b'^account', delete_type=_yottadb.YDB_DEL_TREE)
-
-
 def test_get_1_positional(simple_data):
     assert _yottadb.get(b'^test1') == b'test1value'
     
@@ -219,10 +203,7 @@ def test_lock_incr_timeout_4():
     _yottadb.lock_decr(b'test2')
     time.sleep(1.1)
 
-def simple_function(param, tp_token=NOTTP):
-    print(tp_token)
-    print(param)
-    return _yottadb.YDB_OK
+
 
 # new tp() tests
 
@@ -233,11 +214,15 @@ def no_action(tp_token:int) -> None:
 def set_key(key:KeyTuple, value:bytes, tp_token:int) -> None:
     _yottadb.set(*key, value=value, tp_token=tp_token)
 
+def incr_key(key:KeyTuple, increment:bytes, tp_token:int) -> None:
+    _yottadb.incr(*key, increment=increment, tp_token=tp_token)
+
 def conditional_set_key(key1:KeyTuple, key2:KeyTuple, value:bytes, traker_key:KeyTuple, tp_token:int) -> None:
     if _yottadb.data(*traker_key, tp_token) == _yottadb.YDB_DATA_UNDEF:
         _yottadb.set(*key1, value=value, tp_token=tp_token)
     else:
         _yottadb.set(*key2, value=value, tp_token=tp_token)
+
 
 def raise_YDBError(undefined_key:KeyTuple, tp_token) -> None:
     _yottadb.get(*undefined_key, tp_token=tp_token)
@@ -248,10 +233,15 @@ def raise_standard_python_exception(tp_token) -> None:
 class TransactionData(NamedTuple):
     action: Callable = no_action
     action_arguments: Tuple = ()
+    varnames: Optional[Sequence[bytes]] = None
     restart_key: KeyTuple = KeyTuple(b'tptests', (b'process_transation', b'default'))
     return_value: int = _yottadb.YDB_OK
+    restart_timeout: float = -1
+    restart_timeout_return_value: int = _yottadb.YDB_OK
 
-def process_transaction(nested_transaction_data: Tuple[TransactionData], tp_token: int = NOTTP) -> int:
+def process_transaction(nested_transaction_data: Tuple[TransactionData],
+                        start_time: Optional[datetime.datetime] = None,
+                        tp_token: int = NOTTP) -> int:
     current_data = nested_transaction_data[0]
 
     current_data.action(*current_data.action_arguments, tp_token=tp_token)
@@ -259,12 +249,17 @@ def process_transaction(nested_transaction_data: Tuple[TransactionData], tp_toke
     sub_data = nested_transaction_data[1:]
     if len(sub_data) > 0:
         try:
-            _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": sub_data}, tp_token=tp_token)
+            _yottadb.tp(process_transaction,
+                        kwargs={"nested_transaction_data": sub_data, "start_time": datetime.datetime.now()},
+                        tp_token=tp_token, varnames=current_data.varnames)
         except _yottadb.YDBTPRestart:
             return _yottadb.YDB_TP_RESTART
 
     if current_data.return_value == _yottadb.YDB_TP_RESTART:
-        if _yottadb.data(*current_data.restart_key, tp_token=tp_token) == _yottadb.YDB_DATA_UNDEF:
+        if (current_data.restart_timeout >= 0 and
+              (datetime.datetime.now() - start_time) > datetime.timedelta(seconds=current_data.restart_timeout)):
+            return current_data.restart_timeout_return_value
+        elif _yottadb.data(*current_data.restart_key, tp_token=tp_token) == _yottadb.YDB_DATA_UNDEF:
             _yottadb.incr(*current_data.restart_key, tp_token=tp_token)
             return _yottadb.YDB_TP_RESTART
         else:
@@ -283,7 +278,7 @@ def test_tp_return_YDB_OK():
     _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
 
     assert _yottadb.get(*key) == value
-    _yottadb.delete(*key)
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
 
 
 def test_tp_nested_return_YDB_OK():
@@ -298,8 +293,7 @@ def test_tp_nested_return_YDB_OK():
 
     assert _yottadb.get(*key1) == value1
     assert _yottadb.get(*key2) == value2
-    _yottadb.delete(*key1)
-    _yottadb.delete(*key2)
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
 
 
 def test_tp_return_YDB_ROLLBACK():
@@ -313,6 +307,8 @@ def test_tp_return_YDB_ROLLBACK():
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transation_data,)})
 
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_UNDEF
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
+
 
 
 def test_nested_return_YDB_ROLLBACK():
@@ -332,6 +328,7 @@ def test_nested_return_YDB_ROLLBACK():
 
     assert _yottadb.data(*key1) == _yottadb.YDB_DATA_UNDEF
     assert _yottadb.data(*key2) == _yottadb.YDB_DATA_UNDEF
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
 
 
 def test_tp_return_YDB_TP_RESTART():
@@ -351,9 +348,7 @@ def test_tp_return_YDB_TP_RESTART():
     assert _yottadb.get(*key2) == value
     assert int(_yottadb.get(*tracker)) == 1
 
-    _yottadb.delete(*key1)
-    _yottadb.delete(*key2)
-    _yottadb.delete(*tracker)
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
 
 
 def test_nested_tp_return_YDB_TP_RESTART():
@@ -392,6 +387,27 @@ def test_nested_tp_return_YDB_TP_RESTART():
     _yottadb.delete(*key2_1)
     _yottadb.delete(*key2_2)
     _yottadb.delete(*tracker2)
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
+
+def test_tp_return_YDB_TP_RESTART_reset_all():
+    key = KeyTuple(varname=b'^tptests', subsarray=(b'test_tp_return_YDB_TP_RESTART_reset_all', b'resetvalue'))
+    tracker = KeyTuple(varname=b'tptests', subsarray=(b'test_tp_return_YDB_TP_RESTART_reset_all', b'reset_count'))
+    _yottadb.delete(*key)
+
+    transaction_data = TransactionData(action = incr_key,
+                                       action_arguments = (key, b'1'),
+                                       restart_key = tracker,
+                                       return_value = _yottadb.YDB_TP_RESTART,
+                                       restart_timeout = 0.01,
+                                       restart_timeout_return_value = _yottadb.YDB_OK)
+
+    _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,),
+                                             "start_time": datetime.datetime.now()}, varnames=(b'*',))
+
+    assert _yottadb.get(*key) == b'1'
+    with pytest.raises(_yottadb.YDBLVUNDEFError):
+        _yottadb.get(*tracker)
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
 
 
 def test_tp_return_YDB_ERR_TPTIMEOUT():
@@ -405,6 +421,7 @@ def test_tp_return_YDB_ERR_TPTIMEOUT():
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
 
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_UNDEF
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
 
 
 def test_tp_nested_return_YDB_ERR_TPTIMEOUT():
@@ -420,6 +437,7 @@ def test_tp_nested_return_YDB_ERR_TPTIMEOUT():
 
     assert _yottadb.data(*key1) == _yottadb.YDB_DATA_UNDEF
     assert _yottadb.data(*key2) == _yottadb.YDB_DATA_UNDEF
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
 
 
 def test_tp_raise_YDBError():
@@ -429,6 +447,7 @@ def test_tp_raise_YDBError():
 
     with pytest.raises(_yottadb.YDBError):
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
 
 
 def test_tp_nested_raise_YDBError():
@@ -439,6 +458,7 @@ def test_tp_nested_raise_YDBError():
 
     with pytest.raises(_yottadb.YDBError):
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
 
 
 def test_tp_raise_standard_python_exception():
@@ -452,11 +472,12 @@ def test_tp_nested_raise_standard_python_exception():
     inner_transaction = TransactionData(action=raise_standard_python_exception)
     with pytest.raises(ZeroDivisionError):
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
 
 
 YDB_MAX_TP_DEPTH = 126
 @pytest.mark.parametrize('depth', range(1, YDB_MAX_TP_DEPTH+1))
-def test_tp_return_YDB_to_depth(depth):
+def test_tp_return_YDB_OK_to_depth(depth):
     def key_at_level(level: int) -> KeyTuple:
         return KeyTuple(varname=b'^tptests', subsarray=(bytes(f'test_tp_return_YDB_to_depth{depth}', encoding='ascii'),
                                                         bytes(f'level{level}', encoding='ascii')))
@@ -475,22 +496,23 @@ def test_tp_return_YDB_to_depth(depth):
 
     for level in range(0, depth):
         _yottadb.delete(*key_at_level(level))
+    _yottadb.delete(b'^tptests', delete_type=_yottadb.YDB_DEL_TREE)
 
 
-# old tp() tests
-def test_tp_0():
-    _yottadb.tp(simple_function, args=('test0',))
+# somewhat realistic tp tests
+@pytest.fixture(scope="function")
+def bank():
+    account1 = b'acc#1234'
+    account2 = b'acc#5678'
+    account1_balance = 1234
+    account2_balance = 5678
+    transfer_amount = 10
+    _yottadb.set(varname=b'^account', subsarray=(account1, b'balance'), value=bytes(str(account1_balance), encoding='utf-8'))
+    _yottadb.set(varname=b'^account', subsarray=(account2, b'balance'), value=bytes(str(account2_balance), encoding='utf-8'))
 
-def simple_functional_function(tp_token=NOTTP):
-    _yottadb.set(varname=b'^testtp1', value = b'after', tp_token=tp_token)
-    return _yottadb.YDB_OK
+    yield [{'account#':account1, 'account_balance':account1_balance}, {'account#':account2, 'account_balance':account2_balance}]
 
-def test_tp_1():
-    _yottadb.set(varname=b'^testtp1', value=b'before')
-    _yottadb.tp(simple_functional_function, kwargs={})
-    assert _yottadb.get(varname=b'^testtp1') == b'after'
-    _yottadb.delete(varname=b'^testtp1', delete_type=_yottadb.YDB_DEL_TREE)
-
+    _yottadb.delete(varname=b'^account', delete_type=_yottadb.YDB_DEL_TREE)
 
 
 def transfer_transaction(from_account, to_account, amount, tp_token=NOTTP):
@@ -508,7 +530,7 @@ def transfer_transaction(from_account, to_account, amount, tp_token=NOTTP):
     else:
         return _yottadb.YDB_OK
 
-def test_tp_2(bank):
+def test_tp_bank_transfer_ok(bank):
     account1 = bank[0]['account#']
     account2 = bank[1]['account#']
     account1_balance = bank[0]['account_balance']
@@ -520,7 +542,7 @@ def test_tp_2(bank):
     assert int(_yottadb.get(varname=b'^account', subsarray=(account1, b'balance'))) == account1_balance - transfer_amount
     assert int(_yottadb.get(varname=b'^account', subsarray=(account2, b'balance'))) == account2_balance + transfer_amount
 
-def test_tp_2_rollback(bank):
+def test_tp_bank_transfer_rollback(bank):
     account1 = bank[0]['account#']
     account2 = bank[1]['account#']
     account1_balance = bank[0]['account_balance']
@@ -534,13 +556,6 @@ def test_tp_2_rollback(bank):
     assert int(_yottadb.get(varname=b'account', subsarray=(account1, b'balance'))) == account1_balance
     assert int(_yottadb.get(varname=b'account', subsarray=(account2, b'balance'))) == account2_balance
 
-
-def callback_that_returns_wrong_type(tp_token=None):
-    return "not an int"
-
-def test_tp_callback_return_wrong_type():
-    with pytest.raises(TypeError):
-        _yottadb.tp(callback_that_returns_wrong_type)
 
 
 def callback_for_tp_simple_restart(start_time, tp_token=NOTTP):
@@ -558,23 +573,8 @@ def callback_for_tp_simple_restart(start_time, tp_token=NOTTP):
     else:
         return _yottadb.YDB_TP_RESTART
 
-
-
     return _yottadb.YDB_TP_RESTART
 
-def test_tp_4a_reset_all(simple_reset_test_data):
-    start_time = datetime.datetime.now()
-    result = _yottadb.tp(callback_for_tp_simple_restart, args=(start_time,), varnames=(b'*',))
-    assert result == _yottadb.YDB_OK
-    assert _yottadb.get(b'resetattempt') == b'1'
-    assert _yottadb.get(b'resetvalue') == b'1'
-
-def test_tp_4b_reset_none(simple_reset_test_data):
-    start_time = datetime.datetime.now()
-    result = _yottadb.tp(callback_for_tp_simple_restart, args=(start_time,), varnames=())
-    assert result == _yottadb.YDB_OK
-    assert _yottadb.get(b'resetattempt') == b'2'
-    assert _yottadb.get(b'resetvalue') == b'2'
 
 def test_tp_4c_reset_some(simple_reset_test_data):
     start_time = datetime.datetime.now()
@@ -583,12 +583,6 @@ def test_tp_4c_reset_some(simple_reset_test_data):
     assert _yottadb.get(b'resetattempt') == b'2'
     assert _yottadb.get(b'resetvalue') == b'1'
 
-def test_tp_4d_reset_default_none(simple_reset_test_data):
-    start_time = datetime.datetime.now()
-    result = _yottadb.tp(callback_for_tp_simple_restart, args=(start_time,))
-    assert result == _yottadb.YDB_OK
-    assert _yottadb.get(b'resetattempt') == b'2'
-    assert _yottadb.get(b'resetvalue') == b'2'
 
 def test_subscript_next_1(simple_data):
     assert _yottadb.subscript_next(varname=b'^%') == b'^Test5'
