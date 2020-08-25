@@ -1,5 +1,4 @@
 /* A structure that represents a key using ydb c types. used internally for converting between python and ydb c types */
-#define TEMP_YDB_RAISE_PYTHON_EXCEPTION -2 // TODO: remove after resolution of YDB issue #548
 
 #define YDBPY_DEFAULT_VALUE_LEN 256
 #define YDBPY_DEFAULT_SUBSCRIPT_LEN 32

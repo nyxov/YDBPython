@@ -1390,8 +1390,7 @@ static PyObject* subscript_previous(PyObject* self, PyObject* args, PyObject *kw
  *    3) the positional arguments are passed as the second element and the keyword args are passed as the third.
  *    4) the new tp_token that ydb_tp_st passes to this function as an argument is added to the kwargs dictionary.
  *    5) this function calls calls the python callback function with the args and kwargs arguments.
- *    6) if a function raises an exception then this function returns TEMP_YDB_RAISE_PYTHON_EXCEPTION as a way of indicating an error.
- *            TODO: replace TEMP_YDB_RAISE_PYTHON_EXCEPTION after resolution of YDB issue #548
+ *    6) if a function raises an exception then this function returns TPCALLBACKINVRETVAL as a way of indicating an error.
  *            (note) the PyErr String is already set so the the function receiving the return value (tp) just needs to return NULL.
  */
 static int callback_wrapper(uint64_t tp_token, ydb_buffer_t *errstr, void *function_with_arguments) {
@@ -1430,10 +1429,10 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t *errstr, void *funct
 
     if (NULL == return_value) {
         /* function raised an exception */
-        return TEMP_YDB_RAISE_PYTHON_EXCEPTION; // TODO: replace after resolution of YDB issue #548
+        return YDB_ERR_TPCALLBACKINVRETVAL;
     } else if (!PyLong_Check(return_value)){
         PyErr_SetString(PyExc_TypeError, "Callback function must return value of type int.");
-        return TEMP_YDB_RAISE_PYTHON_EXCEPTION; // TODO: replace after resolution of YDB issue #548
+        return YDB_ERR_TPCALLBACKINVRETVAL;
     }
     return_val = (int)PyLong_AsLong(return_value);
     Py_DECREF(return_value);
@@ -1502,7 +1501,7 @@ static PyObject* tp(PyObject* self, PyObject* args, PyObject *kwds) {
                             namecount, varname_buffers);
 
         /* check status for Errors and Raise Exception */
-        if (TEMP_YDB_RAISE_PYTHON_EXCEPTION == status) { // TODO: replace after resolution of YDB issue #548
+        if (YDB_ERR_TPCALLBACKINVRETVAL == status) {
             return_NULL = true;
         } else if (YDB_TP_RESTART == status) {
             PyErr_SetString(YDBTPRestart, "tp() callback function returned 'YDB_TP_RESTART'.");
