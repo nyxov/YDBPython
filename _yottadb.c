@@ -277,26 +277,27 @@ static int validate_py_keys_sequence_bytes(PyObject* keys_sequence, char *error_
                 snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_INCORECT_LENGTH, i);
                 ret = YDBPY_INVALID_KEY_IN_SEQUENCE_INCORECT_LENGTH;
             }
-
-            /* validate item/key first element (varname) type */
-            varname = PySequence_Fast_GET_ITEM(key_seq, 0);
-            if (YDBPY_VALID == ret && !PyBytes_Check(varname)) {
-                snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES, i);
-                ret = YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES;
-            }
-            /* validate item/key first element (varname) length */
-            len_varname = PySequence_Fast_GET_SIZE(varname);
-            if (YDBPY_VALID == ret && YDB_MAX_IDENT < len_varname) {
-                snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_TOO_LONG, i, len_varname, YDB_MAX_IDENT);
-                ret = YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_TOO_LONG;
-            }
-            /* validate item/key second element (subsarray) if it exists */
-            if (YDBPY_VALID == ret && 2 == len_key_seq) {
-                subsarray = PySequence_Fast_GET_ITEM(key, 1);
-                if (Py_None != subsarray) {
-                    ret = validate_sequence_of_bytes(subsarray, YDB_MAX_SUBS, YDB_MAX_STR, error_sub_reason);
-                    if (YDBPY_VALID != ret) {
-                        snprintf(error_message, YDBPY_MAX_REASON*2, YDBPY_ERRMSG_KEY_IN_SEQUENCE_SUBSARRAY_INVALID, i, error_sub_reason);
+            if ((1 == len_key_seq) || (2 == len_key_seq)) {
+                /* validate item/key first element (varname) type */
+                varname = PySequence_Fast_GET_ITEM(key_seq, 0);
+                if (YDBPY_VALID == ret && !PyBytes_Check(varname)) {
+                    snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES, i);
+                    ret = YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES;
+                }
+                /* validate item/key first element (varname) length */
+                len_varname = PySequence_Fast_GET_SIZE(varname);
+                if (YDBPY_VALID == ret && YDB_MAX_IDENT < len_varname) {
+                    snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_TOO_LONG, i, len_varname, YDB_MAX_IDENT);
+                    ret = YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_TOO_LONG;
+                }
+                /* validate item/key second element (subsarray) if it exists */
+                if (YDBPY_VALID == ret && 2 == len_key_seq) {
+                    subsarray = PySequence_Fast_GET_ITEM(key, 1);
+                    if (Py_None != subsarray) {
+                        ret = validate_sequence_of_bytes(subsarray, YDB_MAX_SUBS, YDB_MAX_STR, error_sub_reason);
+                        if (YDBPY_VALID != ret) {
+                            snprintf(error_message, YDBPY_MAX_REASON*2, YDBPY_ERRMSG_KEY_IN_SEQUENCE_SUBSARRAY_INVALID, i, error_sub_reason);
+                        }
                     }
                 }
             }
