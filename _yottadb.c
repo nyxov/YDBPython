@@ -305,26 +305,26 @@ static int validate_py_keys_sequence_bytes(PyObject *keys_sequence,
         ret = YDBPY_INVALID_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE;
       }
       /* validate item/key length [1 or 2] */
-      if (YDBPY_VALID == ret && !((1 == len_key_seq) || (2 == len_key_seq))) {
+      if ((YDBPY_VALID == ret) && !((1 == len_key_seq) || (2 == len_key_seq))) {
         snprintf(error_message, YDBPY_MAX_REASON,
                  YDBPY_ERRMSG_KEY_IN_SEQUENCE_INCORECT_LENGTH, i);
         ret = YDBPY_INVALID_KEY_IN_SEQUENCE_INCORECT_LENGTH;
       }
       /* validate item/key first element (varname) type */
-      if (YDBPY_VALID == ret && !PyBytes_Check(varname)) {
+      if ((YDBPY_VALID == ret) && !PyBytes_Check(varname)) {
         snprintf(error_message, YDBPY_MAX_REASON,
                  YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES, i);
         ret = YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES;
       }
       /* validate item/key first element (varname) length */
-      if (YDBPY_VALID == ret && YDB_MAX_IDENT < len_varname) {
+      if ((YDBPY_VALID == ret) && (YDB_MAX_IDENT < len_varname)) {
         snprintf(error_message, YDBPY_MAX_REASON,
                  YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_TOO_LONG, i, len_varname,
                  YDB_MAX_IDENT);
         ret = YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_TOO_LONG;
       }
       /* validate item/key second element (subsarray) if it exists */
-      if (YDBPY_VALID == ret && 2 == len_key_seq) {
+      if ((YDBPY_VALID == ret) && (2 == len_key_seq)) {
         if (Py_None != subsarray) {
           ret = validate_sequence_of_bytes(subsarray, YDB_MAX_SUBS, YDB_MAX_STR,
                                            error_sub_reason);
@@ -451,9 +451,10 @@ static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer,
 }
 
 static void raise_ValidationError(int status, char *message) {
-  if (YDBPY_TYPE_ERROR_MAX >= status && YDBPY_TYPE_ERROR_MIN <= status)
+  if ((YDBPY_TYPE_ERROR_MAX >= status) && (YDBPY_TYPE_ERROR_MIN <= status))
     PyErr_SetString(PyExc_TypeError, message);
-  else if (YDBPY_VALUE_ERROR_MAX >= status && YDBPY_VALUE_ERROR_MIN <= status)
+  else if ((YDBPY_VALUE_ERROR_MAX >= status) &&
+           (YDBPY_VALUE_ERROR_MIN <= status))
     PyErr_SetString(PyExc_ValueError, message);
 }
 
@@ -1600,13 +1601,13 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
     PyErr_SetString(PyExc_TypeError, "'callback' must be a callable.");
     return_NULL = true;
   }
-  if (Py_None != callback_args && !PyTuple_Check(callback_args)) {
+  if ((Py_None != callback_args) && !PyTuple_Check(callback_args)) {
     PyErr_SetString(PyExc_TypeError, "'args' must be a tuple. "
                                      "(It will be passed to the callback "
                                      "function as positional arguments.)");
     return_NULL = true;
   }
-  if (Py_None != callback_kwargs && !PyDict_Check(callback_kwargs)) {
+  if ((Py_None != callback_kwargs) && !PyDict_Check(callback_kwargs)) {
     PyErr_SetString(
         PyExc_TypeError,
         "'kwargs' must be a dictionary. "
