@@ -288,15 +288,17 @@ static int validate_py_keys_sequence_bytes(PyObject *keys_sequence,
       key = PySequence_Fast_GET_ITEM(seq, i); // Borrowed Reference
       key_seq = PySequence_Fast(key, "");     // New Reference
       len_key_seq = PySequence_Fast_GET_SIZE(key_seq);
-      varname = Py_None;
-      len_varname = -1;
       if (1 <= len_key_seq) {
         varname = PySequence_Fast_GET_ITEM(key_seq, 0); // Borrowed Reference
         len_varname = PySequence_Fast_GET_SIZE(varname);
+      } else {
+        varname = Py_None;
+        len_varname = -1;
       }
-      subsarray = Py_None;
       if (2 <= len_key_seq)
         subsarray = PySequence_Fast_GET_ITEM(key, 1); // Borrowed Reference
+      else
+        subsarray = Py_None;
 
       /* validate item/key type [list or tuple] */
       if (!key_seq || !(PyTuple_Check(key) || PyList_Check(key))) {
