@@ -4,15 +4,15 @@ stages:
 .ubuntu:
   image: yottadb/yottadb-base:latest-master
   before_script:
-    - sudo apt install -y python3-setuptools python3-dev libffi-dev
+    - apt install -y python3-setuptools python3-dev libffi-dev
     - cd YDBPython
     - python3 setup.py install --user
-    - sudo apt install -y python3-pip
+    - apt install -y python3-pip
 
 .centos:
   image: yottadb/yottadb-centos-base:latest-master
   before_script:
-    - sudo yum install -y python3 gcc python3-devel libffi-devel
+    - yum install -y python3 gcc python3-devel libffi-devel
     - cd YDBPython
     - python3 setup.py install --user
 
