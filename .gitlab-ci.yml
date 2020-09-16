@@ -16,6 +16,7 @@ stages:
 
 .test:
   script:
+    - source $(pkg-config --variable=prefix yottadb)/ydb_env_set
     - python3 -m pip install --user pytest psutil
     - python3 -m pytest tests/
 
