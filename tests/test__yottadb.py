@@ -33,10 +33,6 @@ TEST_DATA_DIRECTORY = '/tmp/test_yottadb/'
 TEST_GLD = TEST_DATA_DIRECTORY + 'test_db.gld'
 TEST_DAT = TEST_DATA_DIRECTORY + 'test_db.dat'
 
-def test_CI_failure():
-    assert False
-
-
 def test_get_1_positional(simple_data):
     assert _yottadb.get(b'^test1') == b'test1value'
     
