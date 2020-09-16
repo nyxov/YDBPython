@@ -1,5 +1,5 @@
 stages:
-  test
+  - test
 
 .ubuntu:
   image: yottadb/yottadb-base:latest-master
