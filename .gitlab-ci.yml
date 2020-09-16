@@ -1,0 +1,36 @@
+stages:
+  test
+
+.ubuntu:
+  image: yottadb/yottadb-base:latest-master
+  before_script:
+    - sudo apt install -y python3-setuptools python3-dev libffi-dev
+    - cd YDBPython
+    - python3 setup.py install --user
+    - sudo apt install -y python3-pip
+
+.centos:
+  image: yottadb/yottadb-centos-base:latest-master
+  before_script:
+    - sudo yum install -y python3 gcc python3-devel libffi-devel
+    - cd YDBPython
+    - python3 setup.py install --user
+
+.test:
+  script:
+    - python3 -m pip install --user pytest psutil
+    - python3 -m pytest tests/
+
+test_ubuntu:
+  stage: test
+  extends:
+    - .ubuntu
+    - .test
+
+
+test_centos:
+  stage: test
+  extends:
+    - .centos
+    - .test
+
