@@ -27,10 +27,8 @@ test_ubuntu:
     - .ubuntu
     - .test
 
-
 test_centos:
   stage: test
   extends:
     - .centos
     - .test
-
