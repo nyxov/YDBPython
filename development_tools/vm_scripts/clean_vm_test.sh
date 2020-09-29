@@ -5,7 +5,7 @@
   # * CentOS 7: after installation use `nmtui` to activate network connection.
   # * scp to freshly installed VM
   # * On Ubuntu unattended upgrades may cause this script to fail if they are running when this script tries to use 'apt'
-  #   * wait for them to finnish or disable them
+  #   * wait for them to finish or disable them
 
 OS=$(awk -F= '$1=="ID" { print $2 ;}' /etc/os-release)
 VERSION=$(awk -F= '$1=="VERSION_ID" { print $2 ;}' /etc/os-release)
@@ -63,7 +63,5 @@ git clone https://gitlab.com/gossrock/YDBPython.git
 # install YDBPython
 cd YDBPython
 python3 setup.py install --user
-
-
 python3 -m pip install --user pytest psutil
 python3 -m pytest tests/
