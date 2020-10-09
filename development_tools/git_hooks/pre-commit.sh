@@ -28,6 +28,5 @@ for file in $commited_py_files ; do
     black -l $MAX_LINE_LENGTH -q ${file}
     git add ${file}
   fi
-  git add ${file}
 done
 git stash pop -q
