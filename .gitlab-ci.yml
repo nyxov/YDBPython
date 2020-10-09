@@ -7,7 +7,7 @@ stages:
     - source $(pkg-config --variable=prefix yottadb)/ydb_env_set
     - apt install -y python3-setuptools python3-dev libffi-dev
     - apt install -y python3-pip
-    - pip install  pytest-runner
+    - python3 -m pip install pytest-runner
     - python3 setup.py install --user
 
 
