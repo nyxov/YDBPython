@@ -18,7 +18,7 @@ stages:
 
 .test:
   script:
-    - python3 -m pip install --user pytest psutil
+    - python3 -m pip install --user pytest psutil pytest-runner
     - python3 -m pytest tests/
 
 test_ubuntu:
