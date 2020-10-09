@@ -6,9 +6,10 @@ stages:
   before_script:
     - source $(pkg-config --variable=prefix yottadb)/ydb_env_set
     - apt install -y python3-setuptools python3-dev libffi-dev
-    - python3 setup.py install --user
     - apt install -y python3-pip
-    - python3 -m pip install --user pytest-runner
+    - pip install  pytest-runner
+    - python3 setup.py install --user
+
 
 .centos:
   image: yottadb/yottadb-centos-base:latest-master
