@@ -5,7 +5,8 @@ stages:
   image: yottadb/yottadb-base:latest-master
   before_script:
     - source $(pkg-config --variable=prefix yottadb)/ydb_env_set
-    - apt install -y python3-setuptools python3-dev libffi-dev pytest-runner
+    - apt install -y python3-setuptools python3-dev libffi-dev
+    - python3 -m pip install --user pytest-runner
     - python3 setup.py install --user
     - apt install -y python3-pip
 
