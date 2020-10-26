@@ -47,4 +47,4 @@ commit-verify:
     - chmod +x ./development_tools/ci/commit_verify.sh
     - wget https://gitlab.com/YottaDB/DBMS/YDBOcto/-/raw/master/tools/ci/needs_copyright.sh
     - chmod +x needs_copyright.sh
-    - ./commit_verify.sh ./needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBPython
+    - ./development_tools/ci/commit_verify.sh ./needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBPython
