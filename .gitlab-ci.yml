@@ -54,7 +54,7 @@ commit-verify:
   image: ubuntu:18.04
   stage: test
   before_script:
-    - apt-get update -qq && apt-get install -y -qq git wget gnupg
+    - apt update -qq && apt-get install -y -qq git wget gnupg
   script:
     # Copy commit gpg key verify script to build directory and execute
     # - wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/commit_verify.sh
@@ -63,3 +63,13 @@ commit-verify:
     #- wget https://gitlab.com/YottaDB/DBMS/YDBOcto/-/raw/master/tools/ci/needs_copyright.sh
     - chmod +x ./development_tools/ci/needs_copyright.sh
     - ./development_tools/ci/commit_verify.sh ./development_tools/ci/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBPython
+
+code-format-check:
+  image: ubuntu:18.04
+  stage: test
+  before_script:
+    - apt update -qq && apt-get install -y -qq git wget gnupg
+    - apt install -y clang-format python3-pip
+    - python3 -m pip install black
+  script:
+    bash ./development_tools/ci/check_code_format.sh
