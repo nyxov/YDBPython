@@ -17,7 +17,7 @@ import pathlib
 import csv
 from typing import Dict
 
-YDB_DIST = os.environ["ydb_dist"]
+YDB_DIST =  os.environ["ydb_dist"]
 ERROR_DEF_FILES = ["libydberrors.h", "libydberrors2.h"]
 ERROR_NAME_ALTERATIONS_FILE = "error_name_alterations.csv"
 

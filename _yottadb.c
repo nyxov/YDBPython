@@ -36,7 +36,7 @@
  *
  * free with FREE_BUFFER_ARRAY macro
  */
-static ydb_buffer_t *empty_buffer_array(int num, int len) {
+        static ydb_buffer_t *empty_buffer_array(int num, int len) {
 	int	      i;
 	ydb_buffer_t *return_buffer_array;
 
