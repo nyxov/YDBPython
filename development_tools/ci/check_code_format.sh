@@ -12,14 +12,15 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
+exit_code=0
 
 files_to_check=$(find -name '*.c' -o -name '*.h' -o  -name '*.py' -o -name '*.pyi')
 echo "Checking code format ..."
 for file in $files_to_check ; do
-  exit_code=0
   if [[ "$file" == *".c" ]] || [[ "$file" == *".h" ]]; then
     if ! clang-format --dry-run --Werror -style=file "$file" &>/dev/null; then
       echo "    $file needs formatting with \"clang-format\"."
+      clang-format --dry-run --Werror -style=file "$file" # debug
       exit_code=1
     fi
   elif [[ "$file" == *".py" ]] || [[ "$file" == *".pyi" ]]; then
