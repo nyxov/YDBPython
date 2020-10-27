@@ -1,4 +1,18 @@
 #!/bin/bash
+#################################################################
+#                                                               #
+# Copyright (c) 2020 Peter Goss All rights reserved.            #
+#                                                               #
+# Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.       #
+# All rights reserved.                                          #
+#                                                               #
+#   This source code contains the intellectual property         #
+#   of its copyright holder(s), and is made available           #
+#   under a license.  If you do not know the terms of           #
+#   the license, please stop and do not read further.           #
+#                                                               #
+#################################################################
+
 # Notes
   # * tested under CentOS 7 and 8 and Ubuntu 18.04 and 20.04
   # * Ubuntu 18.04 and 20.04: install ssh
