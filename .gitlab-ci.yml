@@ -69,7 +69,7 @@ code-format-check:
   stage: test
   before_script:
     - apt update -qq && apt-get install -y -qq git wget gnupg
-    - apt install -y clang-format python3-pip
+    - apt install -y clang-format-10 python3-pip
     - python3 -m pip install black
   script:
     bash ./development_tools/ci/check_code_format.sh
