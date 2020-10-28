@@ -14,6 +14,7 @@
 
 
 stages:
+  - formating-checks
   - test
 
 .ubuntu:
@@ -52,7 +53,7 @@ test_centos:
 
 commit-verify:
   image: ubuntu:18.04
-  stage: test
+  stage: formating-checks
   before_script:
     - apt update -qq && apt-get install -y -qq git wget gnupg
   script:
@@ -66,7 +67,7 @@ commit-verify:
 
 code-format-check:
   image: ubuntu:18.04
-  stage: test
+  stage: formating-checks
   before_script:
     - apt update -qq && apt-get install -y -qq git wget gnupg
     - apt install -y clang-format-10 python3-pip
