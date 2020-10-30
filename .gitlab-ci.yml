@@ -58,10 +58,7 @@ commit-verify:
     - apt update -qq && apt-get install -y -qq git wget gnupg
   script:
     # Copy commit gpg key verify script to build directory and execute
-    # - wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/commit_verify.sh
-    # - chmod +x commit_verify.sh
-    - chmod +x ./development_tools/ci/commit_verify.sh
-    #- wget https://gitlab.com/YottaDB/DBMS/YDBOcto/-/raw/master/tools/ci/needs_copyright.sh
+    - chmod +x commit_verify.sh
     - chmod +x ./development_tools/ci/needs_copyright.sh
     - ./development_tools/ci/commit_verify.sh ./development_tools/ci/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBPython
 
