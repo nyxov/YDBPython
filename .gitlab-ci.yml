@@ -61,7 +61,7 @@ commit-verify:
     - wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/commit_verify.sh
     - chmod +x commit_verify.sh
     - chmod +x ./development_tools/ci/needs_copyright.sh
-    - ./development_tools/ci/commit_verify.sh ./development_tools/ci/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBPython
+    - ./commit_verify.sh ./development_tools/ci/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBPython
 
 code-format-check:
   image: ubuntu:18.04
