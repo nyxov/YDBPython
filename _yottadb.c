@@ -22,9 +22,9 @@
 #include "_yottadb.h"
 #include "_yottadbexceptions.h"
 
-/* LOCAL UTILITY FUNCTIONS */
+/* Local Utility Functions */
 
-/* ARRAY OF YDB_BUFFER_T UTILITIES */
+/* Array of Ydb_buffer_t Utilities */
 
 /* Routine to create an array of empty ydb_buffer_ts with num elements each with
  * an allocated length of len
@@ -36,7 +36,7 @@
  *
  * free with FREE_BUFFER_ARRAY macro
  */
-static ydb_buffer_t *empty_buffer_array(int num, int len) {
+static ydb_buffer_t *create_empty_buffer_array(int num, int len) {
 	int	      i;
 	ydb_buffer_t *return_buffer_array;
 
@@ -47,32 +47,19 @@ static ydb_buffer_t *empty_buffer_array(int num, int len) {
 	return return_buffer_array;
 }
 
-/* Routine to free an array of ydb_buffer_ts
- *
- * Parameters:
- *   array     - pointer to the array of ydb_buffer_ts to be freed.
- *     len    - number of elements in the array to be freed
- *
- */
-// static void FREE_BUFFER_ARRAY(ydb_buffer_t *array, int len) {
-//    for(int i = 0; i < len; i++)
-//        YDB_FREE_BUFFER(&((ydb_buffer_t*)array)[i]);
-//}
-
-/* UTILITIES TO CONVERT BETWEEN SEQUENCES OF PYUNICODE STRING OBJECTS AND AN
- * ARRAY OF YDB_BUFFER_TS */
+/* Conversion Utilities */
 
 /* Routine to validate that the PyObject passed to it is indeed an array of
- * python bytes objects.
+ * Python bytes objects.
  *
  * Parameters:
  *   sequence    - the python object to check.
  */
-
 static int validate_sequence_of_bytes(PyObject *sequence, int max_sequence_len, int max_bytes_len, char *error_message) {
 	int	   ret = YDBPY_VALID;
 	Py_ssize_t i, len_seq, len_bytes;
 	PyObject * item, *seq;
+
 	/* validate sequence type */
 	seq = PySequence_Fast(sequence, "argument must be iterable");
 	if (!seq || !(PyTuple_Check(sequence) || PyList_Check(sequence))) {
@@ -112,7 +99,7 @@ static int validate_sequence_of_bytes(PyObject *sequence, int max_sequence_len, 
  * ydb_buffer_ts. Routine assumes sequence was already validated with
  * 'validate_sequence_of_bytes' function. The function creates a copy of each
  * Python bytes' data so the resulting array should be freed by using the
- * 'FREE_BUFFER_ARRAY' function.
+ * 'FREE_BUFFER_ARRAY' macro.
  *
  * Parameters:
  *    sequence    - a Python Object that is expected to be a Python Sequence
@@ -168,9 +155,6 @@ PyObject *convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
 	return return_tuple;
 }
 
-/* UTILITIES TO CONVERT BETWEEN DATABASE KEYS REPRESENTED USING PYTHON OBJECTS
- * AND YDB C API TYPES */
-
 /* The workhorse routine of a couple of routines that convert from Python
  * objects (varname and subsarray) to YDB keys.
  *
@@ -180,7 +164,6 @@ PyObject *convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
  *    subsarray    - array of python Bytes objects representing the array of
  * subcripts
  */
-
 static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
 	bool	      copy_success, convert_success;
 	Py_ssize_t    len_ssize, sequence_len_ssize;
@@ -433,31 +416,17 @@ static void raise_ValidationError(int status, char *message) {
 		PyErr_SetString(PyExc_ValueError, message);
 }
 
-/* SIMPLE AND SIMPLE THREADED API WRAPPERS */
-
-/* FOR ALL PROXY FUNCTIONS BELOW
- * do almost nothing themselves, simply calls wrapper with a flag for which API
- * they mean to call.
- *
- * Parameters:
- *
- *    self        - the object that this method belongs to (in this case it's
- * the _yottadb module. args        - a Python tuple of the positional arguments
- * passed to the function kwds        - a Python dictonary of the keyword
- * arguments passed the tho function
- */
+/* API Wrappers */
 
 /* FOR ALL BELOW WRAPPERS:
- * does all the work to wrap the 2 related functions using the threaded flag to
- * make the few modifications related how the simple and simple threaded APIs
- * are different.
+ * Each function converts Python types to the appropriate C types and pass them to the matching
+ * YottaDB c-api function then convert the return types and errors into appropriate Python types
+ * and return those values
  *
  * Parameters:
- *    self, args, kwds    - same as proxy functions.
- *    threaded             - either true for simple_treaded api or false used by
- * the proxy functions to indicate which API was being called.
- *
- * FOR ALL
+ *    self        - the object that this method belongs to (in this case it's the _yottadb module.)
+ *    args        - a Python tuple of the positional arguments passed to the function.
+ *    kwds        - a Python dictionary of the keyword arguments passed the tho function.
  */
 
 /* Wrapper for ydb_data_s and ydb_data_st. */
@@ -1018,7 +987,7 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 		default_ret_subs_used = YDB_MAX_SUBS;
 	real_ret_subs_used = default_ret_subs_used;
 	ret_subs_used = default_ret_subs_used;
-	ret_subsarray = empty_buffer_array(ret_subs_used, max_subscript_string);
+	ret_subsarray = create_empty_buffer_array(ret_subs_used, max_subscript_string);
 
 	if (!return_NULL) {
 		/* Call the wrapped function */
@@ -1029,7 +998,7 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 		if (YDB_ERR_INSUFFSUBS == status) {
 			FREE_BUFFER_ARRAY(ret_subsarray, default_ret_subs_used);
 			real_ret_subs_used = ret_subs_used;
-			ret_subsarray = empty_buffer_array(real_ret_subs_used, max_subscript_string);
+			ret_subsarray = create_empty_buffer_array(real_ret_subs_used, max_subscript_string);
 			/* recall the wrapped function */
 			status = ydb_node_next_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y,
 						  &ret_subs_used, ret_subsarray);
@@ -1104,7 +1073,7 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 		default_ret_subs_used = 1;
 	real_ret_subs_used = default_ret_subs_used;
 	ret_subs_used = default_ret_subs_used;
-	ret_subsarray = empty_buffer_array(ret_subs_used, max_subscript_string);
+	ret_subsarray = create_empty_buffer_array(ret_subs_used, max_subscript_string);
 
 	if (!return_NULL) {
 		/* Call the wrapped function */
@@ -1406,7 +1375,7 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 
 /* Callback functions used by Wrapper for ydb_tp_s() / ydb_tp_st() */
 
-/* Callback Wrapper used by tp_st. The aproach of calling a Python function is a
+/* Callback Wrapper used by tp_st. The approach of calling a Python function is a
  * bit of a hack. Here's how it works: 1) This is the callback function always
  * the function passed to called by ydb_tp_st. 2) the actual Python function to
  * be called is passed to this function as the first element in a Python tuple.
