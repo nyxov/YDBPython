@@ -59,10 +59,11 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 ```python
 import yottadb
 
-db = yottadb.Context()
+# create a Context object that will help with keeping track of tp_tokens and other database related settings.
+db = yottadb.Context() 
 
-key1 = db['^hello']
-print(key1, key1.value)
+key1 = db['^hello'] # create a key that has the global varname '^hello'
+print(key1, key1.value) 
 key1.value = 'Hello world!'
 print(key1, key1.value)
 
