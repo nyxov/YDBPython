@@ -10,51 +10,49 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 3. YottaDB
 
 # Installation
-0. install Ubuntu Server 18.04
+0. Install Ubuntu Server 18.04
 
-1. install YottaDB per the [Quick Start](https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#quick-start) guide instructions or from [source](https://gitlab.com/YottaDB/DB/YDB)
+1. Install YottaDB per the [Quick Start](https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#quick-start) guide instructions or from [source](https://gitlab.com/YottaDB/DB/YDB)
 
     Note: Ubuntu Server 20.04 will require YottaDB 1.29 or later. 
 
 2. Get the code: `git clone https://gitlab.com/gossrock/YDBPython.git`
-3. install code:
+3. Install code:
     1. Install prerequisites: python3-dev and libffi-dev package: `sudo apt install python3-dev libffi-dev`
 
     2. Set YottaDB environment variables: `source $(pkg-config --variable=prefix yottadb)/ydb_env_set`
     
-    3. enter code directory `cd YDBPython/` 
+    3. Enter code directory `cd YDBPython/` 
 
-    4. run setup.py to install:
+    4. Run setup.py to install:
            
-        1. option 1: install in venv
+        1. Option 1: install in venv
             1. Install the python3-venv package: `sudo apt install python3-venv`
-            2. create venv: `python3 -m venv .venv`
-            3. activate venv: `source .venv/bin/activate`
-            4. install into venv: `python setup.py install`
+            2. Create venv: `python3 -m venv .venv`
+            3. Activate venv: `source .venv/bin/activate`
+            4. Install into venv: `python setup.py install`
+
+        2. Option 2: install to user
+            1. This method requires setuptools: `sudo apt install python3-setuptools`
+            2. Install for use by user: `python setup.py install --user`
+                        
+        3. Install globally (not suggested):
+            1. This method also requires setuptools `sudo apt install python3-setuptools`
+            2. Install package globally: `sudo -E python3 setup.py install`
             
-        2. option 2: install to user
-            1. this method requires setuptools: `sudo apt install python3-setuptools`
-            2. install for use by user: `python setup.py install --user`
-            
-            
-        3. install globally (not suggested):
-            1. this method also requires setuptools `sudo apt install python3-setuptools`
-            2. install package globally: `sudo -E python3 setup.py install`
-            
-    5. run tests:
-        1. install `pytest` and `psutil`
+    5. Run tests:
+        1. Install `pytest` and `psutil`
             1. If `pip` for `python3` is not installed do so: `sudo apt install python3-pip`
-            2. use `pip` to install `pytest` and `psutil`
-                1. option 1: install into venv
-                    1. activate `venv` if it is not already: `source .venv/bin/activate`
-                    2. install: `pip install pytest psutil`
-                2. option 2: install for user: `pip3 install --user pytest`
-                3. option 3: install globally (not suggested): `sudo pip3 install pytest`
-                    
-            
+            2. Use `pip` to install `pytest` and `psutil`
+                1. Option 1: install into venv
+                    1. Activate `venv` if it is not already: `source .venv/bin/activate`
+                    2. Install: `pip install pytest psutil`
+                2. Option 2: install for user: `pip3 install --user pytest`
+                3. Option 3: install globally (not suggested): `sudo pip3 install pytest`
+                      
     5. TODO: add to pypi
 
-5. enjoy.
+5. Enjoy.
 
 # Basic Example Usage
 
