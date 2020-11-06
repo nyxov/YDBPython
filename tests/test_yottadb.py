@@ -50,6 +50,54 @@ def test_Key_construction_error(ydb):
         yottadb.Key(b"^test1", b"not a Key object")
 
 
+def test_Key__str__(ydb):
+    assert str(ydb[b"test"]) == "test"
+    assert str(ydb[b"test"][b"sub1"]) == "test(sub1)"
+    assert str(ydb[b"test"][b"sub1"][b"sub2"]) == "test(sub1,sub2)"
+
+
+def test_Key__str__(ydb):
+    assert str(ydb[b"test"]) == "test"
+    assert str(ydb[b"test"][b"sub1"]) == "test(sub1)"
+    assert str(ydb[b"test"][b"sub1"][b"sub2"]) == "test(sub1,sub2)"
+
+
+def test_Key__str__(ydb):
+    assert str(ydb[b"test"]) == "test"
+    assert str(ydb[b"test"][b"sub1"]) == "test(sub1)"
+    assert str(ydb[b"test"][b"sub1"][b"sub2"]) == "test(sub1,sub2)"
+
+
+def test_Key__str__(ydb):
+    assert str(ydb[b"test"]) == "test"
+    assert str(ydb[b"test"][b"sub1"]) == "test(sub1)"
+    assert str(ydb[b"test"][b"sub1"][b"sub2"]) == "test(sub1,sub2)"
+
+
+def test_Key__str__(ydb):
+    assert str(ydb[b"test"]) == "test"
+    assert str(ydb[b"test"][b"sub1"]) == "test(sub1)"
+    assert str(ydb[b"test"][b"sub1"][b"sub2"]) == "test(sub1,sub2)"
+
+
+def test_Key__str__(ydb):
+    assert str(ydb[b"test"]) == "test"
+    assert str(ydb[b"test"][b"sub1"]) == "test(sub1)"
+    assert str(ydb[b"test"][b"sub1"][b"sub2"]) == "test(sub1,sub2)"
+
+
+def test_Key__str__(ydb):
+    assert str(ydb[b"test"]) == "test"
+    assert str(ydb[b"test"][b"sub1"]) == "test(sub1)"
+    assert str(ydb[b"test"][b"sub1"][b"sub2"]) == "test(sub1,sub2)"
+
+
+def test_Key__str__(ydb):
+    assert str(ydb[b"test"]) == "test"
+    assert str(ydb[b"test"][b"sub1"]) == "test(sub1)"
+    assert str(ydb[b"test"][b"sub1"][b"sub2"]) == "test(sub1,sub2)"
+
+
 def test_Key_get_value1(ydb, simple_data):
     assert ydb[b"^test1"].value == b"test1value"
 

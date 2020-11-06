@@ -30,7 +30,7 @@ from _yottadb import YDB_DATA_VALUE_NODESC as DATA_VALUE_NODESC
 from _yottadb import YDB_DATA_NOVALUE_DESC as DATA_NOVALUE_DESC
 from _yottadb import YDB_DATA_VALUE_DESC as DATA_VALUE_DESC
 
-from _yottadb import YDBTPRollback, YDBTPRestart
+from _yottadb import YDB_OK, YDBTPRollback, YDBTPRestart
 
 
 class SearchSpace(enum.Enum):
@@ -156,21 +156,28 @@ class Key:
             self.context = Context()
         else:
             raise TypeError("'context' must be an instance of yottadb.Context")
-
-        self.name = name
+        if isinstance(name, bytes):
+            self.name = name
+        else:
+            raise TypeError("'name' must be an instance of bytes")
 
         if parent is not None and not isinstance(parent, Key):
             raise TypeError("'parent' must be of type Key")
         self.parent = parent
 
     def __str__(self) -> str:
-        return_value = self.varname
-        if len(self.subsarray) > 0:
-            return_value += f'("{self.subsarray[0]}"'
-            for sub in self.subsarray[1:]:
-                return_value += f',"{sub}"'
-            return_value += ")"
-        return return_value
+        def encode_sub(sub):
+            try:
+                return str(sub, encoding="utf-8")
+            except UnicodeDecodeError:
+                return str(sub)
+
+        varname = str(self.varname, encoding="ascii")
+        subscripts = ",".join([encode_sub(sub) for sub in self.subsarray])
+        if subscripts == "":
+            return varname
+        else:
+            return f"{varname}({subscripts})"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}:{self}"
