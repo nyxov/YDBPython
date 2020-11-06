@@ -59,35 +59,65 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 ```python
 import yottadb
 
-# create a Context object that will help with keeping track of tp_tokens and other database related settings.
+# create a Context object that controls access to the database (you should only use one)
 db = yottadb.Context() 
 
-key1 = db['^hello'] # create a key that has the global varname '^hello'
-print(key1, key1.value) 
-key1.value = 'Hello world!'
-print(key1, key1.value)
+key1 = db[b'^hello'] # create a key that has the global variable '^hello'
 
-key2 = db['^hello']['cowboy']
-key2.value = 'Howdy partner!'
-print(key2, key2.value)
+print(f"{key1}: {key1.value}") # display current value of '^hello' 
+key1.value = b'Hello world!' # set '^hello' to 'Hello world!'
+print(f"{key1}: {key1.value}") 
 
-key3 = db['^hello']['chinese']
-key3.value = '你好世界!'
-print(key3, key3.value)
+key2 = db[b'^hello'][b'cowboy'] # add a subscript 'cowboy' to the global variable '^hello'
+key2.value = b'Howdy partner!' # set '^hello('cowboy') to 'Howdy partner!'
+print(f"{key2}: {key2.value}") 
 
-for subscript in key1.subscripts:
+key3 = db[b'^hello'][b'chinese'] # add a second subscript to '^hello'
+key3.value = bytes('你好世界!', encoding="utf-8") # the value can be set to anything that can be encoded to bytes 
+print(key3, str(key3.value, encoding="utf-8")) # at this time you will need to handle the encoding and decoding
+
+ 
+for subscript in key1.subscripts: # you can loop through all the subscripts of a key
     sub_key = key1[subscript]
-    print(sub_key, sub_key.value) 
+    print(f"{sub_key}: {sub_key.value}") 
 
-key1.delete_node()
+key1.delete_node() # delete the value of '^hello' but not any of its subscripts
 
-print(key1, key1.value)
-for subscript in key1.subscripts:
+print(f"{key1}: {key1.value}") # should show nothing
+for subscript in key1.subscripts: # the values of the subscripts should still be in the database
+    sub_key = key1[subscript]
+    print(f"{sub_key}: {sub_key.value}")
+
+
+key1.value = b'Hello world!'
+print(f"{key1}: {key1.value}")
+key1.delete_tree() # delete both the value at the '^hello' node and all of it's subscripts
+print(f"{key1}: {key1.value}") # show nothing in the value
+for subscript in key1.subscripts: # displays no subscripts
     sub_key = key1[subscript]
     print(sub_key, sub_key.value)
 
-key1.delete_tree()
-for subscript in key1.subscripts:
-    sub_key = key1[subscript]
-    print(sub_key, sub_key.value)
+#transactions are also available
+@yottadb.transaction
+def simple_transaction(value, context): # the final argument of a transaction is the current context
+    context[b'test1'].value = value
+    context[b'test2'].value = value
+    some_condition_a = False
+    some_condition_b = False  
+    if some_condition_a: 
+        # When you raising yottadb.YDBTPRollback YottaDB will rollback the transaction
+        # and then propagate the exception to your calling code.  
+        raise yottadb.YDBTPRollback("reason for the rollback")
+    elif some_condition_b:
+        # When you raising yottadb.YDBTPRestart YottaDB will call the transaction again.
+        # Warning: This code is intentionally simplistic you will get an infinite loop
+        #           if you continually raise yottadb.YDBTPRestart
+        raise yottadb.YDBTPRestart()
+    else:
+        return yottadb.YDB_OK # indicates success, transaction will be committed
+      
+    
+simple_transaction(b'test', db)
+print(f"{db[b'test1']}: {db[b'test1'].value}")
+print(f"{db[b'test2']}: {db[b'test2'].value}")
 ```
