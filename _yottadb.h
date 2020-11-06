@@ -61,6 +61,8 @@
 #define YDBPY_ERRMSG_SUBSARRAY_INVALID "'subsarray' argument invalid: %s"
 #define YDBPY_ERRMSG_KEYS_INVALID      "'keys' argument invalid: %s"
 
+#define FORMAT_ERROR_MESSAGE(...) snprintf(error_message, YDBPY_MAX_REASON, __VA_ARGS__);
+
 typedef struct {
 	ydb_buffer_t *varname;
 	int	      subs_used;

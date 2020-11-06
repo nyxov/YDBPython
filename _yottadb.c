@@ -14,18 +14,15 @@
 
 #include <assert.h>
 #include <stdbool.h>
-#define PY_SSIZE_T_CLEAN
-#include <Python.h>
 #include <ffi.h>
 #include <libyottadb.h>
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
 
 #include "_yottadb.h"
 #include "_yottadbexceptions.h"
 
 /* Local Utility Functions */
-
-/* Array of Ydb_buffer_t Utilities */
-
 /* Routine to create an array of empty ydb_buffer_ts with num elements each with
  * an allocated length of len
  *
@@ -63,31 +60,31 @@ static int validate_sequence_of_bytes(PyObject *sequence, int max_sequence_len, 
 	/* validate sequence type */
 	seq = PySequence_Fast(sequence, "argument must be iterable");
 	if (!seq || !(PyTuple_Check(sequence) || PyList_Check(sequence))) {
-		snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_NOT_LIST_OR_TUPLE);
+		FORMAT_ERROR_MESSAGE(YDBPY_ERRMSG_NOT_LIST_OR_TUPLE);
 		return YDBPY_INVALID_NOT_LIST_OR_TUPLE;
 	}
 
 	/* validate sequence length */
 	len_seq = PySequence_Fast_GET_SIZE(seq);
 	if (max_sequence_len < len_seq) {
-		snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_SEQUENCE_TOO_LONG, len_seq, max_sequence_len);
+		FORMAT_ERROR_MESSAGE(YDBPY_ERRMSG_SEQUENCE_TOO_LONG, len_seq, max_sequence_len);
 		return YDBPY_INVALID_SEQUENCE_TOO_LONG;
 	}
 
 	/* validate sequence contents */
-	for (i = 0; i < len_seq; i++) { /* check each item for a bytes object */
+	for (i = 0; i < len_seq; i++) {
 		item = PySequence_Fast_GET_ITEM(seq, i);
-		/* validate item type */
+		/* validate item type (bytes) */
 		if (!PyBytes_Check(item)) {
-			snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_ITEM_IN_SEQUENCE_NOT_BYTES, i);
+			FORMAT_ERROR_MESSAGE(YDBPY_ERRMSG_ITEM_IN_SEQUENCE_NOT_BYTES, i);
 			ret = YDBPY_INVALID_ITEM_IN_SEQUENCE_NOT_BYTES;
 			break;
 		}
 		/* validate item length */
 		len_bytes = PySequence_Fast_GET_SIZE(item);
 		if (max_bytes_len < len_bytes) {
-			snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_BYTES_TOO_LONG, len_bytes, max_bytes_len);
-			return YDBPY_INVALID_BYTES_TOO_LONG;
+			FORMAT_ERROR_MESSAGE(YDBPY_ERRMSG_BYTES_TOO_LONG, len_bytes, max_bytes_len);
+			ret = YDBPY_INVALID_BYTES_TOO_LONG;
 			break;
 		}
 	}
@@ -126,8 +123,7 @@ bool convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence, int seque
 		YDB_MALLOC_BUFFER(&buffer_array[i], bytes_len);
 		YDB_COPY_BYTES_TO_BUFFER(bytes_c, bytes_len, &buffer_array[i], done);
 		if (false == done) {
-			for (int j = 0; j < i; j++)
-				YDB_FREE_BUFFER(&buffer_array[j])
+			FREE_BUFFER_ARRAY(&buffer_array, i);
 			Py_DECREF(seq);
 			PyErr_SetString(YDBPythonError, "failed to copy bytes object to buffer array");
 			return false;
@@ -159,10 +155,9 @@ PyObject *convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
  * objects (varname and subsarray) to YDB keys.
  *
  * Parameters:
- *    dest        - pointer to the YDBKey to fill.
+ *    dest       - pointer to the YDBKey to fill.
  *    varname    - Python Bytes object representing the varname
- *    subsarray    - array of python Bytes objects representing the array of
- * subcripts
+ *    subsarray  - array of Python Bytes objects representing the array of subscripts
  */
 static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
 	bool	      copy_success, convert_success;
