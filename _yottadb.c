@@ -151,13 +151,13 @@ PyObject *convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
 	return return_tuple;
 }
 
-/* The workhorse routine of a couple of routines that convert from Python
- * objects (varname and subsarray) to YDB keys.
+/* This function will take an already allocated array of YDBKey structures and load it with the
+ * data contained in the PyObject arguments.
  *
  * Parameters:
  *    dest       - pointer to the YDBKey to fill.
- *    varname    - Python Bytes object representing the varname
- *    subsarray  - array of Python Bytes objects representing the array of subscripts
+ *    varname    - Python bytes object representing the varname
+ *    subsarray  - array of Python bytes objects representing the array of subscripts
  */
 static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
 	bool	      copy_success, convert_success;
@@ -303,16 +303,15 @@ static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, char *error_
 	return ret;
 }
 
-/* Routine to covert a sequence of keys in Python sequences and bytes to an
- * array of YDBKeys. Assumes that the input has already been validated with
- * 'validate_py_keys_sequence' above. Use 'free_YDBKey_array' below to free the
- * returned value.
+/* Takes an already validated (by 'validate_py_keys_sequence' above) PyObject sequence
+ * that represents a series of keys loads that data into a already allocated array
+ * of YDBKeys. (note: 'ret_keys' should later be freed by 'free_YDBKey_array' below)
  *
  * Parameters:
  *    sequence    - a Python object that has already been validated with
- * 'validate_py_keys_sequence' or equivalent.
+ *                      'validate_py_keys_sequence' or equivalent.
  */
-static bool convert_key_sequence_to_YDBKey_array(PyObject *sequence, YDBKey *ret_keys) {
+static bool load_YDBKeys_from_key_sequence(PyObject *sequence, YDBKey *ret_keys) {
 	bool	   success = true;
 	Py_ssize_t i, len_keys;
 	PyObject * key, *varname, *subsarray, *seq, *key_seq;
@@ -338,7 +337,7 @@ static bool convert_key_sequence_to_YDBKey_array(PyObject *sequence, YDBKey *ret
 }
 
 /* Routine to free an array of YDBKeys as returned by above
- * 'convert_key_sequence_to_YDBKey_array'.
+ * 'load_YDBKeys_from_key_sequence'.
  *
  * Parameters:
  *    keysarray    - the array that is to be freed.
@@ -765,7 +764,7 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 	YDB_MALLOC_BUFFER(error_string_buffer, YDB_MAX_ERRORMSG);
 	if (Py_None != keys) {
 		keys_ydb = (YDBKey *)calloc(len_keys, sizeof(YDBKey));
-		success = convert_key_sequence_to_YDBKey_array(keys, keys_ydb);
+		success = load_YDBKeys_from_key_sequence(keys, keys_ydb);
 		if (!success)
 			return_NULL = true;
 	}
