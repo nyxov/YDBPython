@@ -58,7 +58,7 @@ static int validate_sequence_of_bytes(PyObject *sequence, int max_sequence_len, 
 	PyObject * item, *seq;
 
 	/* validate sequence type */
-	seq = PySequence_Fast(sequence, "argument must be iterable");
+	seq = PySequence_Fast(sequence, "argument must be iterable"); // New Reference
 	if (!seq || !(PyTuple_Check(sequence) || PyList_Check(sequence))) {
 		FORMAT_ERROR_MESSAGE(YDBPY_ERRMSG_NOT_LIST_OR_TUPLE);
 		return YDBPY_INVALID_NOT_LIST_OR_TUPLE;
@@ -73,7 +73,7 @@ static int validate_sequence_of_bytes(PyObject *sequence, int max_sequence_len, 
 
 	/* validate sequence contents */
 	for (i = 0; i < len_seq; i++) {
-		item = PySequence_Fast_GET_ITEM(seq, i);
+		item = PySequence_Fast_GET_ITEM(seq, i); // Borrowed Reference
 		/* validate item type (bytes) */
 		if (!PyBytes_Check(item)) {
 			FORMAT_ERROR_MESSAGE(YDBPY_ERRMSG_ITEM_IN_SEQUENCE_NOT_BYTES, i);
@@ -109,14 +109,14 @@ bool convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence, int seque
 	char *	     bytes_c;
 	PyObject *   bytes, *seq;
 
-	seq = PySequence_Fast(sequence, "argument must be iterable");
+	seq = PySequence_Fast(sequence, "argument must be iterable"); // New Reference
 	if (!seq) {
 		PyErr_SetString(YDBPythonError, "Can't convert none sequence to buffer array.");
 		return false;
 	}
 
 	for (int i = 0; i < sequence_len; i++) {
-		bytes = PySequence_Fast_GET_ITEM(seq, i);
+		bytes = PySequence_Fast_GET_ITEM(seq, i); // Borrowed Reference
 		bytes_ssize = PyBytes_Size(bytes);
 		bytes_len = Py_SAFE_DOWNCAST(bytes_ssize, Py_ssize_t, unsigned int);
 		bytes_c = PyBytes_AsString(bytes);
@@ -144,7 +144,7 @@ PyObject *convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
 	int	  i;
 	PyObject *return_tuple;
 
-	return_tuple = PyTuple_New(len);
+	return_tuple = PyTuple_New(len); // New Reference
 	for (i = 0; i < len; i++)
 		PyTuple_SetItem(return_tuple, i, Py_BuildValue("y#", buffer_array[i].buf_addr, buffer_array[i].len_used));
 
@@ -231,7 +231,7 @@ static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, char *error_
 	char	   error_sub_reason[YDBPY_MAX_REASON];
 
 	/* validate key sequence type */
-	seq = PySequence_Fast(keys_sequence, "'keys' argument must be a Sequence");
+	seq = PySequence_Fast(keys_sequence, "'keys' argument must be a Sequence"); // New Reference
 	if (!seq || !(PyTuple_Check(keys_sequence) || PyList_Check(keys_sequence))) {
 		snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_NOT_LIST_OR_TUPLE);
 		ret = YDBPY_INVALID_NOT_LIST_OR_TUPLE;
@@ -316,17 +316,17 @@ static bool load_YDBKeys_from_key_sequence(PyObject *sequence, YDBKey *ret_keys)
 	Py_ssize_t i, len_keys;
 	PyObject * key, *varname, *subsarray, *seq, *key_seq;
 
-	seq = PySequence_Fast(sequence, "argument must be iterable");
+	seq = PySequence_Fast(sequence, "argument must be iterable"); // New Reference
 	len_keys = PySequence_Fast_GET_SIZE(seq);
 
 	for (i = 0; i < len_keys; i++) {
-		key = PySequence_Fast_GET_ITEM(seq, i);
-		key_seq = PySequence_Fast(key, "argument must be iterable");
-		varname = PySequence_Fast_GET_ITEM(key_seq, 0);
+		key = PySequence_Fast_GET_ITEM(seq, i);			     // Borrowed Reference
+		key_seq = PySequence_Fast(key, "argument must be iterable"); // New Reference
+		varname = PySequence_Fast_GET_ITEM(key_seq, 0);		     // Borrowed Reference
 		subsarray = Py_None;
 
 		if (2 == PySequence_Fast_GET_SIZE(key_seq))
-			subsarray = PySequence_Fast_GET_ITEM(key_seq, 1);
+			subsarray = PySequence_Fast_GET_ITEM(key_seq, 1); // Borrowed Reference
 		success = load_YDBKey(&ret_keys[i], varname, subsarray);
 		Py_DECREF(key_seq);
 		if (!success)
@@ -398,7 +398,7 @@ static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp
 	}
 
 	snprintf(full_error_message, YDB_MAX_ERRORMSG, "%s (%d):%s", error_name, status, error_message);
-	message = Py_BuildValue("s", full_error_message);
+	message = Py_BuildValue("s", full_error_message); // New Reference
 
 	RAISE_SPECIFIC_ERROR(status, message);
 }
@@ -465,7 +465,7 @@ static PyObject *data(PyObject *self, PyObject *args, PyObject *kwds) {
 
 		/* Create Python object to return */
 		if (!return_NULL)
-			return_python_int = Py_BuildValue("I", ret_value);
+			return_python_int = Py_BuildValue("I", ret_value); // New Reference
 	}
 
 	/* free allocated memory */
@@ -594,7 +594,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 	Py_ssize_t   varname_len_ssize;
 	char *	     varname;
 	uint64_t     tp_token;
-	PyObject *   subsarray, *return_python_string;
+	PyObject *   subsarray, *return_python_bytes;
 	ydb_buffer_t varname_y, error_string_buffer, ret_value, *subsarray_y;
 
 	/* Defaults for non-required arguments */
@@ -639,7 +639,8 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 		}
 		/* Create Python object to return */
 		if (!return_NULL)
-			return_python_string = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
+			/* New Reference */
+			return_python_bytes = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
 	}
 
 	/* free allocated memory */
@@ -650,7 +651,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 	if (return_NULL)
 		return NULL;
 	else
-		return return_python_string;
+		return return_python_bytes;
 }
 
 /* Wrapper for ydb_incr_s() and ydb_incr_st() */
@@ -661,7 +662,7 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 	unsigned int varname_len, increment_len;
 	uint64_t     tp_token;
 	char *	     varname, *increment;
-	PyObject *   subsarray, *return_python_string;
+	PyObject *   subsarray, *return_python_bytes;
 	ydb_buffer_t increment_y, error_string_buffer, ret_value, varname_y, *subsarray_y;
 
 	/* Defaults for non-required arguments */
@@ -705,7 +706,8 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 		/* Create Python object to return */
 		if (!return_NULL)
-			return_python_string = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
+			/* New Reference */
+			return_python_bytes = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
 	}
 
 	/* free allocated memory */
@@ -718,7 +720,7 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 	if (return_NULL)
 		return NULL;
 	else
-		return return_python_string;
+		return return_python_bytes;
 }
 
 /* Wrapper for ydb_lock_s() and ydb_lock_st() */
@@ -1016,6 +1018,7 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 		}
 		/* Create Python object to return */
 		if (!return_NULL)
+			/* New Reference */
 			return_tuple = convert_ydb_buffer_array_to_py_tuple(ret_subsarray, ret_subs_used);
 	}
 	/* free allocated memory */
@@ -1092,6 +1095,7 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 
 		/* Create Python object to return */
 		if (!return_NULL)
+			/* New Reference */
 			return_tuple = convert_ydb_buffer_array_to_py_tuple(ret_subsarray, ret_subs_used);
 	}
 
@@ -1219,6 +1223,7 @@ static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 		/* Create Python object to return */
 		if (!return_NULL)
+			/* New Reference */
 			return_value = Py_BuildValue("y#", zwr_buf.buf_addr, (Py_ssize_t)zwr_buf.len_used);
 	}
 	/* free allocated memory */
@@ -1240,7 +1245,7 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 	unsigned int varname_len;
 	char *	     varname;
 	uint64_t     tp_token;
-	PyObject *   subsarray, *return_python_string;
+	PyObject *   subsarray, *return_python_bytes;
 	ydb_buffer_t error_string_buffer, ret_value, varname_y, *subsarray_y;
 
 	/* Defaults for non-required arguments */
@@ -1286,7 +1291,8 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 
 		/* Create Python object to return */
 		if (!return_NULL)
-			return_python_string = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
+			/* New Reference */
+			return_python_bytes = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
 	}
 	/* free allocated memory */
 	YDB_FREE_BUFFER(&varname_y);
@@ -1297,7 +1303,7 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 	if (return_NULL)
 		return NULL;
 	else
-		return return_python_string;
+		return return_python_bytes;
 }
 
 /* Wrapper for ydb_subscript_previous_s() and ydb_subscript_previous_st() */
@@ -1308,7 +1314,7 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 	unsigned int varname_len;
 	char *	     varname;
 	uint64_t     tp_token;
-	PyObject *   subsarray, *return_python_string;
+	PyObject *   subsarray, *return_python_bytes;
 	ydb_buffer_t error_string_buffer, ret_value, varname_y, *subsarray_y;
 
 	/* Defaults for non-required arguments */
@@ -1354,7 +1360,8 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 
 		/* Create Python object to return */
 		if (!return_NULL)
-			return_python_string = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
+			/* New Reference */
+			return_python_bytes = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
 	}
 	/* free allocated memory */
 	YDB_FREE_BUFFER(&varname_y);
@@ -1364,7 +1371,7 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 	if (return_NULL)
 		return NULL;
 	else
-		return return_python_string;
+		return return_python_bytes;
 }
 
 /* Callback functions used by Wrapper for ydb_tp_s() / ydb_tp_st() */
@@ -1391,9 +1398,9 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t *errstr, void *funct
 	bool	  decref_kwargs = false;
 	PyObject *function, *args, *kwargs, *return_value, *tp_token_py;
 
-	function = PyTuple_GetItem(function_with_arguments, 0);
-	args = PyTuple_GetItem(function_with_arguments, 1);
-	kwargs = PyTuple_GetItem(function_with_arguments, 2);
+	function = PyTuple_GetItem(function_with_arguments, 0); // Borrowed Reference
+	args = PyTuple_GetItem(function_with_arguments, 1);	// Borrowed Reference
+	kwargs = PyTuple_GetItem(function_with_arguments, 2);	// Borrowed Reference
 
 	if (Py_None == args) {
 		args = PyTuple_New(0);
@@ -1408,7 +1415,7 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t *errstr, void *funct
 	PyDict_SetItemString(kwargs, "tp_token", tp_token_py);
 	Py_DECREF(tp_token_py);
 
-	return_value = PyObject_Call(function, args, kwargs);
+	return_value = PyObject_Call(function, args, kwargs); // New Reference
 
 	if (decref_args)
 		Py_DECREF(args);
@@ -1474,6 +1481,7 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 	if (!return_NULL) {
 		/* Setup for Call */
 		YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
+		/* New Reference */
 		function_with_arguments = Py_BuildValue("(OOO)", callback, callback_args, callback_kwargs);
 		namecount = 0;
 		if (Py_None != varnames)
@@ -1505,6 +1513,7 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 			return_NULL = true;
 		}
 		/* free allocated memory */
+		Py_DECREF(function_with_arguments);
 		YDB_FREE_BUFFER(&error_string_buffer);
 		free(varname_buffers);
 	}
@@ -1564,6 +1573,7 @@ static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
 		}
 
 		if (!return_NULL)
+			/* New Reference */
 			return_value = Py_BuildValue("y#", str_buf.buf_addr, (Py_ssize_t)str_buf.len_used);
 	}
 	YDB_FREE_BUFFER(&zwr_buf);
