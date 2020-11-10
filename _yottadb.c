@@ -207,11 +207,8 @@ static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
  *    key    - pointer to the YDBKey to free.
  */
 static void free_YDBKey(YDBKey *key) {
-	int i;
-
 	YDB_FREE_BUFFER((key->varname));
-	for (i = 0; i < key->subs_used; i++)
-		YDB_FREE_BUFFER(&((ydb_buffer_t *)key->subsarray)[i]);
+	FREE_BUFFER_ARRAY(key->subsarray, key->subs_used);
 }
 
 /* Routine to validate a sequence of Python sequences representing keys. (Used
