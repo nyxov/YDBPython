@@ -212,11 +212,14 @@ static void free_YDBKey(YDBKey *key) {
 }
 
 /* Routine to validate a sequence of Python sequences representing keys. (Used
- * only by lock().) Validation rule: 1) key_sequence must be a sequence 2) each
- * item in key_sequence must be a sequence 3) each item must be a sequence of 1
- * or 2 sub-items. 4) item[0] must be a bytes object. 5) item[1] either does not
- * exist, is None or a sequence 6) if item[1] is a sequence then it must contain
- * only bytes objects.
+ * only by lock().)
+ * Validation rule:
+ *      1) key_sequence must be a sequence
+ *      2) each item in key_sequence must be a sequence
+ *      3) each item must be a sequence of 1 or 2 sub-items.
+ *      4) item[0] must be a bytes object.
+ *      5) item[1] either does not exist, is None or a sequence
+ *      6) if item[1] is a sequence then it must contain only bytes objects.
  *
  * Parameters:
  *    keys_sequence        - a Python object that is to be validated.
