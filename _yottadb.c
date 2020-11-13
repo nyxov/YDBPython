@@ -94,9 +94,10 @@ static int validate_sequence_of_bytes(PyObject *sequence, int max_sequence_len, 
 
 /* Routine to convert a sequence of Python bytes into a C array of
  * ydb_buffer_ts. Routine assumes sequence was already validated with
- * 'validate_sequence_of_bytes' function. The function creates a copy of each
- * Python bytes' data so the resulting array should be freed by using the
- * 'FREE_BUFFER_ARRAY' macro.
+ * 'validate_sequence_of_bytes' function or the special case macros
+ * VALIDATE_SUBSARRAY or VALIDATE_VARNAMES. The function creates a
+ * copy of each Python bytes' data so the resulting array should be
+ * freed by using the 'FREE_BUFFER_ARRAY' macro.
  *
  * Parameters:
  *    sequence    - a Python Object that is expected to be a Python Sequence
@@ -158,6 +159,8 @@ PyObject *convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
  *    dest       - pointer to the YDBKey to fill.
  *    varname    - Python bytes object representing the varname
  *    subsarray  - array of Python bytes objects representing the array of subscripts
+ *                   Note: Because this function calls `convert_py_bytes_sequence_to_ydb_buffer_array`
+ *                          subsarray should be validated with the VALIDATE_SUBSARRAY macro.
  */
 static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
 	bool	      copy_success, convert_success;
