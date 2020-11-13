@@ -366,7 +366,7 @@ static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp
 	ydb_buffer_t ignored_buffer;
 	PyObject *   message;
 	char	     full_error_message[YDB_MAX_ERRORMSG];
-	char *	     error_name, *error_message, *err_field1, *err_field2, *err_field3, *err_field4;
+	char *	     error_status, *api, *error_name, *error_message;
 	char *	     next_field = NULL;
 	const char * delim = ",";
 
@@ -377,16 +377,15 @@ static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp
 
 	if (0 != error_string_buffer->len_used) {
 		error_string_buffer->buf_addr[error_string_buffer->len_used] = '\0';
-		err_field1 = strtok_r(error_string_buffer->buf_addr, delim, &next_field);
-		err_field2 = strtok_r(NULL, delim, &next_field);
-		err_field3 = strtok_r(NULL, delim, &next_field);
-		err_field4 = strtok_r(NULL, delim, &next_field);
-		if (NULL != err_field4) {
-			error_name = err_field3;
-			error_message = err_field4;
-		} else {
-			error_name = err_field1;
-			error_message = err_field2;
+		/* normal error message format */
+		error_status = strtok_r(error_string_buffer->buf_addr, delim, &next_field);
+		api = strtok_r(NULL, delim, &next_field);
+		error_name = strtok_r(NULL, delim, &next_field);
+		error_message = strtok_r(NULL, delim, &next_field);
+		if (NULL == error_message) {
+			/* alternate error message case */
+			error_name = error_status;
+			error_message = api;
 		}
 		if (NULL == error_name)
 			error_name = "UNKNOWN";

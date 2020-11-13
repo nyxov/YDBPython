@@ -105,13 +105,13 @@ def simple_transaction(value, context): # the final argument of a transaction is
     some_condition_a = False
     some_condition_b = False  
     if some_condition_a: 
-        # When you raising yottadb.YDBTPRollback YottaDB will rollback the transaction
-        # and then propagate the exception to your calling code.  
+        # When yottadb.YDBTPRollback is raised YottaDB will rollback the transaction
+        # and then propagate the exception to the calling code.  
         raise yottadb.YDBTPRollback("reason for the rollback")
     elif some_condition_b:
-        # When you raising yottadb.YDBTPRestart YottaDB will call the transaction again.
-        # Warning: This code is intentionally simplistic you will get an infinite loop
-        #           if you continually raise yottadb.YDBTPRestart
+        # When yottadb.YDBTPRestart is raised YottaDB will call the transaction again.
+        # Warning: This code is intentionally simplistic. An infinite loop will occur
+        #           if yottadb.YDBTPRestart is continually raised
         raise yottadb.YDBTPRestart()
     else:
         return yottadb.YDB_OK # indicates success, transaction will be committed
