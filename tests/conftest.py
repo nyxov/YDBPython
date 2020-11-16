@@ -16,7 +16,7 @@ import os
 import shutil
 import subprocess
 import shlex
-import pytest  n
+import pytest  # type: ignore # ignore due to pytest not having type annotations
 
 import yottadb
 from yottadb import KeyTuple
