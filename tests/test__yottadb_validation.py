@@ -11,7 +11,7 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
-import pytest  # type: ignore
+import pytest  # type: ignore # ignore due to pytest not having type annotations
 import _yottadb
 import psutil
 

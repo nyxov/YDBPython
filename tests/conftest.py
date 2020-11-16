@@ -16,15 +16,15 @@ import os
 import shutil
 import subprocess
 import shlex
-import pytest  # type: ignore
+import pytest  n
+
+import yottadb
+from yottadb import KeyTuple
 
 YDB_INSTALL_DIR = os.environ["ydb_dist"]
 TEST_DATA_DIRECTORY = "/tmp/test_yottadb/"
 TEST_GLD = TEST_DATA_DIRECTORY + "test_db.gld"
 TEST_DAT = TEST_DATA_DIRECTORY + "test_db.dat"
-
-import yottadb
-from yottadb import KeyTuple
 
 
 def execute(command: str, stdin: str = "") -> str:
