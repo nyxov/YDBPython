@@ -641,11 +641,15 @@ def callback_for_tp_simple_restart(start_time, tp_token=NOTTP):
 
 
 def test_tp_4c_reset_some(simple_reset_test_data):
+    ydb.set(b"resetattempt", value=b"0")
+    ydb.set(b"resetvalue", value=b"0")
     start_time = datetime.datetime.now()
     result = _yottadb.tp(callback_for_tp_simple_restart, args=(start_time,), varnames=(b"resetvalue",))
     assert result == _yottadb.YDB_OK
     assert _yottadb.get(b"resetattempt") == b"2"
     assert _yottadb.get(b"resetvalue") == b"1"
+    ydb.delete_node(b"resetattempt")
+    ydb.delete_node(b"resetvalue")
 
 
 def test_subscript_next_1(simple_data):

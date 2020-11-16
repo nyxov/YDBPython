@@ -28,12 +28,24 @@ TEST_DAT = TEST_DATA_DIRECTORY + "test_db.dat"
 
 
 def execute(command: str, stdin: str = "") -> str:
+    """
+    A utility function to simplify the running of shell commands.
+
+    :param command: the command to run
+    :param stdin: optional text that may be piped to the command
+    :return: returns standard out decoded as a string.
+    """
     process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     return process.communicate(stdin.encode())[0].decode().strip()
 
 
 @pytest.fixture(scope="session")
 def ydb():
+    """
+    A pytest fixture that sets up a test database, yields a yottadb.Context object for
+    the test to use to access that database and then deletes the database when the
+    testing session is complete.
+    """
     # setup
 
     # for some strange reason ydb will not want to run with
@@ -81,6 +93,11 @@ SIMPLE_DATA = (
 
 @pytest.fixture(scope="function")
 def simple_data(ydb):
+    """
+    A pytest fixture that adds the above SIMPLE_DATA tuple to the testing database and then
+    deletes that data. This fixture is in function scope so it will be deleted after each
+    test that uses it.
+    """
     for key, value in SIMPLE_DATA:
         ydb.set(*key, value=value)
 
@@ -135,7 +152,11 @@ TREE_DATA = (
 
 @pytest.fixture(scope="function")
 def tree_data(ydb):
-
+    """
+    A pytest fixture that adds the above TREE_DATA tuple to the testing database and then
+    deletes that data. This fixture is in function scope so it will be deleted after each
+    test that uses it.
+    """
     for key, value in TREE_DATA:
         ydb.set(*key, value=value)
 
@@ -143,12 +164,3 @@ def tree_data(ydb):
 
     for key, value in TREE_DATA:
         ydb.delete_tree(*key)
-
-
-@pytest.fixture
-def simple_reset_test_data(ydb):
-    ydb.set(b"resetattempt", value=b"0")
-    ydb.set(b"resetvalue", value=b"0")
-    yield
-    ydb.delete_node(b"resetattempt")
-    ydb.delete_node(b"resetvalue")
