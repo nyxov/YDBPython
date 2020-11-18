@@ -17,38 +17,61 @@ import psutil
 
 
 def varname_invalid(function):
-    with pytest.raises(TypeError):
+    """
+    This function is used to test the function passed does correct validation of a variable name.
+    It tests that the function will:
+        1) Raise a TypeError when the varname is not of type bytes
+        2) That a varname may be as long as _yottadb.YDB_MAX_IDENT without raising ValueError
+        3) that if a varname is longer than _yottadb.YDB_MAX_IDENT it will raise a ValueError
+
+    :param function: any function that takes "varname" as a parameter.
+    """
+    with pytest.raises(TypeError):  # varname must be bytes type, if not raise TypeError
         function(varname="b")
 
     try:
-        function(varname=b"b" * (_yottadb.YDB_MAX_IDENT))  # almost too long
+        function(varname=b"b" * (_yottadb.YDB_MAX_IDENT))  # almost too long so should not raise ValueError
     except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
         pass
-    with pytest.raises(ValueError):
+
+    with pytest.raises(ValueError):  # varname must not be longer than _yottadb.YDB_MAX_IDENT. if not, raise ValueError
         function(varname=b"b" * (_yottadb.YDB_MAX_IDENT + 1))
 
 
 def subsarray_invalid(function):
-    with pytest.raises(TypeError):
-        function(b"test", b"this is the wrong kind of sequence")
+    """
+    This function is used to test the function passed does correct validation of a list of subscripts.
+    A subsarray must be a sequence (such as list or tuple but not bytes) of bytes objects.
+    It tests that the function will:
+        1) raise a TypeError if the subsarray parameter is a bytes object.
+        2) not raise a ValueError when it has a sequence that is equal to _yottadb.YDB_MAX_SUBS in length
+        3) raises a ValueError when the sequence's length exceeds _yottab.YDB_MAX_SUBS
+        4) raises a TypeError when a value in the sequence is not of type bytes
+        5) not raise a ValueError when a bytes object is of length _yottadb.YDB_MAX_STR
+        6) raises a ValueError when a bytes object exceeds _yotadb.YDB_MAX_STR
+
+    :param function: any function that takes "varname"  and "subsarray" as a parameters.
+    """
+    with pytest.raises(TypeError):  # must raise TypeError if subsarray is a bytes object
+        function(varname=b"test", subsarray=b"this is the wrong kind of sequence")
 
     try:
-        function(b"test", (b"b",) * (_yottadb.YDB_MAX_SUBS))  # almost too many
+        function(varname=b"test", subsarray=(b"b",) * (_yottadb.YDB_MAX_SUBS))  # almost too many so will not raise ValueError
     except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
         pass
 
-    with pytest.raises(ValueError):
-        function(b"test", (b"b",) * (_yottadb.YDB_MAX_SUBS + 1))
+    with pytest.raises(ValueError):  # too many items in subsarray parameter so raise ValueError
+        function(varname=b"test", subsarray=(b"b",) * (_yottadb.YDB_MAX_SUBS + 1))
 
-    with pytest.raises(TypeError):
-        function(b"test", ("not a bytes object",))
+    with pytest.raises(TypeError):  # items in subsarray must be bytes so raise TypeError if not
+        function(varname=b"test", subsarray=("not a bytes object",))
 
     try:
-        function(b"test", (b"b" * (_yottadb.YDB_MAX_STR),))  # almost too long
+        function(b"test", (b"b" * (_yottadb.YDB_MAX_STR),))  # almost too long so do not raise ValueError
     except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
         pass
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # item in subsarray sequence is too long so raise ValueError
         function(b"test", (b"b" * (_yottadb.YDB_MAX_STR + 1),))
 
 
