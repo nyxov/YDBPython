@@ -640,7 +640,7 @@ def callback_for_tp_simple_restart(start_time, tp_token=NOTTP):
     return _yottadb.YDB_TP_RESTART
 
 
-def test_tp_4c_reset_some(simple_reset_test_data):
+def test_tp_4c_reset_some(ydb):
     ydb.set(b"resetattempt", value=b"0")
     ydb.set(b"resetvalue", value=b"0")
     start_time = datetime.datetime.now()
