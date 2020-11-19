@@ -70,12 +70,6 @@ def ydb():
     testing session is complete.
     """
     # setup
-
-    # for some strange reason ydb will not want to run with
-    #   both ydb_gbldir set to /tmp/test_yottadb/test_db.gld
-    #   and being run from the same directory as the project.
-    os.chdir("..")  # so changing to the parent directory to run the tests
-
     if os.path.exists(TEST_DATA_DIRECTORY):  # clean up previous test if it failed to do so previously
         shutil.rmtree(TEST_DATA_DIRECTORY)
 

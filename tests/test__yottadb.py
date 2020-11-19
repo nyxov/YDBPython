@@ -191,7 +191,7 @@ def test_lock_incr_2():
 
 
 def test_lock_incr_timeout_1():
-    subprocess.Popen(shlex.split("python3 YDBPython/tests/lock.py -t 2 ^test1"))
+    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test1"))
     time.sleep(1)
     with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr(b"^test1")
@@ -199,7 +199,7 @@ def test_lock_incr_timeout_1():
 
 
 def test_lock_incr_timeout_2():
-    subprocess.Popen(shlex.split("python3 YDBPython/tests/lock.py -t 2 ^test2 sub1"))
+    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test2 sub1"))
     time.sleep(1)
     with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr(b"^test2", (b"sub1",))
@@ -207,7 +207,7 @@ def test_lock_incr_timeout_2():
 
 
 def test_lock_incr_timeout_3():
-    subprocess.Popen(shlex.split("python3 YDBPython/tests/lock.py -t 2 ^test2"))
+    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test2"))
     time.sleep(1)
     with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr(b"^test2", (b"sub1",))
@@ -215,7 +215,7 @@ def test_lock_incr_timeout_3():
 
 
 def test_lock_incr_timeout_4():
-    subprocess.Popen(shlex.split("python3 YDBPython/tests/lock.py -t 2 ^test2 sub1"))
+    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test2 sub1"))
     time.sleep(1)
     t1 = datetime.datetime.now()
     _yottadb.lock_incr(b"test2")
@@ -750,17 +750,17 @@ def test_lock_blocking_other(simple_data):
     keys_to_lock = (t1, t2, t3)
     _yottadb.lock(keys=keys_to_lock, timeout_nsec=0)
     print(t1)
-    assert execute(f"python3 YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t1)}") == "Lock Failed"
-    assert execute(f"python3 YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t2)}") == "Lock Failed"
-    assert execute(f"python3 YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Failed"
+    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t1)}") == "Lock Failed"
+    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t2)}") == "Lock Failed"
+    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Failed"
     _yottadb.lock()
-    assert execute(f"python3 YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t1)}") == "Lock Success"
-    assert execute(f"python3 YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t2)}") == "Lock Success"
-    assert execute(f"python3 YDBPython/tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Success"
+    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t1)}") == "Lock Success"
+    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t2)}") == "Lock Success"
+    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Success"
 
 
 def test_lock_being_blocked():
-    subprocess.Popen(shlex.split("python3 YDBPython/tests/lock.py ^test1"))
+    subprocess.Popen(shlex.split("python3 tests/lock.py ^test1"))
     time.sleep(1)
     with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock([KeyTuple(b"^test1")])
