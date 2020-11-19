@@ -26,6 +26,29 @@ TEST_DATA_DIRECTORY = "/tmp/test_yottadb/"
 TEST_GLD = TEST_DATA_DIRECTORY + "test_db.gld"
 TEST_DAT = TEST_DATA_DIRECTORY + "test_db.dat"
 
+SIMPLE_DATA = (
+    (KeyTuple(b"^test1"), b"test1value"),
+    (KeyTuple(b"^test2", (b"sub1",)), b"test2value"),
+    (KeyTuple(b"^test3"), b"test3value1"),
+    (KeyTuple(b"^test3", (b"sub1",)), b"test3value2"),
+    (KeyTuple(b"^test3", (b"sub1", b"sub2")), b"test3value3"),
+    (KeyTuple(b"^test4"), b"test4"),
+    (KeyTuple(b"^test4", (b"sub1",)), b"test4sub1"),
+    (KeyTuple(b"^test4", (b"sub1", b"subsub1")), b"test4sub1subsub1"),
+    (KeyTuple(b"^test4", (b"sub1", b"subsub2")), b"test4sub1subsub2"),
+    (KeyTuple(b"^test4", (b"sub1", b"subsub3")), b"test4sub1subsub3"),
+    (KeyTuple(b"^test4", (b"sub2",)), b"test4sub2"),
+    (KeyTuple(b"^test4", (b"sub2", b"subsub1")), b"test4sub2subsub1"),
+    (KeyTuple(b"^test4", (b"sub2", b"subsub2")), b"test4sub2subsub2"),
+    (KeyTuple(b"^test4", (b"sub2", b"subsub3")), b"test4sub2subsub3"),
+    (KeyTuple(b"^test4", (b"sub3",)), b"test4sub3"),
+    (KeyTuple(b"^test4", (b"sub3", b"subsub1")), b"test4sub3subsub1"),
+    (KeyTuple(b"^test4", (b"sub3", b"subsub2")), b"test4sub3subsub2"),
+    (KeyTuple(b"^test4", (b"sub3", b"subsub3")), b"test4sub3subsub3"),
+    (KeyTuple(b"^Test5"), b"test5value"),
+    (KeyTuple(b"^test6", (b"sub6", b"subsub6")), b"test6value"),
+)
+
 
 def execute(command: str, stdin: str = "") -> str:
     """
@@ -67,30 +90,6 @@ def ydb():
     shutil.rmtree(TEST_DATA_DIRECTORY)
 
 
-SIMPLE_DATA = (
-    (KeyTuple(b"^test1"), b"test1value"),
-    (KeyTuple(b"^test2", (b"sub1",)), b"test2value"),
-    (KeyTuple(b"^test3"), b"test3value1"),
-    (KeyTuple(b"^test3", (b"sub1",)), b"test3value2"),
-    (KeyTuple(b"^test3", (b"sub1", b"sub2")), b"test3value3"),
-    (KeyTuple(b"^test4"), b"test4"),
-    (KeyTuple(b"^test4", (b"sub1",)), b"test4sub1"),
-    (KeyTuple(b"^test4", (b"sub1", b"subsub1")), b"test4sub1subsub1"),
-    (KeyTuple(b"^test4", (b"sub1", b"subsub2")), b"test4sub1subsub2"),
-    (KeyTuple(b"^test4", (b"sub1", b"subsub3")), b"test4sub1subsub3"),
-    (KeyTuple(b"^test4", (b"sub2",)), b"test4sub2"),
-    (KeyTuple(b"^test4", (b"sub2", b"subsub1")), b"test4sub2subsub1"),
-    (KeyTuple(b"^test4", (b"sub2", b"subsub2")), b"test4sub2subsub2"),
-    (KeyTuple(b"^test4", (b"sub2", b"subsub3")), b"test4sub2subsub3"),
-    (KeyTuple(b"^test4", (b"sub3",)), b"test4sub3"),
-    (KeyTuple(b"^test4", (b"sub3", b"subsub1")), b"test4sub3subsub1"),
-    (KeyTuple(b"^test4", (b"sub3", b"subsub2")), b"test4sub3subsub2"),
-    (KeyTuple(b"^test4", (b"sub3", b"subsub3")), b"test4sub3subsub3"),
-    (KeyTuple(b"^Test5"), b"test5value"),
-    (KeyTuple(b"^test6", (b"sub6", b"subsub6")), b"test6value"),
-)
-
-
 @pytest.fixture(scope="function")
 def simple_data(ydb):
     """
@@ -104,63 +103,4 @@ def simple_data(ydb):
     yield
 
     for key, value in SIMPLE_DATA:
-        ydb.delete_tree(*key)
-
-
-TREE_DATA = (
-    (
-        KeyTuple(
-            b"^tree1",
-            (b"sub1"),
-        ),
-        b"tree1.sub1",
-    ),
-    (
-        KeyTuple(
-            b"^tree1",
-            (b"sub2"),
-        ),
-        b"tree1.sub2",
-    ),
-    (
-        KeyTuple(
-            b"^tree1",
-            (b"sub3"),
-        ),
-        b"tree1.sub3",
-    ),
-    (KeyTuple(b"^tree2", (b"sub1", b"sub1sub1")), b"tree2.sub1.sub1sub1"),
-    (KeyTuple(b"^tree2", (b"sub1", b"sub1sub2")), b"tree2.sub1.sub1sub2"),
-    (KeyTuple(b"^tree2", (b"sub1", b"sub1sub3")), b"tree2.sub1.sub1sub3"),
-    (KeyTuple(b"^tree2", (b"sub2", b"sub2sub1")), b"tree2.sub2.sub2sub1"),
-    (KeyTuple(b"^tree2", (b"sub2", b"sub2sub2")), b"tree2.sub2.sub2sub2"),
-    (KeyTuple(b"^tree2", (b"sub2", b"sub2sub3")), b"tree2.sub2.sub2sub3"),
-    (KeyTuple(b"^tree2", (b"sub3", b"sub3sub1")), b"tree2.sub3.sub3sub1"),
-    (KeyTuple(b"^tree2", (b"sub3", b"sub3sub2")), b"tree2.sub3.sub3sub2"),
-    (KeyTuple(b"^tree2", (b"sub3", b"sub3sub3")), b"tree2.sub3.sub3sub3"),
-    (KeyTuple(b"^tree3"), b"tree3"),
-    (KeyTuple(b"^tree2", (b"sub1",)), b"tree3.sub1"),
-    (KeyTuple(b"^tree2", (b"sub1", b"sub1sub1")), b"tree3.sub1.sub1sub1"),
-    (KeyTuple(b"^tree3"), b"tree3"),
-    (KeyTuple(b"^tree2", (b"sub2",)), b"tree3.sub2"),
-    (KeyTuple(b"^tree2", (b"sub2", b"sub2sub1")), b"tree3.sub2.sub2sub1"),
-    (KeyTuple(b"^tree3"), b"tree3"),
-    (KeyTuple(b"^tree2", (b"sub3",)), b"tree3.sub3"),
-    (KeyTuple(b"^tree2", (b"sub3", b"sub3sub1")), b"tree3.sub3.sub3sub1"),
-)
-
-
-@pytest.fixture(scope="function")
-def tree_data(ydb):
-    """
-    A pytest fixture that adds the above TREE_DATA tuple to the testing database and then
-    deletes that data. This fixture is in function scope so it will be deleted after each
-    test that uses it.
-    """
-    for key, value in TREE_DATA:
-        ydb.set(*key, value=value)
-
-    yield
-
-    for key, value in TREE_DATA:
         ydb.delete_tree(*key)
