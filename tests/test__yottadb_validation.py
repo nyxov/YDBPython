@@ -13,9 +13,17 @@
 #################################################################
 """
     This file is for tests of the validation of input from Python. Most tests are named by the function
-    being called and the parameter that is having it's data validation tested. Many functions have
-    "varname" and "subsarray" parameters which have the same rules for valid itput. Each of these functions
-    are passed to "varname_invalid" and "subsarray_invalid" for testing.
+    being called and the parameter that is having its data validation tested.
+
+    Some background: originally the plan was to have all validation be done by the underlying YottaDB C API,
+    however a bug arose in the transition from using 'int' to 'Py_size_t' that meant that length as well as type
+    must be validated (see documentation for `test_unsigned_int_length_bytes_overflow()` below for additional
+    detail). Since we were needing to test the length anyway the decision was to make that length equal to
+    YottaDB's limitations. This also has the benefit of making these types of input errors raise the normal
+    'TypeError' and 'ValueError' exceptions as is expected in Python.
+
+    Note: Many functions have "varname" and "subsarray" parameters which have the same rules for valid input.
+    Each of these functions are passed to "varname_invalid" and "subsarray_invalid" for testing.
 """
 import pytest  # type: ignore # ignore due to pytest not having type annotations
 import _yottadb
@@ -111,8 +119,8 @@ def test_delete_subsarray():
 # delete_excel()
 def test_delete_excel_varnames():
     """
-    This functions tests the validation of the delete_excel functions varnames parameter.
-    It tests that this function:
+    This function tests the validation of the delete_excel function's varnames parameter.
+    It tests that the delete_excel function:
         1) Raises a TypeError if the varnames parameter is not a proper Sequence (list or tuple)
         2) Raises a TypeError if the contents of the varname list or tuple is not a bytes object
         3) Accepts up to _yottadb.YDB_MAX_NAMES without raising an exception
@@ -163,14 +171,14 @@ def test_incr_subsarray():
 
 def test_incr_increment():
     """
-    This function tests the validation of the incr functions increment parameter.
-    It tests that this function:
-        1) Raise a TypeError if the value that is passed to it is not a bytes object
+    This function tests the validation of the incr function's increment parameter.
+    It tests that the incr function:
+        1) Raises a TypeError if the value that is passed to it is not a bytes object
         2) Accepts a value up to _yottadb.YDB_MAX_STR in length without raising an exception
-        3) Raise a ValueError if the value is longer than _yottadb.YDB_MAX_STR
+        3) Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
     """
     key = {"varname": b"test", "subsarray": (b"b",)}
-    # Case 1: Raise a TypeError if the value that is passed to it is not a bytes object
+    # Case 1: Raises a TypeError if the value that is passed to it is not a bytes object
     with pytest.raises(TypeError):
         _yottadb.incr(**key, increment="not bytes")
 
@@ -180,7 +188,7 @@ def test_incr_increment():
     except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
         pass
 
-    # Case 3: Raise a ValueError if the value is longer than _yottadb.YDB_MAX_STR
+    # Case 3: Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
     with pytest.raises(ValueError):
         _yottadb.incr(**key, increment=b"1" * (_yottadb.YDB_MAX_STR + 1))
 
@@ -188,8 +196,8 @@ def test_incr_increment():
 # lock()
 def test_lock_keys():
     """
-    This function tests the lock functions key parameter.
-    It tests that this function:
+    This function tests the lock function`s key parameter.
+    It tests that the lock function:
         1)  Raises a Type Error if the value is a not a list or tuple.
         2)  Accepts a list of keys as long as _yottadb.YDB_MAX_NAMES without raising a exception
         3)  Raises a ValueError if the list passed to it is longer than _yottadb.YDB_MAX_NAMES
@@ -328,21 +336,21 @@ def test_set_subsarray():
 
 def test_set_value():
     """
-    This function tests the validation of the set functions value parameter.
-    It tests that this function:
-        1) Raise a TypeError if the value that is passed to it is not a bytes object
+    This function tests the validation of the set function's value parameter.
+    It tests that the set function:
+        1) Raises a TypeError if the value that is passed to it is not a bytes object
         2) Accepts a value up to _yottadb.YDB_MAX_STR in length without raising an exception
-        3) Raise a ValueError if the value is longer than _yottadb.YDB_MAX_STR
+        3) Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
     """
     key = {"varname": b"test", "subsarray": (b"b",)}
-    # Case 1: Raise a TypeError if the value that is passed to it is not a bytes object
+    # Case 1: Raises a TypeError if the value that is passed to it is not a bytes object
     with pytest.raises(TypeError):
         _yottadb.set(**key, value="not bytes")
 
     # Case 2: Accepts a value up to _yottadb.YDB_MAX_STR in length without raising an exception
     _yottadb.set(**key, value=b"b" * (_yottadb.YDB_MAX_STR))
 
-    # Case 3: Raise a ValueError if the value is longer than _yottadb.YDB_MAX_STR
+    # Case 3: Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
     with pytest.raises(ValueError):
         _yottadb.set(**key, value=b"b" * (_yottadb.YDB_MAX_STR + 1))
 
@@ -350,8 +358,8 @@ def test_set_value():
 # str2zwr()
 def test_str2zwr_input():
     """
-    This function tests the validation of the str2zwr functions input parameter.
-    It tests that this function:
+    This function tests the validation of the str2zwr function's input parameter.
+    It tests that the str2zwr function:
         1) Raises a TypeError if input is not of type bytes
         2) Accepts a value up to _yottadb.YDB_MAX_STR without raising an exception
         3) Raises a ValueError if input is longer than _yottadb.YDB_MAX_STR
@@ -438,8 +446,8 @@ def test_tp_kwargs():
 
 def test_tp_varnames():
     """
-    This functions tests the validation of the tp functions varnames parameter.
-    It tests that this function:
+    This function tests the validation of the tp function's varnames parameter.
+    It tests that the tp function:
         1) Raises a TypeError if the varnames parameter is not a proper Sequence (list or tuple)
         2) Raises a TypeError if the contents of the varname list or tuple is not a bytes object
         3) Accepts up to _yottadb.YDB_MAX_NAMES without raising an exception
@@ -475,8 +483,8 @@ def test_tp_varnames():
 # zwr2str()
 def test_zwr2str_input():
     """
-    This function tests the validation of the zwr2str functions input parameter.
-    It tests that this function:
+    This function tests the validation of the zwr2str function's input parameter.
+    It tests that the zwr2str function:
         1) Raises a TypeError if input is not of type bytes
         2) Accepts a value up to _yottadb.YDB_MAX_STR without raising an exception
         3) Raises a ValueError if input is longer than _yottadb.YDB_MAX_STR
@@ -501,9 +509,9 @@ def test_zwr2str_input():
 @pytest.mark.skipif(psutil.virtual_memory().available < ((2 ** 32) + 1), reason="not enough memory for this test.")
 def test_unsigned_int_length_bytes_overflow():
     """
-    Python bytes objects may have more bytes than can be represented by a 32 bit unsigned integer.
-    Prior to validation a length that was 1 more than that length would act as if it was only a 1 byte
-    long bytes object. This Tests all senarios where that could happen and that when that happens the
+    Python bytes objects may have more bytes than can be represented by a 32-bit unsigned integer.
+    Prior to validation a length that was 1 more than that length would act as if it was only a 1-byte
+    long bytes object. This tests all scenarios where that could happen and that when that happens the
     function will raise a ValueError instead of continuing as if a single byte was passed to it.
     """
     BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = b"1" * ((2 ** 32) + 1)  # works for python 3.8/Ubuntu 20.04
