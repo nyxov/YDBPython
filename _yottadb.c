@@ -406,7 +406,15 @@ static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp
 	RAISE_SPECIFIC_ERROR(status, message);
 	Py_DECREF(message);
 }
-
+/* Routine that raises the appropriate Python Error during validation of Python input
+ * paramaters. The 2 types of errors that will be raised are:
+ *     1) TypeError in the case that the parameter is of the wrong type
+ *     2) ValueError if the parameter is of the right type but is invalid in some other way (e.g. too long)
+ *
+ * Parameters:
+ *     status  - the error message status number (specific values defined in _yottdb.h)
+ *     message - the message to be set in the Python exception.
+ */
 static void raise_ValidationError(int status, char *message) {
 	if ((YDBPY_TYPE_ERROR_MAX >= status) && (YDBPY_TYPE_ERROR_MIN <= status))
 		PyErr_SetString(PyExc_TypeError, message);
