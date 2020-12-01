@@ -271,7 +271,7 @@ static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, char *error_
 				ret = YDBPY_INVALID_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE;
 			}
 			/* validate item/key length [1 or 2] */
-			else if (!((1 == len_key_seq) || (2 == len_key_seq))) {
+			else if ((1 != len_key_seq) && (2 != len_key_seq)) {
 				snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_INCORECT_LENGTH, i);
 				ret = YDBPY_INVALID_KEY_IN_SEQUENCE_INCORECT_LENGTH;
 			}
