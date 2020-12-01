@@ -281,13 +281,13 @@ static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, char *error_
 				ret = YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES;
 			}
 			/* validate item/key first element (varname) length */
-			else if ((YDB_MAX_IDENT < len_varname)) {
+			else if (YDB_MAX_IDENT < len_varname) {
 				snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_TOO_LONG, i,
 					 len_varname, YDB_MAX_IDENT);
 				ret = YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_TOO_LONG;
 			}
 			/* validate item/key second element (subsarray) if it exists */
-			else if ((2 == len_key_seq)) {
+			else if (2 == len_key_seq) {
 				if (Py_None != subsarray) {
 					ret = validate_sequence_of_bytes(subsarray, YDB_MAX_SUBS, YDB_MAX_STR, error_sub_reason);
 					if (YDBPY_VALID != ret) {
