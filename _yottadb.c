@@ -28,8 +28,7 @@
  *
  * Parameters:
  *   num    - the number of buffers to allocate in the array
- *   len    - the length of the string to allocate for each of the the
- * ydb_buffer_ts
+ *   len    - the length of the string to allocate for each of the the ydb_buffer_ts
  *
  * free with FREE_BUFFER_ARRAY macro
  */
@@ -100,8 +99,7 @@ static int validate_sequence_of_bytes(PyObject *sequence, int max_sequence_len, 
  * freed by using the 'FREE_BUFFER_ARRAY' macro.
  *
  * Parameters:
- *    sequence    - a Python Object that is expected to be a Python Sequence
- * containing Strings.
+ *    sequence    - a Python Object that is expected to be a Python Sequence containing Strings.
  */
 bool convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence, int sequence_len, ydb_buffer_t *buffer_array) {
 	bool	     done;
@@ -138,7 +136,7 @@ bool convert_py_bytes_sequence_to_ydb_buffer_array(PyObject *sequence, int seque
 /* converts an array of ydb_buffer_ts into a sequence (Tuple) of Python strings.
  *
  * Parameters:
- *    buffer_array        - a C array of ydb_buffer_ts
+ *    buffer_array       - a C array of ydb_buffer_ts
  *    len                - the length of the above array
  */
 PyObject *convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int len) {
@@ -307,12 +305,11 @@ static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, char *error_
 }
 
 /* Takes an already validated (by 'validate_py_keys_sequence' above) PyObject sequence
- * that represents a series of keys loads that data into a already allocated array
+ * that represents a series of keys loads that data into an already allocated array
  * of YDBKeys. (note: 'ret_keys' should later be freed by 'free_YDBKey_array' below)
  *
  * Parameters:
- *    sequence    - a Python object that has already been validated with
- *                      'validate_py_keys_sequence' or equivalent.
+ *    sequence    - a Python object that has already been validated with 'validate_py_keys_sequence' or equivalent.
  */
 static bool load_YDBKeys_from_key_sequence(PyObject *sequence, YDBKey *ret_keys) {
 	bool	   success = true;
@@ -344,13 +341,16 @@ static bool load_YDBKeys_from_key_sequence(PyObject *sequence, YDBKey *ret_keys)
  *
  * Parameters:
  *    keysarray    - the array that is to be freed.
- *    len        - the number of elements in keysarray.
+ *    len          - the number of elements in keysarray.
  */
 static void free_YDBKey_array(YDBKey *keysarray, int len) {
 	int i;
-	for (i = 0; i < len; i++)
-		free_YDBKey(&keysarray[i]);
-	free(keysarray);
+	if (NULL != keysarray) {
+		for (i = 0; i < len; i++)
+			if (NULL != &keysarray[i])
+				free_YDBKey(&keysarray[i]);
+		free(keysarray);
+	}
 }
 
 /* Routine to help raise a YDBError. The caller still needs to return NULL for
@@ -358,9 +358,8 @@ static void free_YDBKey_array(YDBKey *keysarray, int len) {
  * set in the error_string_buffer and look it up if not.
  *
  * Parameters:
- *    status                - the error code that is returned by the wrapped
- * ydb_ function. error_string_buffer    - a ydb_buffer_t that may or may not
- * contain the error message.
+ *    status                 - the error code that is returned by the wrapped ydb_ function.
+ *    error_string_buffer    - a ydb_buffer_t that may or may not contain the error message.
  */
 static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp_token) {
 	ydb_buffer_t ignored_buffer;
