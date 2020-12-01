@@ -404,6 +404,7 @@ static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp
 	message = Py_BuildValue("s", full_error_message); // New Reference
 
 	RAISE_SPECIFIC_ERROR(status, message);
+	Py_DECREF(message);
 }
 
 static void raise_ValidationError(int status, char *message) {
