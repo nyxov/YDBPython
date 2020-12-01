@@ -372,6 +372,7 @@ static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp
 	if (0 == error_string_buffer->len_used) {
 		YDB_MALLOC_BUFFER(&ignored_buffer, YDB_MAX_ERRORMSG);
 		ydb_message_t(tp_token, &ignored_buffer, status, error_string_buffer);
+		YDB_FREE_BUFFER(&ignored_buffer);
 	}
 
 	if (0 != error_string_buffer->len_used) {
@@ -386,6 +387,7 @@ static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp
 			error_name = error_status;
 			error_message = api;
 		}
+		/* just in case error_name or error_message are still NULL set them to some string value */
 		if (NULL == error_name)
 			error_name = "UNKNOWN";
 		if (NULL == error_message)
