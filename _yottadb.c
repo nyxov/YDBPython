@@ -402,7 +402,7 @@ static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp
 	Py_DECREF(message);
 }
 /* Routine that raises the appropriate Python Error during validation of Python input
- * paramaters. The 2 types of errors that will be raised are:
+ * parameters. The 2 types of errors that will be raised are:
  *     1) TypeError in the case that the parameter is of the wrong type
  *     2) ValueError if the parameter is of the right type but is invalid in some other way (e.g. too long)
  *
