@@ -384,14 +384,9 @@ static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp
 		error_message = strtok_r(NULL, delim, &next_field);
 		if (NULL == error_message) {
 			/* alternate error message case */
-			error_name = error_status;
-			error_message = api;
+			error_name = (NULL == error_status) ? error_status : "UNKNOWN";
+			error_message = (NULL == api) ? api : "";
 		}
-		/* just in case error_name or error_message are still NULL set them to some string value */
-		if (NULL == error_name)
-			error_name = "UNKNOWN";
-		if (NULL == error_message)
-			error_message = "";
 	} else if (YDB_TP_ROLLBACK == status) {
 		error_name = "%YDB-TP-ROLLBACK";
 		error_message = " Transaction callback function returned YDB_TP_ROLLBACK.";
