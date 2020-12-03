@@ -446,14 +446,15 @@ static void raise_ValidationError(int status, char *message) {
 
 /* Wrapper for ydb_data_s and ydb_data_st. */
 static PyObject *data(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
-	char *	     varname;
-	int	     subs_used, status;
-	Py_ssize_t   varname_len_ssize;
-	unsigned int varname_len, ret_value;
-	uint64_t     tp_token;
-	PyObject *   subsarray, *return_python_int;
-	ydb_buffer_t error_string_buffer, varname_y, *subsarray_y;
+	bool	      return_NULL = false;
+	char *	      varname;
+	int	      subs_used, status;
+	Py_ssize_t    varname_len_ssize;
+	unsigned int  varname_len, ret_value;
+	uint64_t      tp_token;
+	PyObject *    subsarray, *return_python_int;
+	ydb_buffer_t  error_string_buffer, varname_y;
+	ydb_buffer_t *subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
@@ -500,14 +501,15 @@ static PyObject *data(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /* Wrapper for ydb_delete_s() and ydb_delete_st() */
 static PyObject *delete_wrapper(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
-	int	     deltype, status, subs_used;
-	Py_ssize_t   varname_len_ssize;
-	unsigned int varname_len;
-	char *	     varname;
-	uint64_t     tp_token;
-	PyObject *   subsarray;
-	ydb_buffer_t error_string_buffer, varname_y, *subsarray_y;
+	bool	      return_NULL = false;
+	int	      deltype, status, subs_used;
+	Py_ssize_t    varname_len_ssize;
+	unsigned int  varname_len;
+	char *	      varname;
+	uint64_t      tp_token;
+	PyObject *    subsarray;
+	ydb_buffer_t  error_string_buffer, varname_y;
+	ydb_buffer_t *subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
@@ -605,14 +607,15 @@ static PyObject *delete_excel(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /* Wrapper for ydb_get_s() and ydb_get_st() */
 static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
-	int	     subs_used, status, return_length;
-	unsigned int varname_len;
-	Py_ssize_t   varname_len_ssize;
-	char *	     varname;
-	uint64_t     tp_token;
-	PyObject *   subsarray, *return_python_bytes;
-	ydb_buffer_t varname_y, error_string_buffer, ret_value, *subsarray_y;
+	bool	      return_NULL = false;
+	int	      subs_used, status, return_length;
+	unsigned int  varname_len;
+	Py_ssize_t    varname_len_ssize;
+	char *	      varname;
+	uint64_t      tp_token;
+	PyObject *    subsarray, *return_python_bytes;
+	ydb_buffer_t  varname_y, error_string_buffer, ret_value;
+	ydb_buffer_t *subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
@@ -671,14 +674,15 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /* Wrapper for ydb_incr_s() and ydb_incr_st() */
 static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
-	int	     status, subs_used;
-	Py_ssize_t   varname_len_ssize, increment_len_ssize;
-	unsigned int varname_len, increment_len;
-	uint64_t     tp_token;
-	char *	     varname, *increment;
-	PyObject *   subsarray, *return_python_bytes;
-	ydb_buffer_t increment_y, error_string_buffer, ret_value, varname_y, *subsarray_y;
+	bool	      return_NULL = false;
+	int	      status, subs_used;
+	Py_ssize_t    varname_len_ssize, increment_len_ssize;
+	unsigned int  varname_len, increment_len;
+	uint64_t      tp_token;
+	char *	      varname, *increment;
+	PyObject *    subsarray, *return_python_bytes;
+	ydb_buffer_t  increment_y, error_string_buffer, ret_value, varname_y;
+	ydb_buffer_t *subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
@@ -850,14 +854,15 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /* Wrapper for ydb_lock_decr_s() and ydb_lock_decr_st() */
 static PyObject *lock_decr(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
-	int	     status, subs_used;
-	Py_ssize_t   varname_len_ssize;
-	unsigned int varname_len;
-	char *	     varname;
-	uint64_t     tp_token;
-	PyObject *   subsarray;
-	ydb_buffer_t error_string_buffer, varname_y, *subsarray_y;
+	bool	      return_NULL = false;
+	int	      status, subs_used;
+	Py_ssize_t    varname_len_ssize;
+	unsigned int  varname_len;
+	char *	      varname;
+	uint64_t      tp_token;
+	PyObject *    subsarray;
+	ydb_buffer_t  error_string_buffer, varname_y;
+	ydb_buffer_t *subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
@@ -911,7 +916,8 @@ static PyObject *lock_incr(PyObject *self, PyObject *args, PyObject *kwds) {
 	uint64_t	   tp_token;
 	unsigned long long timeout_nsec;
 	PyObject *	   subsarray;
-	ydb_buffer_t	   error_string_buffer, varname_y, *subsarray_y;
+	ydb_buffer_t	   error_string_buffer, varname_y;
+	ydb_buffer_t *	   subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
@@ -962,14 +968,15 @@ static PyObject *lock_incr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /* Wrapper for ydb_node_next_s() and ydb_node_next_st() */
 static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
-	int	     max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, subs_used;
-	Py_ssize_t   varname_len_ssize;
-	unsigned int varname_len;
-	char *	     varname;
-	uint64_t     tp_token;
-	PyObject *   subsarray, *return_tuple;
-	ydb_buffer_t error_string_buffer, *ret_subsarray, varname_y, *subsarray_y;
+	bool	      return_NULL = false;
+	int	      max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, subs_used;
+	Py_ssize_t    varname_len_ssize;
+	unsigned int  varname_len;
+	char *	      varname;
+	uint64_t      tp_token;
+	PyObject *    subsarray, *return_tuple;
+	ydb_buffer_t  error_string_buffer, varname_y;
+	ydb_buffer_t *ret_subsarray, *subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
@@ -1046,14 +1053,15 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /* Wrapper for ydb_node_previous_s() and ydb_node_previous_st() */
 static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
-	int	     max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, subs_used;
-	Py_ssize_t   varname_len_ssize;
-	unsigned int varname_len;
-	char *	     varname;
-	uint64_t     tp_token;
-	PyObject *   subsarray, *return_tuple;
-	ydb_buffer_t error_string_buffer, *ret_subsarray, varname_y, *subsarray_y;
+	bool	      return_NULL = false;
+	int	      max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, subs_used;
+	Py_ssize_t    varname_len_ssize;
+	unsigned int  varname_len;
+	char *	      varname;
+	uint64_t      tp_token;
+	PyObject *    subsarray, *return_tuple;
+	ydb_buffer_t  error_string_buffer, varname_y;
+	ydb_buffer_t *ret_subsarray, *subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
@@ -1123,14 +1131,15 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /* Wrapper for ydb_set_s() and ydb_set_st() */
 static PyObject *set(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
-	int	     status, subs_used;
-	Py_ssize_t   varname_len_ssize, value_len_ssize;
-	unsigned int varname_len, value_len;
-	uint64_t     tp_token;
-	char *	     varname, *value;
-	PyObject *   subsarray;
-	ydb_buffer_t error_string_buffer, value_buffer, varname_y, *subsarray_y;
+	bool	      return_NULL = false;
+	int	      status, subs_used;
+	Py_ssize_t    varname_len_ssize, value_len_ssize;
+	unsigned int  varname_len, value_len;
+	uint64_t      tp_token;
+	char *	      varname, *value;
+	PyObject *    subsarray;
+	ydb_buffer_t  error_string_buffer, value_buffer, varname_y;
+	ydb_buffer_t *subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
@@ -1246,14 +1255,15 @@ static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /* Wrapper for ydb_subscript_next_s() and ydb_subscript_next_st() */
 static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
-	int	     status, return_length, subs_used;
-	Py_ssize_t   varname_len_ssize;
-	unsigned int varname_len;
-	char *	     varname;
-	uint64_t     tp_token;
-	PyObject *   subsarray, *return_python_bytes;
-	ydb_buffer_t error_string_buffer, ret_value, varname_y, *subsarray_y;
+	bool	      return_NULL = false;
+	int	      status, return_length, subs_used;
+	Py_ssize_t    varname_len_ssize;
+	unsigned int  varname_len;
+	char *	      varname;
+	uint64_t      tp_token;
+	PyObject *    subsarray, *return_python_bytes;
+	ydb_buffer_t  error_string_buffer, ret_value, varname_y;
+	ydb_buffer_t *subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
@@ -1314,14 +1324,15 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 
 /* Wrapper for ydb_subscript_previous_s() and ydb_subscript_previous_st() */
 static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
-	int	     status, return_length, subs_used;
-	Py_ssize_t   varname_len_ssize;
-	unsigned int varname_len;
-	char *	     varname;
-	uint64_t     tp_token;
-	PyObject *   subsarray, *return_python_bytes;
-	ydb_buffer_t error_string_buffer, ret_value, varname_y, *subsarray_y;
+	bool	      return_NULL = false;
+	int	      status, return_length, subs_used;
+	Py_ssize_t    varname_len_ssize;
+	unsigned int  varname_len;
+	char *	      varname;
+	uint64_t      tp_token;
+	PyObject *    subsarray, *return_python_bytes;
+	ydb_buffer_t  error_string_buffer, ret_value, varname_y;
+	ydb_buffer_t *subsarray_y;
 
 	/* Defaults for non-required arguments */
 	subsarray = Py_None;
@@ -1440,13 +1451,14 @@ static int callback_wrapper(uint64_t tp_token, ydb_buffer_t *errstr, void *funct
 
 /* Wrapper for ydb_tp_s() / ydb_tp_st() */
 static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
-	bool	     success;
-	int	     namecount, status;
-	uint64_t     tp_token;
-	char *	     transid;
-	PyObject *   callback, *callback_args, *callback_kwargs, *varnames, *function_with_arguments;
-	ydb_buffer_t error_string_buffer, *varname_buffers;
+	bool	      return_NULL = false;
+	bool	      success;
+	int	      namecount, status;
+	uint64_t      tp_token;
+	char *	      transid;
+	PyObject *    callback, *callback_args, *callback_kwargs, *varnames, *function_with_arguments;
+	ydb_buffer_t  error_string_buffer;
+	ydb_buffer_t *varname_buffers;
 
 	/* Defaults for non-required arguments */
 	callback_args = Py_None;
