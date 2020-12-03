@@ -227,6 +227,7 @@ static void free_YDBKey(YDBKey *key) {
  */
 static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, char *error_message) {
 	int	   ret = YDBPY_VALID;
+	int	   num_chars;
 	Py_ssize_t i, len_keys, len_key_seq, len_varname;
 	PyObject * key, *varname, *subsarray, *seq, *key_seq;
 	char	   error_sub_reason[YDBPY_MAX_REASON];
@@ -234,14 +235,16 @@ static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, char *error_
 	/* validate key sequence type */
 	seq = PySequence_Fast(keys_sequence, "'keys' argument must be a Sequence"); // New Reference
 	if (!seq || !(PyTuple_Check(keys_sequence) || PyList_Check(keys_sequence))) {
-		snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_NOT_LIST_OR_TUPLE);
+		num_chars = snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_NOT_LIST_OR_TUPLE);
+		assert((0 <= num_chars) && (YDBPY_MAX_REASON > num_chars));
 		ret = YDBPY_INVALID_NOT_LIST_OR_TUPLE;
 	}
 
 	/* validate key sequence length */
 	len_keys = PySequence_Fast_GET_SIZE(seq);
 	if (YDB_MAX_NAMES < len_keys) {
-		snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_SEQUENCE_TOO_LONG, len_keys, YDB_MAX_NAMES);
+		num_chars = snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_SEQUENCE_TOO_LONG, len_keys, YDB_MAX_NAMES);
+		assert((0 <= num_chars) && (YDBPY_MAX_REASON > num_chars));
 		ret = YDBPY_INVALID_SEQUENCE_TOO_LONG;
 	}
 
@@ -265,23 +268,30 @@ static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, char *error_
 
 			/* validate item/key type [list or tuple] */
 			if (!key_seq || !(PyTuple_Check(key) || PyList_Check(key))) {
-				snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE, i);
+				num_chars
+				    = snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE, i);
+				assert((0 <= num_chars) && (YDBPY_MAX_REASON > num_chars));
 				ret = YDBPY_INVALID_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE;
 			}
 			/* validate item/key length [1 or 2] */
 			else if ((1 != len_key_seq) && (2 != len_key_seq)) {
-				snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_INCORECT_LENGTH, i);
+				num_chars
+				    = snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_INCORECT_LENGTH, i);
+				assert((0 <= num_chars) && (YDBPY_MAX_REASON > num_chars));
 				ret = YDBPY_INVALID_KEY_IN_SEQUENCE_INCORECT_LENGTH;
 			}
 			/* validate item/key first element (varname) type */
 			else if (!PyBytes_Check(varname)) {
-				snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES, i);
+				num_chars
+				    = snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES, i);
+				assert((0 <= num_chars) && (YDBPY_MAX_REASON > num_chars));
 				ret = YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES;
 			}
 			/* validate item/key first element (varname) length */
 			else if (YDB_MAX_IDENT < len_varname) {
-				snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_TOO_LONG, i,
-					 len_varname, YDB_MAX_IDENT);
+				num_chars = snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_TOO_LONG,
+						     i, len_varname, YDB_MAX_IDENT);
+				assert((0 <= num_chars) && (YDBPY_MAX_REASON > num_chars));
 				ret = YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_TOO_LONG;
 			}
 			/* validate item/key second element (subsarray) if it exists */
@@ -289,8 +299,10 @@ static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, char *error_
 				if (Py_None != subsarray) {
 					ret = validate_sequence_of_bytes(subsarray, YDB_MAX_SUBS, YDB_MAX_STR, error_sub_reason);
 					if (YDBPY_VALID != ret) {
-						snprintf(error_message, YDBPY_MAX_REASON * 2,
-							 YDBPY_ERRMSG_KEY_IN_SEQUENCE_SUBSARRAY_INVALID, i, error_sub_reason);
+						num_chars
+						    = snprintf(error_message, YDBPY_MAX_REASON * 2,
+							       YDBPY_ERRMSG_KEY_IN_SEQUENCE_SUBSARRAY_INVALID, i, error_sub_reason);
+						assert((0 <= num_chars) && (YDBPY_MAX_REASON > num_chars));
 					}
 				}
 			}
@@ -364,6 +376,7 @@ static void free_YDBKey_array(YDBKey *keysarray, int len) {
 static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp_token) {
 	ydb_buffer_t ignored_buffer;
 	PyObject *   message;
+	int	     num_chars = 0;
 	char	     full_error_message[YDB_MAX_ERRORMSG];
 	char *	     error_status, *api, *error_name, *error_message;
 	char *	     next_field = NULL;
@@ -395,7 +408,8 @@ static void raise_YDBError(int status, ydb_buffer_t *error_string_buffer, int tp
 		error_message = "";
 	}
 
-	snprintf(full_error_message, YDB_MAX_ERRORMSG, "%s (%d):%s", error_name, status, error_message);
+	num_chars = snprintf(full_error_message, YDB_MAX_ERRORMSG, "%s (%d):%s", error_name, status, error_message);
+	assert((0 <= num_chars) && (YDB_MAX_ERRORMSG > num_chars));
 	message = Py_BuildValue("s", full_error_message); // New Reference
 
 	RAISE_SPECIFIC_ERROR(status, message);
@@ -734,7 +748,7 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 	bool		   return_NULL = false;
 	bool		   success = true;
-	int		   len_keys, initial_arguments, number_of_arguments;
+	int		   len_keys, initial_arguments, number_of_arguments, num_chars;
 	uint64_t	   tp_token;
 	unsigned long long timeout_nsec;
 	ffi_cif		   call_interface;
@@ -758,7 +772,9 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 	if (Py_None != keys) {
 		validation_status = validate_py_keys_sequence_bytes(keys, validation_error_reason);
 		if (YDBPY_VALID != validation_status) {
-			snprintf(validation_error_message, YDBPY_MAX_ERRORMSG, YDBPY_ERRMSG_KEYS_INVALID, validation_error_reason);
+			num_chars = snprintf(validation_error_message, YDBPY_MAX_ERRORMSG, YDBPY_ERRMSG_KEYS_INVALID,
+					     validation_error_reason);
+			assert((0 <= num_chars) && (YDB_MAX_ERRORMSG > num_chars));
 			raise_ValidationError(validation_status, validation_error_message);
 			return NULL;
 		}
