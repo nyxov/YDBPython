@@ -471,7 +471,7 @@ static PyObject *data(PyObject *self, PyObject *args, PyObject *kwds) {
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
-	SETUP_BUFFER(varname, varname_y, varname_len, "data()", return_NULL);
+	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "data()", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	if (!return_NULL) {
@@ -529,7 +529,7 @@ static PyObject *delete_wrapper(PyObject *self, PyObject *args, PyObject *kwds) 
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
-	SETUP_BUFFER(varname, varname_y, varname_len, "delete_wrapper()", return_NULL);
+	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "delete_wrapper()", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	if (!return_NULL) {
@@ -633,7 +633,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
-	SETUP_BUFFER(varname, varname_y, varname_len, "get()", return_NULL);
+	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "get()", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_VALUE_LEN);
@@ -708,9 +708,9 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 				       YDBPY_ERRMSG_BYTES_TOO_LONG);
 
 	/* Setup for Call */
-	SETUP_BUFFER(varname, varname_y, varname_len, "incr() for varname", return_NULL);
+	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "incr() for varname", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
-	SETUP_BUFFER(increment, increment_y, increment_len, "incr() for increment", return_NULL);
+	POPULATE_NEW_BUFFER(increment, increment_y, increment_len, "incr() for increment", return_NULL);
 
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	YDB_MALLOC_BUFFER(&ret_value, 50);
@@ -880,7 +880,7 @@ static PyObject *lock_decr(PyObject *self, PyObject *args, PyObject *kwds) {
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
-	SETUP_BUFFER(varname, varname_y, varname_len, "lock_decr()", return_NULL);
+	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "lock_decr()", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	if (!return_NULL) {
@@ -937,7 +937,7 @@ static PyObject *lock_incr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	VALIDATE_SUBSARRAY(subsarray);
 	/* Setup for Call */
-	SETUP_BUFFER(varname, varname_y, varname_len, "lock_incr()", return_NULL);
+	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "lock_incr()", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	if (!return_NULL) {
@@ -994,7 +994,7 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
-	SETUP_BUFFER(varname, varname_y, varname_len, "node_next()", return_NULL);
+	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "node_next()", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	max_subscript_string = YDBPY_DEFAULT_SUBSCRIPT_LEN;
@@ -1079,7 +1079,7 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
-	SETUP_BUFFER(varname, varname_y, varname_len, "node_previous()", return_NULL);
+	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "node_previous()", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 
@@ -1163,10 +1163,10 @@ static PyObject *set(PyObject *self, PyObject *args, PyObject *kwds) {
 	value_len = Py_SAFE_DOWNCAST(value_len_ssize, Py_ssize_t, unsigned int);
 
 	/* Setup for Call */
-	SETUP_BUFFER(varname, varname_y, varname_len, "set() for varname", return_NULL);
+	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "set() for varname", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
-	SETUP_BUFFER(value, value_buffer, value_len, "set() for value", return_NULL);
+	POPULATE_NEW_BUFFER(value, value_buffer, value_len, "set() for value", return_NULL);
 	if (!return_NULL) {
 		/* Call the wrapped function */
 		status = ydb_set_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &value_buffer);
@@ -1216,7 +1216,7 @@ static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 				       YDBPY_ERRMSG_BYTES_TOO_LONG2);
 
 	/* Setup for Call */
-	SETUP_BUFFER(str, str_buf, str_len, "ydb_str2zwr", return_NULL);
+	POPULATE_NEW_BUFFER(str, str_buf, str_len, "ydb_str2zwr", return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buf, YDB_MAX_ERRORMSG);
 	YDB_MALLOC_BUFFER(&zwr_buf, YDBPY_DEFAULT_VALUE_LEN);
 	if (!return_NULL) {
@@ -1281,7 +1281,7 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
-	SETUP_BUFFER(varname, varname_y, varname_len, "subscript_next()", return_NULL);
+	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "subscript_next()", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_SUBSCRIPT_LEN);
@@ -1350,7 +1350,7 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
-	SETUP_BUFFER(varname, varname_y, varname_len, "subscript_previous()", return_NULL);
+	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "subscript_previous()", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_SUBSCRIPT_LEN);
@@ -1563,7 +1563,7 @@ static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
 				       YDBPY_ERRMSG_BYTES_TOO_LONG2);
 
 	/* Setup for Call */
-	SETUP_BUFFER(zwr, zwr_buf, zwr_len, "zwr2str()", return_NULL);
+	POPULATE_NEW_BUFFER(zwr, zwr_buf, zwr_len, "zwr2str()", return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buf, YDB_MAX_ERRORMSG);
 	YDB_MALLOC_BUFFER(&str_buf, YDBPY_DEFAULT_VALUE_LEN);
 	if (!return_NULL) {
