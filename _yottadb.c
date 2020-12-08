@@ -571,7 +571,6 @@ static PyObject *delete_excel(PyObject *self, PyObject *args, PyObject *kwds) {
 	static char *kwlist[] = {"varnames", "tp_token", NULL};
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OK", kwlist, &varnames, &tp_token))
 		return NULL;
-
 	VALIDATE_VARNAMES(varnames);
 
 	/* Setup for Call */
@@ -590,7 +589,6 @@ static PyObject *delete_excel(PyObject *self, PyObject *args, PyObject *kwds) {
 	/* check status for Errors and Raise Exception */
 	if (YDB_OK != status) {
 		raise_YDBError(status, &error_string_buffer, tp_token);
-		/* free allocated memory */
 		return_NULL = true;
 	}
 
@@ -625,11 +623,9 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 	static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
 		return NULL;
-
 	/* validate varname */
 	VALIDATE_AND_CONVERT_BYTES_LEN(varname_len_ssize, varname_len, YDB_MAX_IDENT, YDBPY_INVALID_VARNAME_TOO_LONG,
 				       YDBPY_ERRMSG_VARNAME_TOO_LONG);
-
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
@@ -641,7 +637,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 		/* Call the wrapped function */
 		status = ydb_get_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &ret_value);
 
-		/* check to see if length of string was longer than 1024 is so, try again
+		/* Check to see if length of string was longer than 1024. If so, try again
 		 * with proper length */
 		if (YDB_ERR_INVSTRLEN == status) {
 			return_length = ret_value.len_used;
@@ -701,9 +697,7 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 	/* validate varname */
 	VALIDATE_AND_CONVERT_BYTES_LEN(varname_len_ssize, varname_len, YDB_MAX_IDENT, YDBPY_INVALID_VARNAME_TOO_LONG,
 				       YDBPY_ERRMSG_VARNAME_TOO_LONG);
-
 	VALIDATE_SUBSARRAY(subsarray);
-
 	VALIDATE_AND_CONVERT_BYTES_LEN(increment_len_ssize, increment_len, YDB_MAX_STR, YDBPY_INVALID_BYTES_TOO_LONG,
 				       YDBPY_ERRMSG_BYTES_TOO_LONG);
 
@@ -711,7 +705,6 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "incr() for varname", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
 	POPULATE_NEW_BUFFER(increment, increment_y, increment_len, "incr() for increment", return_NULL);
-
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	YDB_MALLOC_BUFFER(&ret_value, 50);
 	if (!return_NULL) {
@@ -728,7 +721,6 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 			/* New Reference */
 			return_python_bytes = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
 	}
-
 	/* free allocated memory */
 	YDB_FREE_BUFFER(&varname_y);
 	FREE_BUFFER_ARRAY(subsarray_y, subs_used);
