@@ -456,7 +456,7 @@ static PyObject *data(PyObject *self, PyObject *args, PyObject *kwds) {
 	ydb_buffer_t  error_string_buffer, varname_y;
 	ydb_buffer_t *subsarray_y;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	subsarray = Py_None;
 	tp_token = YDB_NOTTP;
 
@@ -511,7 +511,7 @@ static PyObject *delete_wrapper(PyObject *self, PyObject *args, PyObject *kwds) 
 	ydb_buffer_t  error_string_buffer, varname_y;
 	ydb_buffer_t *subsarray_y;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	subsarray = Py_None;
 	tp_token = YDB_NOTTP;
 	deltype = YDB_DEL_NODE;
@@ -563,7 +563,7 @@ static PyObject *delete_excel(PyObject *self, PyObject *args, PyObject *kwds) {
 	PyObject *   varnames;
 	ydb_buffer_t error_string_buffer;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	varnames = Py_None;
 	tp_token = YDB_NOTTP;
 
@@ -615,7 +615,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 	ydb_buffer_t  varname_y, error_string_buffer, ret_value;
 	ydb_buffer_t *subsarray_y;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	subsarray = Py_None;
 	tp_token = YDB_NOTTP;
 
@@ -680,7 +680,7 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 	ydb_buffer_t  increment_y, error_string_buffer, ret_value, varname_y;
 	ydb_buffer_t *subsarray_y;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	subsarray = Py_None;
 	tp_token = YDB_NOTTP;
 	increment = "1";
@@ -738,7 +738,7 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 	bool		   return_NULL = false;
 	bool		   success = true;
-	int		   len_keys, initial_arguments, number_of_arguments, num_chars;
+	int		   len_keys, initial_arguments, number_of_arguments, num_chars, first, status;
 	uint64_t	   tp_token;
 	unsigned long long timeout_nsec;
 	ffi_cif		   call_interface;
@@ -749,7 +749,8 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 	int		   validation_status;
 	char		   validation_error_reason[YDBPY_MAX_REASON * 2];
 	char		   validation_error_message[YDBPY_MAX_ERRORMSG];
-	/* Defaults for non-required arguments */
+
+	/* Default values for optional arguments passed from Python */
 	timeout_nsec = 0;
 	tp_token = YDB_NOTTP;
 	keys = Py_None;
@@ -802,7 +803,7 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 		arg_values[3] = &len_keys;	      // namecount
 
 		for (int i = 0; i < len_keys; i++) {
-			int first = initial_arguments + 3 * i;
+			first = initial_arguments + 3 * i;
 			arg_types[first] = &ffi_type_pointer;		// varname
 			arg_values[first] = &keys_ydb[i].varname;	// varname
 			arg_types[first + 1] = &ffi_type_sint;		// subs_used
@@ -811,7 +812,6 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 			arg_values[first + 2] = &keys_ydb[i].subsarray; // subsarray
 		}
 
-		int status; // return value
 		if (ffi_prep_cif(&call_interface, FFI_DEFAULT_ABI, number_of_arguments, ret_type, arg_types) == FFI_OK) {
 			/* Call the wrapped function */
 			ffi_call(&call_interface, FFI_FN(ydb_lock_st), &status, arg_values);
@@ -856,7 +856,7 @@ static PyObject *lock_decr(PyObject *self, PyObject *args, PyObject *kwds) {
 	ydb_buffer_t  error_string_buffer, varname_y;
 	ydb_buffer_t *subsarray_y;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	subsarray = Py_None;
 	tp_token = YDB_NOTTP;
 
@@ -864,11 +864,9 @@ static PyObject *lock_decr(PyObject *self, PyObject *args, PyObject *kwds) {
 	static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
 		return NULL;
-
 	/* validate varname */
 	VALIDATE_AND_CONVERT_BYTES_LEN(varname_len_ssize, varname_len, YDB_MAX_IDENT, YDBPY_INVALID_VARNAME_TOO_LONG,
 				       YDBPY_ERRMSG_VARNAME_TOO_LONG);
-
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
@@ -911,7 +909,7 @@ static PyObject *lock_incr(PyObject *self, PyObject *args, PyObject *kwds) {
 	ydb_buffer_t	   error_string_buffer, varname_y;
 	ydb_buffer_t *	   subsarray_y;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	subsarray = Py_None;
 	timeout_nsec = 0;
 	tp_token = YDB_NOTTP;
@@ -922,12 +920,11 @@ static PyObject *lock_incr(PyObject *self, PyObject *args, PyObject *kwds) {
 					 &tp_token)) {
 		return NULL;
 	}
-
 	/* validate varname */
 	VALIDATE_AND_CONVERT_BYTES_LEN(varname_len_ssize, varname_len, YDB_MAX_IDENT, YDBPY_INVALID_VARNAME_TOO_LONG,
 				       YDBPY_ERRMSG_VARNAME_TOO_LONG);
-
 	VALIDATE_SUBSARRAY(subsarray);
+
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "lock_incr()", return_NULL);
 	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
@@ -970,7 +967,7 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 	ydb_buffer_t  error_string_buffer, varname_y;
 	ydb_buffer_t *ret_subsarray, *subsarray_y;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	subsarray = Py_None;
 	tp_token = YDB_NOTTP;
 
@@ -1055,7 +1052,7 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 	ydb_buffer_t  error_string_buffer, varname_y;
 	ydb_buffer_t *ret_subsarray, *subsarray_y;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	subsarray = Py_None;
 	tp_token = YDB_NOTTP;
 
@@ -1133,7 +1130,7 @@ static PyObject *set(PyObject *self, PyObject *args, PyObject *kwds) {
 	ydb_buffer_t  error_string_buffer, value_buffer, varname_y;
 	ydb_buffer_t *subsarray_y;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	subsarray = Py_None;
 	tp_token = YDB_NOTTP;
 	value = "";
@@ -1194,7 +1191,7 @@ static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 	ydb_buffer_t error_string_buf, str_buf, zwr_buf;
 	PyObject *   return_value;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	str = "";
 	str_len = 0;
 	tp_token = YDB_NOTTP;
@@ -1257,7 +1254,7 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 	ydb_buffer_t  error_string_buffer, ret_value, varname_y;
 	ydb_buffer_t *subsarray_y;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	subsarray = Py_None;
 	tp_token = YDB_NOTTP;
 
@@ -1326,7 +1323,7 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 	ydb_buffer_t  error_string_buffer, ret_value, varname_y;
 	ydb_buffer_t *subsarray_y;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	subsarray = Py_None;
 	tp_token = YDB_NOTTP;
 
@@ -1452,7 +1449,7 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 	ydb_buffer_t  error_string_buffer;
 	ydb_buffer_t *varname_buffers;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	callback_args = Py_None;
 	callback_kwargs = Py_None;
 	transid = "BATCH";
@@ -1541,7 +1538,7 @@ static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
 	PyObject *   return_value;
 	ydb_buffer_t error_string_buf, zwr_buf, str_buf;
 
-	/* Defaults for non-required arguments */
+	/* Default values for optional arguments passed from Python */
 	zwr = "";
 	zwr_len = 0;
 	tp_token = YDB_NOTTP;
