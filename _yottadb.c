@@ -462,6 +462,7 @@ static PyObject *data(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
 		return NULL;
 
@@ -472,7 +473,7 @@ static PyObject *data(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "data()", return_NULL);
-	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
+	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	if (!return_NULL) {
 		/* Call the wrapped function */
@@ -518,6 +519,7 @@ static PyObject *delete_wrapper(PyObject *self, PyObject *args, PyObject *kwds) 
 
 	/* parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "delete_type", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OiK", kwlist, &varname, &varname_len_ssize, &subsarray, &deltype,
 					 &tp_token)) {
 		return NULL;
@@ -530,7 +532,7 @@ static PyObject *delete_wrapper(PyObject *self, PyObject *args, PyObject *kwds) 
 
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "delete_wrapper()", return_NULL);
-	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
+	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	if (!return_NULL) {
 		/* Call the wrapped function */
@@ -569,6 +571,7 @@ static PyObject *delete_excel(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"varnames", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OK", kwlist, &varnames, &tp_token))
 		return NULL;
 	VALIDATE_VARNAMES(varnames);
@@ -621,6 +624,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
 		return NULL;
 	/* validate varname */
@@ -630,7 +634,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "get()", return_NULL);
-	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
+	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_VALUE_LEN);
 	if (!return_NULL) {
@@ -685,10 +689,10 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 	tp_token = YDB_NOTTP;
 	increment = "1";
 	increment_len = 1;
-	increment_len_ssize = 1;
 
 	/* parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "increment", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|Oy#K", kwlist, &varname, &varname_len_ssize, &subsarray, &increment,
 					 &increment_len_ssize, &tp_token)) {
 		return NULL;
@@ -703,10 +707,10 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "incr() for varname", return_NULL);
-	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
+	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	POPULATE_NEW_BUFFER(increment, increment_y, increment_len, "incr() for increment", return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
-	YDB_MALLOC_BUFFER(&ret_value, 50);
+	YDB_MALLOC_BUFFER(&ret_value, MAX_CONONICAL_NUMBER_STRING_MAX);
 	if (!return_NULL) {
 		/* Call the wrapped function */
 		status = ydb_incr_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y, &increment_y, &ret_value);
@@ -738,7 +742,7 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 	bool		   return_NULL = false;
 	bool		   success = true;
-	int		   len_keys, initial_arguments, number_of_arguments, num_chars, first, status;
+	int		   len_keys, number_of_arguments, num_chars, first, status;
 	uint64_t	   tp_token;
 	unsigned long long timeout_nsec;
 	ffi_cif		   call_interface;
@@ -757,6 +761,7 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"keys", "timeout_nsec", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OKK", kwlist, &keys, &timeout_nsec, &tp_token))
 		return NULL;
 
@@ -787,9 +792,8 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 	if (!return_NULL) {
 		/* build ffi call */
 		ret_type = &ffi_type_sint;
-		initial_arguments = 4;
 
-		number_of_arguments = initial_arguments + (len_keys * 3);
+		number_of_arguments = YDB_LOCK_ST_INIT_ARG_NUMS + (len_keys * YDB_LOCK_ST_NUM_ARGS_PER_KEY);
 		ffi_type *arg_types[number_of_arguments];
 		void *	  arg_values[number_of_arguments];
 		/* ffi signature */
@@ -803,7 +807,7 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 		arg_values[3] = &len_keys;	      // namecount
 
 		for (int i = 0; i < len_keys; i++) {
-			first = initial_arguments + 3 * i;
+			first = YDB_LOCK_ST_INIT_ARG_NUMS + YDB_LOCK_ST_NUM_ARGS_PER_KEY * i;
 			arg_types[first] = &ffi_type_pointer;		// varname
 			arg_values[first] = &keys_ydb[i].varname;	// varname
 			arg_types[first + 1] = &ffi_type_sint;		// subs_used
@@ -862,6 +866,7 @@ static PyObject *lock_decr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
 		return NULL;
 	/* validate varname */
@@ -871,7 +876,7 @@ static PyObject *lock_decr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "lock_decr()", return_NULL);
-	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
+	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	if (!return_NULL) {
 		/* Call the wrapped function */
@@ -916,6 +921,7 @@ static PyObject *lock_incr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "timeout_nsec", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OLK", kwlist, &varname, &varname_len_ssize, &subsarray, &timeout_nsec,
 					 &tp_token)) {
 		return NULL;
@@ -927,7 +933,7 @@ static PyObject *lock_incr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "lock_incr()", return_NULL);
-	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
+	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	if (!return_NULL) {
 		/* Call the wrapped function */
@@ -973,18 +979,18 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
 		return NULL;
 
 	/* validate varname */
 	VALIDATE_AND_CONVERT_BYTES_LEN(varname_len_ssize, varname_len, YDB_MAX_IDENT, YDBPY_INVALID_VARNAME_TOO_LONG,
 				       YDBPY_ERRMSG_VARNAME_TOO_LONG);
-
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "node_next()", return_NULL);
-	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
+	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	max_subscript_string = YDBPY_DEFAULT_SUBSCRIPT_LEN;
 	default_ret_subs_used = subs_used + 5;
@@ -1024,9 +1030,10 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 			return_NULL = true;
 		}
 		/* Create Python object to return */
-		if (!return_NULL)
+		if (!return_NULL) {
 			/* New Reference */
 			return_tuple = convert_ydb_buffer_array_to_py_tuple(ret_subsarray, ret_subs_used);
+		}
 	}
 	/* free allocated memory */
 	YDB_FREE_BUFFER(&varname_y);
@@ -1058,6 +1065,7 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
 		return NULL;
 
@@ -1069,7 +1077,7 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "node_previous()", return_NULL);
-	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
+	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 
 	max_subscript_string = YDBPY_DEFAULT_SUBSCRIPT_LEN;
@@ -1138,6 +1146,7 @@ static PyObject *set(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "value", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|Oy#K", kwlist, &varname, &varname_len_ssize, &subsarray, &value,
 					 &value_len_ssize, &tp_token)) {
 		return NULL;
@@ -1153,7 +1162,7 @@ static PyObject *set(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "set() for varname", return_NULL);
-	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
+	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	POPULATE_NEW_BUFFER(value, value_buffer, value_len, "set() for value", return_NULL);
 	if (!return_NULL) {
@@ -1198,6 +1207,7 @@ static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"input", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &str, &str_len_ssize, &tp_token))
 		return NULL;
 
@@ -1260,6 +1270,7 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 
 	/* parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
 		return NULL;
 
@@ -1271,7 +1282,7 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "subscript_next()", return_NULL);
-	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
+	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_SUBSCRIPT_LEN);
 	if (!return_NULL) {
@@ -1329,6 +1340,7 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 
 	/* Setup for Call */
 	static char *kwlist[] = {"varname", "subsarray", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|OK", kwlist, &varname, &varname_len_ssize, &subsarray, &tp_token))
 		return NULL;
 
@@ -1340,7 +1352,7 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 
 	/* Setup for Call */
 	POPULATE_NEW_BUFFER(varname, varname_y, varname_len, "subscript_previous()", return_NULL);
-	SETUP_SUBS(subsarray, subs_used, subsarray_y, return_NULL);
+	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_SUBSCRIPT_LEN);
 	if (!return_NULL) {
@@ -1460,6 +1472,7 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"callback", "args", "kwargs", "transid", "varnames", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOsOK", kwlist, &callback, &callback_args, &callback_kwargs, &transid,
 					 &varnames, &tp_token)) {
 		return_NULL = true;
@@ -1545,6 +1558,7 @@ static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* parse and validate */
 	static char *kwlist[] = {"input", "tp_token", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &zwr, &zwr_len_ssize, &tp_token))
 		return NULL;
 

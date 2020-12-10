@@ -15,8 +15,12 @@
 /* A structure that represents a key using ydb c types. used internally for
  * converting between python and ydb c types */
 
-#define YDBPY_DEFAULT_VALUE_LEN	    256
-#define YDBPY_DEFAULT_SUBSCRIPT_LEN 32
+#define YDBPY_DEFAULT_VALUE_LEN		256
+#define YDBPY_DEFAULT_SUBSCRIPT_LEN	32
+#define MAX_CONONICAL_NUMBER_STRING_MAX 48
+
+#define YDB_LOCK_ST_INIT_ARG_NUMS    4
+#define YDB_LOCK_ST_NUM_ARGS_PER_KEY 3
 
 #define YDBPY_VALID 0
 
@@ -91,7 +95,7 @@ typedef struct {
 		}                                                                                              \
 	}
 
-#define SETUP_SUBS(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB, RETURN_NULL)                                                  \
+#define POPULATE_SUBS_USED_AND_SUBSARRAY(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB, RETURN_NULL)                            \
 	{                                                                                                               \
 		bool success = true;                                                                                    \
 		SUBSUSED = 0;                                                                                           \
