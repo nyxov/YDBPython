@@ -966,7 +966,7 @@ static PyObject *lock_incr(PyObject *self, PyObject *args, PyObject *kwds) {
 /* Wrapper for ydb_node_next_s() and ydb_node_next_st() */
 static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 	bool	      return_NULL = false;
-	int	      max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, subs_used;
+	int	      max_subscript_string, ret_subsarray_num_elements, ret_subs_used, status, subs_used;
 	Py_ssize_t    varname_len_ssize;
 	unsigned int  varname_len;
 	char *	      varname;
@@ -995,11 +995,8 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray, subs_used, subsarray_y, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	max_subscript_string = YDBPY_DEFAULT_SUBSCRIPT_LEN;
-	default_ret_subs_used = subs_used + 5;
-	if (YDB_MAX_SUBS < default_ret_subs_used)
-		default_ret_subs_used = YDB_MAX_SUBS;
-	real_ret_subs_used = default_ret_subs_used;
-	ret_subs_used = default_ret_subs_used;
+	ret_subsarray_num_elements = YDB_MAX_SUBS > subs_used + 5 ? subs_used + 5 : YDB_MAX_SUBS;
+	ret_subs_used = ret_subsarray_num_elements;
 	ret_subsarray = create_empty_buffer_array(ret_subs_used, max_subscript_string);
 	if (!return_NULL) {
 		/* Call the wrapped function */
@@ -1008,9 +1005,9 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 
 		/* If not enough buffers in ret_subsarray */
 		if (YDB_ERR_INSUFFSUBS == status) {
-			FREE_BUFFER_ARRAY(ret_subsarray, default_ret_subs_used);
-			real_ret_subs_used = ret_subs_used;
-			ret_subsarray = create_empty_buffer_array(real_ret_subs_used, max_subscript_string);
+			FREE_BUFFER_ARRAY(ret_subsarray, ret_subsarray_num_elements);
+			ret_subsarray_num_elements = ret_subs_used;
+			ret_subsarray = create_empty_buffer_array(ret_subs_used, max_subscript_string);
 			/* recall the wrapped function */
 			status = ydb_node_next_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y,
 						  &ret_subs_used, ret_subsarray);
@@ -1021,7 +1018,7 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 			max_subscript_string = ret_subsarray[ret_subs_used].len_used;
 			YDB_FREE_BUFFER(&ret_subsarray[ret_subs_used])
 			YDB_MALLOC_BUFFER(&ret_subsarray[ret_subs_used], max_subscript_string);
-			ret_subs_used = real_ret_subs_used;
+			ret_subs_used = ret_subsarray_num_elements;
 			/* recall the wrapped function */
 			status = ydb_node_next_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y,
 						  &ret_subs_used, ret_subsarray);
@@ -1041,7 +1038,7 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 	YDB_FREE_BUFFER(&varname_y);
 	FREE_BUFFER_ARRAY(subsarray_y, subs_used);
 	YDB_FREE_BUFFER(&error_string_buffer);
-	FREE_BUFFER_ARRAY(ret_subsarray, real_ret_subs_used);
+	FREE_BUFFER_ARRAY(ret_subsarray, ret_subsarray_num_elements);
 
 	if (return_NULL)
 		return NULL;
@@ -1052,7 +1049,7 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 /* Wrapper for ydb_node_previous_s() and ydb_node_previous_st() */
 static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 	bool	      return_NULL = false;
-	int	      max_subscript_string, default_ret_subs_used, real_ret_subs_used, ret_subs_used, status, subs_used;
+	int	      max_subscript_string, ret_subsarray_num_elements, ret_subs_used, status, subs_used;
 	Py_ssize_t    varname_len_ssize;
 	unsigned int  varname_len;
 	char *	      varname;
@@ -1082,11 +1079,8 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 
 	max_subscript_string = YDBPY_DEFAULT_SUBSCRIPT_LEN;
-	default_ret_subs_used = subs_used - 1;
-	if (0 >= default_ret_subs_used)
-		default_ret_subs_used = 1;
-	real_ret_subs_used = default_ret_subs_used;
-	ret_subs_used = default_ret_subs_used;
+	ret_subsarray_num_elements = 0 < subs_used - 1 ? subs_used - 1 : 1;
+	ret_subs_used = ret_subsarray_num_elements;
 	ret_subsarray = create_empty_buffer_array(ret_subs_used, max_subscript_string);
 	if (!return_NULL) {
 		/* Call the wrapped function */
@@ -1098,7 +1092,7 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 			max_subscript_string = ret_subsarray[ret_subs_used].len_used;
 			YDB_FREE_BUFFER(&ret_subsarray[ret_subs_used])
 			YDB_MALLOC_BUFFER(&ret_subsarray[ret_subs_used], max_subscript_string);
-			ret_subs_used = real_ret_subs_used;
+			ret_subs_used = ret_subsarray_num_elements;
 			/* recall the wrapped function */
 			status = ydb_node_previous_st(tp_token, &error_string_buffer, &varname_y, subs_used, subsarray_y,
 						      &ret_subs_used, ret_subsarray);
@@ -1120,7 +1114,7 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 	YDB_FREE_BUFFER(&varname_y);
 	FREE_BUFFER_ARRAY(subsarray_y, subs_used);
 	YDB_FREE_BUFFER(&error_string_buffer);
-	FREE_BUFFER_ARRAY(ret_subsarray, real_ret_subs_used);
+	FREE_BUFFER_ARRAY(ret_subsarray, ret_subsarray_num_elements);
 
 	if (return_NULL)
 		return NULL;
