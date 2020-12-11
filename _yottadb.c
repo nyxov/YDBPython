@@ -656,9 +656,10 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 			return_NULL = true;
 		}
 		/* Create Python object to return */
-		if (!return_NULL)
+		if (!return_NULL) {
 			/* New Reference */
 			return_python_bytes = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
+		}
 	}
 
 	/* free allocated memory */
@@ -721,9 +722,10 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 		}
 
 		/* Create Python object to return */
-		if (!return_NULL)
+		if (!return_NULL) {
 			/* New Reference */
 			return_python_bytes = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
+		}
 	}
 	/* free allocated memory */
 	YDB_FREE_BUFFER(&varname_y);
@@ -1072,7 +1074,6 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 	/* validate varname */
 	VALIDATE_AND_CONVERT_BYTES_LEN(varname_len_ssize, varname_len, YDB_MAX_IDENT, YDBPY_INVALID_VARNAME_TOO_LONG,
 				       YDBPY_ERRMSG_VARNAME_TOO_LONG);
-
 	VALIDATE_SUBSARRAY(subsarray);
 
 	/* Setup for Call */
@@ -1109,9 +1110,10 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 		}
 
 		/* Create Python object to return */
-		if (!return_NULL)
+		if (!return_NULL) {
 			/* New Reference */
 			return_tuple = convert_ydb_buffer_array_to_py_tuple(ret_subsarray, ret_subs_used);
+		}
 	}
 
 	/* free allocated memory */
@@ -1210,7 +1212,6 @@ static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &str, &str_len_ssize, &tp_token))
 		return NULL;
-
 	VALIDATE_AND_CONVERT_BYTES_LEN(str_len_ssize, str_len, YDB_MAX_STR, YDBPY_INVALID_BYTES_TOO_LONG,
 				       YDBPY_ERRMSG_BYTES_TOO_LONG2);
 
@@ -1237,9 +1238,10 @@ static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 		}
 
 		/* Create Python object to return */
-		if (!return_NULL)
+		if (!return_NULL) {
 			/* New Reference */
 			return_value = Py_BuildValue("y#", zwr_buf.buf_addr, (Py_ssize_t)zwr_buf.len_used);
+		}
 	}
 	/* free allocated memory */
 	YDB_FREE_BUFFER(&str_buf);
@@ -1306,9 +1308,10 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 		}
 
 		/* Create Python object to return */
-		if (!return_NULL)
+		if (!return_NULL) {
 			/* New Reference */
 			return_python_bytes = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
+		}
 	}
 	/* free allocated memory */
 	YDB_FREE_BUFFER(&varname_y);
@@ -1375,9 +1378,10 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 		}
 
 		/* Create Python object to return */
-		if (!return_NULL)
+		if (!return_NULL) {
 			/* New Reference */
 			return_python_bytes = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
+		}
 	}
 	/* free allocated memory */
 	YDB_FREE_BUFFER(&varname_y);
@@ -1587,9 +1591,10 @@ static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
 			return_NULL = true;
 		}
 
-		if (!return_NULL)
+		if (!return_NULL) {
 			/* New Reference */
 			return_value = Py_BuildValue("y#", str_buf.buf_addr, (Py_ssize_t)str_buf.len_used);
+		}
 	}
 	YDB_FREE_BUFFER(&zwr_buf);
 	YDB_FREE_BUFFER(&error_string_buf);
