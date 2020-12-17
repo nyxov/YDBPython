@@ -49,7 +49,7 @@ static ydb_buffer_t *create_empty_buffer_array(int num, int len) {
  * Python bytes objects.
  *
  * Parameters:
- *   sequence    - the python object to check.
+ *   sequence    - the Python object to check.
  */
 static int validate_sequence_of_bytes(PyObject *sequence, int max_sequence_len, int max_bytes_len, char *error_message) {
 	int	   ret = YDBPY_VALID;
@@ -548,6 +548,7 @@ static PyObject *delete_wrapper(PyObject *self, PyObject *args, PyObject *kwds) 
 	YDB_FREE_BUFFER(&varname_ydb);
 	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 	YDB_FREE_BUFFER(&error_string_buffer)
+
 	if (return_NULL) {
 		return NULL;
 	} else {
@@ -598,6 +599,7 @@ static PyObject *delete_excel(PyObject *self, PyObject *args, PyObject *kwds) {
 	/* free allocated memory */
 	FREE_BUFFER_ARRAY(varnames_ydb, namecount);
 	YDB_FREE_BUFFER(&error_string_buffer);
+
 	if (return_NULL) {
 		return NULL;
 	} else {
@@ -641,7 +643,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 		/* Call the wrapped function */
 		status = ydb_get_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb, &ret_value_ydb);
 
-		/* Check to see if length of string was longer than 1024. If so, try again
+		/* Check to see if length of string was longer than YDBPY_DEFAULT_VALUE_LEN. If so, try again
 		 * with proper length */
 		if (YDB_ERR_INVSTRLEN == status) {
 			return_length = ret_value_ydb.len_used;
@@ -667,6 +669,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 	YDB_FREE_BUFFER(&error_string_buffer);
 	YDB_FREE_BUFFER(&ret_value_ydb);
+
 	if (return_NULL)
 		return NULL;
 	else
@@ -1272,7 +1275,6 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 	/* validate varname */
 	VALIDATE_AND_CONVERT_BYTES_LEN(varname_py_len, varname_ydb_len, YDB_MAX_IDENT, YDBPY_INVALID_VARNAME_TOO_LONG,
 				       YDBPY_ERRMSG_VARNAME_TOO_LONG);
-
 	VALIDATE_SUBSARRAY(subsarray_py);
 
 	/* Setup for Call */
@@ -1285,7 +1287,7 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 		status
 		    = ydb_subscript_next_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb, &ret_value_ydb);
 
-		/* check to see if length of string was longer than 1024 is so, try again
+		/* check to see if length of string was longer than YDBPY_DEFAULT_SUBSCRIPT_LEN is so, try again
 		 * with proper length */
 		if (YDB_ERR_INVSTRLEN == status) {
 			return_length = ret_value_ydb.len_used;
@@ -1344,7 +1346,6 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 	/* validate varname */
 	VALIDATE_AND_CONVERT_BYTES_LEN(varname_py_len, varname_ydb_len, YDB_MAX_IDENT, YDBPY_INVALID_VARNAME_TOO_LONG,
 				       YDBPY_ERRMSG_VARNAME_TOO_LONG);
-
 	VALIDATE_SUBSARRAY(subsarray_py);
 
 	/* Setup for Call */
@@ -1357,7 +1358,7 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 		status = ydb_subscript_previous_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb,
 						   &ret_value_ydb);
 
-		/* check to see if length of string was longer than 1024 is so, try again
+		/* check to see if length of string was longer than YDBPY_DEFAULT_SUBSCRIPT_LEN is so, try again
 		 * with proper length */
 		if (YDB_ERR_INVSTRLEN == status) {
 			return_length = ret_value_ydb.len_used;
@@ -1383,6 +1384,7 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 	YDB_FREE_BUFFER(&error_string_buffer);
 	YDB_FREE_BUFFER(&ret_value_ydb);
+
 	if (return_NULL)
 		return NULL;
 	else
@@ -1392,22 +1394,24 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 /* Callback functions used by Wrapper for ydb_tp_s() / ydb_tp_st() */
 
 /* Callback Wrapper used by tp_st. The approach of calling a Python function is a
- * bit of a hack. Here's how it works: 1) This is the callback function always
- * the function passed to called by ydb_tp_st. 2) the actual Python function to
- * be called is passed to this function as the first element in a Python tuple.
- *    3) the positional arguments are passed as the second element and the
- * keyword args are passed as the third. 4) the new tp_token that ydb_tp_st
- * passes to this function as an argument is added to the kwargs dictionary. 5)
- * this function calls calls the python callback function with the args and
- * kwargs arguments. 6) if a function raises an exception then this function
- * returns TPCALLBACKINVRETVAL as a way of indicating an error. (note) the PyErr
- * String is already set so the the function receiving the return value (tp)
- * just needs to return NULL.
+ * bit of a hack. Here's how it works:
+ *      1) This is the callback function that is always passed to the ydb_tp_st
+ *              Simple API function and should only ever be called by ydb_tp_st
+ *              via tp() below. It assumes that everything passed to it was validated.
+ *      2) The actual Python function to be called is passed to this function
+ *              as the first element in a Python tuple.
+ *      3) The positional arguments are passed as the second element and the
+ *              keyword args are passed as the third.
+ *      4) The new tp_token that ydb_tp_st passes to this function as an argument
+ *              is added to the kwargs dictionary.
+ *      5) This function calls calls the Python callback function with the args and
+ *              kwargs arguments.
+ *      6) if a function raises an exception then this function returns TPCALLBACKINVRETVAL
+ *              as a way of indicating an error.
+ *      Note: the PyErr String is already set so the the function receiving the return
+ *              value (tp()) just needs to return NULL.
  */
 static int callback_wrapper(uint64_t tp_token_ydb, ydb_buffer_t *errstr, void *function_with_arguments) {
-	/* this should only ever be called by ydb_tp_st c api via tp below.
-	 * It assumes that everything passed to it was validated.
-	 */
 	int	  ret_value_ydb;
 	bool	  decref_args = false;
 	bool	  decref_kwargs = false;
@@ -1446,6 +1450,7 @@ static int callback_wrapper(uint64_t tp_token_ydb, ydb_buffer_t *errstr, void *f
 	}
 	ret_value_ydb = (int)PyLong_AsLong(ret_value_py);
 	Py_DECREF(ret_value_py);
+
 	return ret_value_ydb;
 }
 
@@ -1466,7 +1471,6 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 	transid = "BATCH";
 	namecount = 0;
 	varnames_py = Py_None;
-
 	tp_token = YDB_NOTTP;
 
 	/* parse and validate */
