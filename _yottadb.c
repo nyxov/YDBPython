@@ -649,6 +649,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 			FIX_BUFFER_LENGTH(ret_value_ydb);
 			/* Call the wrapped function */
 			status = ydb_get_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb, &ret_value_ydb);
+			assert(YDB_ERR_INVSTRLEN != status);
 		}
 		/* check status for Errors and Raise Exception */
 		if (YDB_OK != status) {
@@ -1022,6 +1023,7 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 			/* recall the wrapped function */
 			status = ydb_node_next_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb,
 						  &ret_subs_used, ret_subsarray_ydb);
+			assert(YDB_ERR_INVSTRLEN != status);
 		}
 		/* check status for Errors and Raise Exception */
 		if (YDB_OK != status) {
@@ -1094,6 +1096,7 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 			/* recall the wrapped function */
 			status = ydb_node_previous_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb,
 						      &ret_subs_used, ret_subsarray_ydb);
+			assert(YDB_ERR_INVSTRLEN != status);
 		}
 		/* check status for Errors and Raise Exception */
 		if (YDB_OK != status) {
@@ -1218,6 +1221,7 @@ static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 			FIX_BUFFER_LENGTH(zwr_ydb);
 			/* recall the wrapped function */
 			status = ydb_str2zwr_st(tp_token, &error_string_buf, &str_ydb, &zwr_ydb);
+			assert(YDB_ERR_INVSTRLEN != status);
 		}
 		/* check status for Errors and Raise Exception */
 		if (YDB_OK != status) {
@@ -1286,6 +1290,7 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 			/* recall the wrapped function */
 			status = ydb_subscript_next_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb,
 						       &ret_value_ydb);
+			assert(YDB_ERR_INVSTRLEN != status);
 		}
 		/* check status for Errors and Raise Exception */
 		if (YDB_OK != status) {
@@ -1354,6 +1359,7 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 			FIX_BUFFER_LENGTH(ret_value_ydb);
 			status = ydb_subscript_previous_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb,
 							   &ret_value_ydb);
+			assert(YDB_ERR_INVSTRLEN != status);
 		}
 		/* check status for Errors and Raise Exception */
 		if (YDB_OK != status) {
@@ -1430,7 +1436,10 @@ static int callback_wrapper(uint64_t tp_token_ydb, ydb_buffer_t *errstr, void *f
 		Py_DECREF(kwargs);
 
 	if (NULL == ret_value_py) {
-		/* function raised an exception */
+		/* `function` raised an exception.
+		 *      Note: Do not need to `PyErr_SetString` because this, or similar operation
+		 *              was done when the exception was raised by `function`
+		 */
 		return YDB_ERR_TPCALLBACKINVRETVAL;
 	} else if (!PyLong_Check(ret_value_py)) {
 		PyErr_SetString(PyExc_TypeError, "Callback function must return value of type int.");
@@ -1551,7 +1560,6 @@ static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "y#|K", kwlist, &zwr_py, &zwr_py_len, &tp_token))
 		return NULL;
-
 	VALIDATE_AND_CONVERT_BYTES_LEN(zwr_py_len, zwr_ydb_len, YDB_MAX_STR, YDBPY_INVALID_BYTES_TOO_LONG,
 				       YDBPY_ERRMSG_BYTES_TOO_LONG2);
 
@@ -1562,19 +1570,18 @@ static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
 	if (!return_NULL) {
 		/* Call the wrapped function */
 		status = ydb_zwr2str_st(tp_token, &error_string_buf, &zwr_ydb, &str_ydb);
-
 		/* recall with properly sized buffer if zwr_ydb is not long enough */
 		if (YDB_ERR_INVSTRLEN == status) {
 			FIX_BUFFER_LENGTH(str_ydb);
 			/* recall the wrapped function */
 			status = ydb_zwr2str_st(tp_token, &error_string_buf, &zwr_ydb, &str_ydb);
+			assert(YDB_ERR_INVSTRLEN != status);
 		}
 		/* check status for Errors and Raise Exception */
 		if (YDB_OK != status) {
 			raise_YDBError(status, &error_string_buf, tp_token);
 			return_NULL = true;
 		}
-
 		if (!return_NULL) {
 			/* New Reference */
 			str_py = Py_BuildValue("y#", str_ydb.buf_addr, (Py_ssize_t)str_ydb.len_used);
@@ -1670,8 +1677,8 @@ static PyMethodDef methods[] = {
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
 
-static struct PyModuleDef _yottadbmodule = {PyModuleDef_HEAD_INIT, "_yottadb",			      /* name of module */
-					    "A module that provides basic access to YottaDB's c api", /* module
+static struct PyModuleDef _yottadbmodule = {PyModuleDef_HEAD_INIT, "_yottadb",				       /* name of module */
+					    "A module that provides basic access to the YottaDB's Simple API", /* module
 													 documentation,
 													 may be NULL */
 					    -1, /* size of per-interpreter state of the module, or -1 if the module
@@ -1686,7 +1693,7 @@ PyMODINIT_FUNC PyInit__yottadb(void) {
 	/* Defining Module 'Constants' */
 	PyObject *module_dictionary = PyModule_GetDict(module);
 
-	/* expose constants defined in c */
+	/* Expose constants defined in C */
 	PyDict_SetItemString(module_dictionary, "YDB_DEL_TREE", Py_BuildValue("i", YDB_DEL_TREE));
 	PyDict_SetItemString(module_dictionary, "YDB_DEL_NODE", Py_BuildValue("i", YDB_DEL_NODE));
 
