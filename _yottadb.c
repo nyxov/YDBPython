@@ -611,7 +611,7 @@ static PyObject *delete_excel(PyObject *self, PyObject *args, PyObject *kwds) {
 /* Wrapper for ydb_get_s() and ydb_get_st() */
 static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 	bool	      return_NULL = false;
-	int	      subs_used, status, return_length;
+	int	      subs_used, status;
 	unsigned int  varname_ydb_len;
 	Py_ssize_t    varname_py_len;
 	char *	      varname_py;
@@ -646,9 +646,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 		/* Check to see if length of string was longer than YDBPY_DEFAULT_VALUE_LEN. If so, try again
 		 * with proper length */
 		if (YDB_ERR_INVSTRLEN == status) {
-			return_length = ret_value_ydb.len_used;
-			YDB_FREE_BUFFER(&ret_value_ydb);
-			YDB_MALLOC_BUFFER(&ret_value_ydb, return_length);
+			FIX_BUFFER_LENGTH(ret_value_ydb);
 			/* Call the wrapped function */
 			status = ydb_get_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb, &ret_value_ydb);
 		}
@@ -1019,9 +1017,7 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 
 		/* if a buffer is not long enough */
 		while (YDB_ERR_INVSTRLEN == status) {
-			max_subscript_string = ret_subsarray_ydb[ret_subs_used].len_used;
-			YDB_FREE_BUFFER(&ret_subsarray_ydb[ret_subs_used])
-			YDB_MALLOC_BUFFER(&ret_subsarray_ydb[ret_subs_used], max_subscript_string);
+			FIX_BUFFER_LENGTH(ret_subsarray_ydb[ret_subs_used]);
 			ret_subs_used = ret_subsarray_num_elements;
 			/* recall the wrapped function */
 			status = ydb_node_next_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb,
@@ -1093,9 +1089,7 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 
 		/* if a buffer is not long enough */
 		while (YDB_ERR_INVSTRLEN == status) {
-			max_subscript_string = ret_subsarray_ydb[ret_subs_used].len_used;
-			YDB_FREE_BUFFER(&ret_subsarray_ydb[ret_subs_used])
-			YDB_MALLOC_BUFFER(&ret_subsarray_ydb[ret_subs_used], max_subscript_string);
+			FIX_BUFFER_LENGTH(ret_subsarray_ydb[ret_subs_used]);
 			ret_subs_used = ret_subsarray_num_elements;
 			/* recall the wrapped function */
 			status = ydb_node_previous_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb,
@@ -1190,7 +1184,7 @@ static PyObject *set(PyObject *self, PyObject *args, PyObject *kwds) {
 /* Wrapper for ydb_str2zwr_s() and ydb_str2zwr_st() */
 static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 	bool	     return_NULL = false;
-	int	     status, return_length;
+	int	     status;
 	Py_ssize_t   str_py_len;
 	unsigned int str_ydb_len;
 	uint64_t     tp_token;
@@ -1221,9 +1215,7 @@ static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 
 		/* recall with properly sized buffer if zwr_buf is not long enough */
 		if (YDB_ERR_INVSTRLEN == status) {
-			return_length = zwr_ydb.len_used;
-			YDB_FREE_BUFFER(&zwr_ydb);
-			YDB_MALLOC_BUFFER(&zwr_ydb, return_length);
+			FIX_BUFFER_LENGTH(zwr_ydb);
 			/* recall the wrapped function */
 			status = ydb_str2zwr_st(tp_token, &error_string_buf, &str_ydb, &zwr_ydb);
 		}
@@ -1253,7 +1245,7 @@ static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 /* Wrapper for ydb_subscript_next_s() and ydb_subscript_next_st() */
 static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) {
 	bool	      return_NULL = false;
-	int	      status, return_length, subs_used;
+	int	      status, subs_used;
 	Py_ssize_t    varname_py_len;
 	unsigned int  varname_ydb_len;
 	char *	      varname_py;
@@ -1290,9 +1282,7 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 		/* check to see if length of string was longer than YDBPY_DEFAULT_SUBSCRIPT_LEN is so, try again
 		 * with proper length */
 		if (YDB_ERR_INVSTRLEN == status) {
-			return_length = ret_value_ydb.len_used;
-			YDB_FREE_BUFFER(&ret_value_ydb);
-			YDB_MALLOC_BUFFER(&ret_value_ydb, return_length);
+			FIX_BUFFER_LENGTH(ret_value_ydb);
 			/* recall the wrapped function */
 			status = ydb_subscript_next_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb,
 						       &ret_value_ydb);
@@ -1324,7 +1314,7 @@ static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) 
 /* Wrapper for ydb_subscript_previous_s() and ydb_subscript_previous_st() */
 static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 	bool	      return_NULL = false;
-	int	      status, return_length, subs_used;
+	int	      status, subs_used;
 	Py_ssize_t    varname_py_len;
 	unsigned int  varname_ydb_len;
 	char *	      varname_py;
@@ -1361,9 +1351,7 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
 		/* check to see if length of string was longer than YDBPY_DEFAULT_SUBSCRIPT_LEN is so, try again
 		 * with proper length */
 		if (YDB_ERR_INVSTRLEN == status) {
-			return_length = ret_value_ydb.len_used;
-			YDB_FREE_BUFFER(&ret_value_ydb);
-			YDB_MALLOC_BUFFER(&ret_value_ydb, return_length);
+			FIX_BUFFER_LENGTH(ret_value_ydb);
 			status = ydb_subscript_previous_st(tp_token, &error_string_buffer, &varname_ydb, subs_used, subsarray_ydb,
 							   &ret_value_ydb);
 		}
@@ -1545,7 +1533,7 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 /* Wrapper for ydb_zwr2str_s() and ydb_zwr2str_st() */
 static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
 	bool	     return_NULL = false;
-	int	     status, return_length;
+	int	     status;
 	Py_ssize_t   zwr_py_len;
 	unsigned int zwr_ydb_len;
 	uint64_t     tp_token;
@@ -1577,9 +1565,7 @@ static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
 
 		/* recall with properly sized buffer if zwr_ydb is not long enough */
 		if (YDB_ERR_INVSTRLEN == status) {
-			return_length = str_ydb.len_used;
-			YDB_FREE_BUFFER(&str_ydb);
-			YDB_MALLOC_BUFFER(&str_ydb, return_length);
+			FIX_BUFFER_LENGTH(str_ydb);
 			/* recall the wrapped function */
 			status = ydb_zwr2str_st(tp_token, &error_string_buf, &zwr_ydb, &str_ydb);
 		}

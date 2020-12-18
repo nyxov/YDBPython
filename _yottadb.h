@@ -149,6 +149,13 @@ typedef struct {
 #define VALIDATE_VARNAMES(VARNAMES) \
 	{ VALIDATE_SEQUENCE_OF_BYTES_INPUT(VARNAMES, YDB_MAX_NAMES, YDB_MAX_IDENT, YDBPY_ERRMSG_VARNAME_INVALID) }
 
+#define FIX_BUFFER_LENGTH(BUFFER)                           \
+	{                                                   \
+		int correct_length = BUFFER.len_used;       \
+		YDB_FREE_BUFFER(&BUFFER);                   \
+		YDB_MALLOC_BUFFER(&BUFFER, correct_length); \
+	}
+
 /* PYTHON EXCEPTION DECLARATIONS */
 
 /* YottaDBError represents an error return status from any of the libyottadb
