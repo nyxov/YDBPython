@@ -225,7 +225,7 @@ static void free_YDBKey(YDBKey *key) {
  * Parameters:
  *    keys_sequence        - a Python object that is to be validated.
  */
-static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, char *error_message) {
+static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, int max_len, char *error_message) {
 	int	   ret = YDBPY_VALID;
 	int	   num_chars;
 	Py_ssize_t i, len_keys, len_key_seq, len_varname;
@@ -234,20 +234,21 @@ static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, char *error_
 
 	/* validate key sequence type */
 	seq = PySequence_Fast(keys_sequence, "'keys' argument must be a Sequence"); // New Reference
-	if (!seq || !(PyTuple_Check(keys_sequence) || PyList_Check(keys_sequence))) {
+	if (!(PyTuple_Check(keys_sequence) || PyList_Check(keys_sequence))) {
 		num_chars = snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_NOT_LIST_OR_TUPLE);
 		assert((0 <= num_chars) && (YDBPY_MAX_REASON > num_chars));
 		ret = YDBPY_INVALID_NOT_LIST_OR_TUPLE;
 	}
 
 	/* validate key sequence length */
-	len_keys = PySequence_Fast_GET_SIZE(seq);
-	if (YDB_MAX_NAMES < len_keys) {
-		num_chars = snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_SEQUENCE_TOO_LONG, len_keys, YDB_MAX_NAMES);
-		assert((0 <= num_chars) && (YDBPY_MAX_REASON > num_chars));
-		ret = YDBPY_INVALID_SEQUENCE_TOO_LONG;
+	if (YDBPY_VALID == ret) {
+		len_keys = PySequence_Fast_GET_SIZE(seq);
+		if (max_len < len_keys) {
+			num_chars = snprintf(error_message, YDBPY_MAX_REASON, YDBPY_ERRMSG_SEQUENCE_TOO_LONG, len_keys, max_len);
+			assert((0 <= num_chars) && (YDBPY_MAX_REASON > num_chars));
+			ret = YDBPY_INVALID_SEQUENCE_TOO_LONG;
+		}
 	}
-
 	/* validate each item/key in key sequence */
 	if (YDBPY_VALID == ret) {
 		for (i = 0; i < len_keys; i++) {
@@ -771,7 +772,7 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 		return NULL;
 
 	if (Py_None != keys_py) {
-		validation_status = validate_py_keys_sequence_bytes(keys_py, validation_error_reason);
+		validation_status = validate_py_keys_sequence_bytes(keys_py, YDB_LOCK_MAX_KEYS, validation_error_reason);
 		if (YDBPY_VALID != validation_status) {
 			num_chars = snprintf(validation_error_message, YDBPY_MAX_ERRORMSG, YDBPY_ERRMSG_KEYS_INVALID,
 					     validation_error_reason);
@@ -1732,6 +1733,8 @@ PyMODINIT_FUNC PyInit__yottadb(void) {
 	PyDict_SetItemString(module_dictionary, "YDB_NOTTP", Py_BuildValue("i", YDB_NOTTP));
 
 	PyDict_SetItemString(module_dictionary, "YDB_ERR_TPTIMEOUT", Py_BuildValue("i", YDB_ERR_TPTIMEOUT));
+
+	PyDict_SetItemString(module_dictionary, "YDB_LOCK_MAX_KEYS", Py_BuildValue("i", YDB_LOCK_MAX_KEYS));
 
 	/* Exceptions */
 	YDBException = PyErr_NewException("_yottadb.YDBException",

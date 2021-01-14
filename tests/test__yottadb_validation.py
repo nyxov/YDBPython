@@ -199,8 +199,8 @@ def test_lock_keys():
     This function tests the lock function`s key parameter.
     It tests that the lock function:
         1)  Raises a Type Error if the value is a not a list or tuple.
-        2)  Accepts a list of keys as long as _yottadb.YDB_MAX_NAMES without raising a exception
-        3)  Raises a ValueError if the list passed to it is longer than _yottadb.YDB_MAX_NAMES
+        2)  Accepts a list of keys as long as _yottadb.YDB_LOCK_MAX_KEYS without raising a exception
+        3)  Raises a ValueError if the list passed to it is longer than _yottadb.YDB_LOCK_MAX_KEYS
         4)  Raises a TypeError if the first element of a key is not a bytes object
         5)  Raises a ValueError if a key doesn't have any element
         6)  Raise a ValueError if a key has more than 2 elements
@@ -217,13 +217,13 @@ def test_lock_keys():
     with pytest.raises(TypeError):
         _yottadb.lock("not list or tuple")
 
-    # Case 2: Accepts a list of keys as long as _yottadb.YDB_MAX_NAMES without raising a exception
-    keys = [[b"test" + bytes(str(x), encoding="utf-8")] for x in range(0, _yottadb.YDB_MAX_NAMES)]
+    # Case 2: Accepts a list of keys as long as _yottadb.YDB_LOCK_MAX_KEYS without raising a exception
+    keys = [[b"test" + bytes(str(x), encoding="utf-8")] for x in range(0, _yottadb.YDB_LOCK_MAX_KEYS)]
     _yottadb.lock(keys)
 
-    # Case 3: Raises a ValueError if the list passed to it is longer than _yottadb.YDB_MAX_NAMES
+    # Case 3: Raises a ValueError if the list passed to it is longer than _yottadb.YDB_LOCK_MAX_KEYS
     with pytest.raises(ValueError):
-        keys = [[b"test" + bytes(str(x), encoding="utf-8")] for x in range(0, _yottadb.YDB_MAX_NAMES + 1)]
+        keys = [[b"test" + bytes(str(x), encoding="utf-8")] for x in range(0, _yottadb.YDB_LOCK_MAX_KEYS + 1)]
         _yottadb.lock(keys)
 
     # Case 4: Raises a type Error if the first element of a key is not a bytes object
