@@ -14,7 +14,6 @@
 
 #include <assert.h>
 #include <stdbool.h>
-#include <ffi.h>
 #include <libyottadb.h>
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
@@ -224,10 +223,12 @@ static void free_YDBKey(YDBKey *key) {
  *
  * Parameters:
  *    keys_sequence        - a Python object that is to be validated.
+ *    max_len              - the number of keys that are allowed in the keys_sequence
+ *    error_message        - a preallocated string for storing the reason for validation failure.
  */
 static int validate_py_keys_sequence_bytes(PyObject *keys_sequence, int max_len, char *error_message) {
 	int	   ret = YDBPY_VALID;
-	int	   num_chars;
+	int	   num_chars = 0;
 	Py_ssize_t i, len_keys, len_key_seq, len_varname;
 	PyObject * key, *varname, *subsarray, *seq, *key_seq;
 	char	   error_sub_reason[YDBPY_MAX_REASON];
@@ -751,10 +752,8 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 	int		   len_keys, number_of_arguments, num_chars, first, status;
 	uint64_t	   tp_token;
 	unsigned long long timeout_nsec;
-	ffi_cif		   call_interface;
-	ffi_type *	   ret_type;
 	PyObject *	   keys_py;
-	ydb_buffer_t *	   error_string_buffer;
+	ydb_buffer_t	   error_string_buffer;
 	YDBKey *	   keys_ydb = NULL;
 	int		   validation_status;
 	char		   validation_error_reason[YDBPY_MAX_REASON * 2];
@@ -770,7 +769,6 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OKK", kwlist, &keys_py, &timeout_nsec, &tp_token))
 		return NULL;
-
 	if (Py_None != keys_py) {
 		validation_status = validate_py_keys_sequence_bytes(keys_py, YDB_LOCK_MAX_KEYS, validation_error_reason);
 		if (YDBPY_VALID != validation_status) {
@@ -787,8 +785,7 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 		len_keys = Py_SAFE_DOWNCAST(PySequence_Length(keys_py), Py_ssize_t, int);
 
 	/* Setup for Call */
-	error_string_buffer = (ydb_buffer_t *)calloc(1, sizeof(ydb_buffer_t));
-	YDB_MALLOC_BUFFER(error_string_buffer, YDB_MAX_ERRORMSG);
+	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	if (Py_None != keys_py) {
 		keys_ydb = (YDBKey *)calloc(len_keys, sizeof(YDBKey));
 		success = load_YDBKeys_from_key_sequence(keys_py, keys_ydb);
@@ -796,54 +793,34 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 			return_NULL = true;
 	}
 	if (!return_NULL) {
-		/* build ffi call */
-		ret_type = &ffi_type_sint;
-
 		number_of_arguments = YDB_LOCK_ST_INIT_ARG_NUMS + (len_keys * YDB_LOCK_ST_NUM_ARGS_PER_KEY);
-		ffi_type *arg_types[number_of_arguments];
-		void *	  arg_values[number_of_arguments];
-		/* ffi signature */
-		arg_types[0] = &ffi_type_uint64;      // tptoken
-		arg_values[0] = &tp_token;	      // tptoken
-		arg_types[1] = &ffi_type_pointer;     // errstr
-		arg_values[1] = &error_string_buffer; // errstr
-		arg_types[2] = &ffi_type_uint64;      // timout_nsec
-		arg_values[2] = &timeout_nsec;	      // timout_nsec
-		arg_types[3] = &ffi_type_sint;	      // namecount
-		arg_values[3] = &len_keys;	      // namecount
-
+		void *arg_values[number_of_arguments + 1];
+		arg_values[0] = number_of_arguments;
+		arg_values[1] = tp_token;
+		arg_values[2] = &error_string_buffer;
+		arg_values[3] = timeout_nsec;
+		arg_values[4] = len_keys;
 		for (int i = 0; i < len_keys; i++) {
-			first = YDB_LOCK_ST_INIT_ARG_NUMS + YDB_LOCK_ST_NUM_ARGS_PER_KEY * i;
-			arg_types[first] = &ffi_type_pointer;		// varname
-			arg_values[first] = &keys_ydb[i].varname;	// varname
-			arg_types[first + 1] = &ffi_type_sint;		// subs_used
-			arg_values[first + 1] = &keys_ydb[i].subs_used; // subs_used
-			arg_types[first + 2] = &ffi_type_pointer;	// subsarray
-			arg_values[first + 2] = &keys_ydb[i].subsarray; // subsarray
+			first = YDB_LOCK_ST_INIT_ARG_NUMS + 1 + YDB_LOCK_ST_NUM_ARGS_PER_KEY * i;
+			arg_values[first] = keys_ydb[i].varname;
+			arg_values[first + 1] = keys_ydb[i].subs_used;
+			arg_values[first + 2] = keys_ydb[i].subsarray;
 		}
 
-		if (ffi_prep_cif(&call_interface, FFI_DEFAULT_ABI, number_of_arguments, ret_type, arg_types) == FFI_OK) {
-			/* Call the wrapped function */
-			ffi_call(&call_interface, FFI_FN(ydb_lock_st), &status, arg_values);
-		} else {
-			PyErr_SetString(PyExc_SystemError, "ffi_prep_cif failed ");
-			return_NULL = true;
-		}
-
+		status = ydb_call_variadic_plist_func(&ydb_lock_st, arg_values);
 		/* check for errors */
 		if (YDB_LOCK_TIMEOUT == status) {
 			PyErr_SetString(YDBTimeoutError, "Not able to acquire all requested locks in the specified time.");
 			return_NULL = true;
 		} else if (YDB_OK != status) {
-			raise_YDBError(status, error_string_buffer, tp_token);
+			raise_YDBError(status, &error_string_buffer, tp_token);
 			return_NULL = true;
 			return NULL;
 		}
 	}
 
 	/* free allocated memory */
-	YDB_FREE_BUFFER(error_string_buffer);
-	free(error_string_buffer);
+	YDB_FREE_BUFFER(&error_string_buffer);
 	free_YDBKey_array(keys_ydb, len_keys);
 
 	if (return_NULL) {

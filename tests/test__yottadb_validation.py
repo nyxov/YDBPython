@@ -194,64 +194,91 @@ def test_incr_increment():
 
 
 # lock()
-def test_lock_keys():
+"""
+This function tests the lock function`s key parameter.
+It tests that the lock function:
+    1)  Raises a Type Error if the value is a not a list or tuple.
+    2)  Accepts a list of keys as long as _yottadb.YDB_LOCK_MAX_KEYS without raising a exception
+    3)  Raises a ValueError if the list passed to it is longer than _yottadb.YDB_LOCK_MAX_KEYS
+    4)  Raises a TypeError if the first element of a key is not a bytes object
+    5)  Raises a ValueError if a key doesn't have any element
+    6)  Raise a ValueError if a key has more than 2 elements
+    7)  Raises a TypeError if the first element of a key (representing a varname) is not a bytes object
+    8)  The first element of a key (varname) may be up to _yottadb.YDB_MAX_IDENT in length without raising an exception
+    9)  Raises a TypeError if the second element of a key is not a list or tuple
+    10) Accepts a subsarray list of bytes up to _yottadb.YDB_MAX_SUBS without raising an exception
+    11) Raises a ValueError if a subsarray is longer than _yottadb.YDB_MAX_SUBS
+    12) Raises a TypeError if an element of a subsarray is not a bytes object
+    13) Accepts an item in a subsarray of length _yottadb.YDB_MAX_STR without raising an exception
+    14) Raises a Value Error if a subsarray has an element that is longer than _yottadb.YDB_MAX_STR
     """
-    This function tests the lock function`s key parameter.
-    It tests that the lock function:
-        1)  Raises a Type Error if the value is a not a list or tuple.
-        2)  Accepts a list of keys as long as _yottadb.YDB_LOCK_MAX_KEYS without raising a exception
-        3)  Raises a ValueError if the list passed to it is longer than _yottadb.YDB_LOCK_MAX_KEYS
-        4)  Raises a TypeError if the first element of a key is not a bytes object
-        5)  Raises a ValueError if a key doesn't have any element
-        6)  Raise a ValueError if a key has more than 2 elements
-        7)  Raises a TypeError if the first element of a key (representing a varname) is not a bytes object
-        8)  The first element of a key (varname) may be up to _yottadb.YDB_MAX_IDENT in length without raising an exception
-        9)  Raises a TypeError if the second element of a key is not a list or tuple
-        10) Accepts a subsarray list of bytes up to _yottadb.YDB_MAX_SUBS without raising an exception
-        11) Raises a ValueError if a subsarray is longer than _yottadb.YDB_MAX_SUBS
-        12) Raises a TypeError if an element of a subsarray is not a bytes object
-        13) Accepts an item in a subsarray of length _yottadb.YDB_MAX_STR without raising an exception
-        14) Raises a Value Error if a subsarray has an element that is longer than _yottadb.YDB_MAX_STR
-    """
+
+
+def test_lock_keys_case1():
     # Case 1: Raises a Type Error if the value is a not a list or tuple.
     with pytest.raises(TypeError):
         _yottadb.lock("not list or tuple")
 
+
+def test_lock_keys_case2():
     # Case 2: Accepts a list of keys as long as _yottadb.YDB_LOCK_MAX_KEYS without raising a exception
     keys = [[b"test" + bytes(str(x), encoding="utf-8")] for x in range(0, _yottadb.YDB_LOCK_MAX_KEYS)]
     _yottadb.lock(keys)
 
+
+def test_lock_keys_case3():
     # Case 3: Raises a ValueError if the list passed to it is longer than _yottadb.YDB_LOCK_MAX_KEYS
     with pytest.raises(ValueError):
         keys = [[b"test" + bytes(str(x), encoding="utf-8")] for x in range(0, _yottadb.YDB_LOCK_MAX_KEYS + 1)]
         _yottadb.lock(keys)
 
     # Case 4: Raises a type Error if the first element of a key is not a bytes object
+
+
+def test_lock_keys_case4():
     with pytest.raises(TypeError):
         _yottadb.lock(("not list or tuple",))
 
     # Case 5: Raises a ValueError if a key doesn't have any element
+
+
+def test_lock_keys_case5():
     with pytest.raises(ValueError):
         _yottadb.lock(([],))
 
     # Case 6: Raise a ValueError if a key has more than 2 elements
+
+
+def test_lock_keys_case6():
     with pytest.raises(ValueError):
         _yottadb.lock(([b"varname", [b"subscript"], b"extra"],))  # too many
 
     # Case 7: Raises a TypeError if the first element of a key (representing a varname) is not a bytes object
+
+
+def test_lock_keys_case7():
     with pytest.raises(TypeError):
         _yottadb.lock((("test",),))
 
     # Case 8: The first element of a key (varname) may be up to _yottadb.YDB_MAX_IDENT in length without raising an exception
+
+
+def test_lock_keys_case8():
     _yottadb.lock(((b"a" * (_yottadb.YDB_MAX_IDENT),),))
     with pytest.raises(ValueError):
         _yottadb.lock(((b"a" * (_yottadb.YDB_MAX_IDENT + 1),),))
 
     # Case 9: Raises a TypeError if the second element of a key is not a list or tuple
+
+
+def test_lock_keys_case9():
     with pytest.raises(TypeError):
         _yottadb.lock(((b"test", "not list or tuple"),))
 
     # Case 10: Accepts a subsarray list of bytes up to _yottadb.YDB_MAX_SUBS without raising an exception
+
+
+def test_lock_keys_case10():
     subsarray = [b"test" + bytes(str(x), encoding="utf-8") for x in range(0, _yottadb.YDB_MAX_SUBS)]
     _yottadb.lock(
         (
@@ -263,6 +290,9 @@ def test_lock_keys():
     )
 
     # Case 11: Raises a ValueError if a subsarray is longer than _yottadb.YDB_MAX_SUBS
+
+
+def test_lock_keys_case11():
     with pytest.raises(ValueError):
         subsarray = [b"test" + bytes(str(x), encoding="utf-8") for x in range(0, _yottadb.YDB_MAX_SUBS + 1)]
         _yottadb.lock(
@@ -275,16 +305,26 @@ def test_lock_keys():
         )
 
     # Case 12: Raises a TypeError if an element of a subsarray is not a bytes object
+
+
+def test_lock_keys_case12():
     with pytest.raises(TypeError):
         _yottadb.lock(((b"test", ["not bytes"]),))
 
     # Case 13: Accepts an item in a subsarray of length _yottadb.YDB_MAX_STR without raising an exception
+
+
+def test_lock_keys_case13():
     try:
+        # _yottadb.lock(((b"test", [b"a" * (256)]),))
         _yottadb.lock(((b"test", [b"a" * (_yottadb.YDB_MAX_STR)]),))
     except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
         pass
 
     # Case 14: Raises a Value Error if a subsarray has an element that is longer than _yottadb.YDB_MAX_STR
+
+
+def test_lock_keys_case14():
     with pytest.raises(ValueError):
         _yottadb.lock(((b"test", [b"a" * (_yottadb.YDB_MAX_STR + 1)]),))
 
