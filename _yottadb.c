@@ -1415,7 +1415,7 @@ static int callback_wrapper(uint64_t tp_token_ydb, ydb_buffer_t *errstr, void *f
 
 	if (NULL == ret_value_py) {
 		/* `function` raised an exception.
-		 *      Note: Do not need to `PyErr_SetString` because this, or similar operation
+		 *      Note: Do not need to `PyErr_SetString` because this or similar operation
 		 *              was done when the exception was raised by `function`
 		 */
 		return YDB_ERR_TPCALLBACKINVRETVAL;

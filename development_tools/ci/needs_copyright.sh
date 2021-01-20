@@ -34,7 +34,7 @@ skipextensions="ref rst png zwr html ci csv"	# List of extensions that cannot ha
 	# .zwr  -> zwrite format extract file (does not currently allow a comment character).
 	# .html -> there are a couple of files currently under doc/templates which don't need copyrights.
 	# .ci   -> e.g. calltab.ci stores the call-in table which does not currently have a provision for comment characters.
-	# .csv  -> comma separated values file. No comments in "standard".
+	# .csv  -> comma separated values file. The CSV standard does not require support for comments
 if echo "$skipextensions" | grep -q -w "$(echo "$file" | awk -F . '{print $NF}')"; then
 	exit 1
 fi

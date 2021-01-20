@@ -12,6 +12,7 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
+
 cd "$(git rev-parse --show-toplevel)" || exit 1
 committed_files=$(git diff --cached --name-only HEAD)
 changed_files=$(git diff --name-only | tr "\n" " ")
@@ -37,7 +38,6 @@ if [[ $exit_value -eq 0 ]] ; then
     fi
   done
 fi
-
 
 if [[ exit_value -eq 0 ]] ; then
   echo "Automatically modifying files (copyright updates and code formatting) ..."

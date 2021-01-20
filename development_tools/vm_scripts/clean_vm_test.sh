@@ -42,7 +42,6 @@ if [ "$OS_LIKE" == "debian" ]; then
     # packages needed for testing are:
       # Ubuntu 18.04 and 20.04: python3-pip
   sudo apt install -y binutils pkg-config libtinfo5 python3-dev libffi-dev python3-setuptools python3-dev libffi-dev gcc python3-pip
-
 elif [ "$OS_LIKE" == "\"rhel fedora\"" ]; then
   # update system
   sudo yum check-update
