@@ -795,19 +795,19 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 	if (!return_NULL) {
 		number_of_arguments = YDB_LOCK_ST_INIT_ARG_NUMS + (len_keys * YDB_LOCK_ST_NUM_ARGS_PER_KEY);
 		void *arg_values[number_of_arguments + 1];
-		arg_values[0] = number_of_arguments;
-		arg_values[1] = tp_token;
-		arg_values[2] = &error_string_buffer;
-		arg_values[3] = timeout_nsec;
-		arg_values[4] = len_keys;
+		arg_values[0] = (void *)(uintptr_t)number_of_arguments;
+		arg_values[1] = (void *)tp_token;
+		arg_values[2] = (void *)&error_string_buffer;
+		arg_values[3] = (void *)timeout_nsec;
+		arg_values[4] = (void *)(uintptr_t)len_keys;
 		for (int i = 0; i < len_keys; i++) {
 			first = YDB_LOCK_ST_INIT_ARG_NUMS + 1 + YDB_LOCK_ST_NUM_ARGS_PER_KEY * i;
-			arg_values[first] = keys_ydb[i].varname;
-			arg_values[first + 1] = keys_ydb[i].subs_used;
-			arg_values[first + 2] = keys_ydb[i].subsarray;
+			arg_values[first] = (void *)keys_ydb[i].varname;
+			arg_values[first + 1] = (void *)(uintptr_t)keys_ydb[i].subs_used;
+			arg_values[first + 2] = (void *)keys_ydb[i].subsarray;
 		}
 
-		status = ydb_call_variadic_plist_func(&ydb_lock_st, arg_values);
+		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_lock_st, (uintptr_t)arg_values);
 		/* check for errors */
 		if (YDB_LOCK_TIMEOUT == status) {
 			PyErr_SetString(YDBTimeoutError, "Not able to acquire all requested locks in the specified time.");
