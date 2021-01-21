@@ -226,7 +226,7 @@ def test_lock_incr_timeout_4():
     time.sleep(1.1)
 
 
-# new tp() tests
+# tp() tests
 
 # generic recursive transaction tools
 def no_action(tp_token: int) -> None:

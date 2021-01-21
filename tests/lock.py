@@ -26,7 +26,7 @@ def key_tuple_to_str(self) -> str:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Lock a value in the database.")
     parser.add_argument("keys", metavar="N", type=str, nargs="+")
-    parser.add_argument("-t", "--time", type=int, default=2, help="time in seconds that the script will waite to unlock the key.")
+    parser.add_argument("-t", "--time", type=int, default=2, help="time in seconds that the script will wait to unlock the key.")
     parser.add_argument(
         "-T",
         "--locktimeout",
