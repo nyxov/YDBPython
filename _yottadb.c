@@ -976,7 +976,7 @@ static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
 	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 	max_subscript_string = YDBPY_DEFAULT_SUBSCRIPT_LEN;
-	ret_subsarray_num_elements = YDB_MAX_SUBS > subs_used + 5 ? subs_used + 5 : YDB_MAX_SUBS;
+	ret_subsarray_num_elements = YDBPY_DEFAULT_SUBSCRIPT_COUNT;
 	ret_subs_used = ret_subsarray_num_elements;
 	ret_subsarray_ydb = create_empty_buffer_array(ret_subs_used, max_subscript_string);
 	if (!return_NULL) {
@@ -1059,7 +1059,7 @@ static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
 	YDB_MALLOC_BUFFER(&error_string_buffer, YDB_MAX_ERRORMSG);
 
 	max_subscript_string = YDBPY_DEFAULT_SUBSCRIPT_LEN;
-	ret_subsarray_num_elements = 0 < subs_used - 1 ? subs_used - 1 : 1;
+	ret_subsarray_num_elements = YDBPY_DEFAULT_SUBSCRIPT_COUNT;
 	ret_subs_used = ret_subsarray_num_elements;
 	ret_subsarray_ydb = create_empty_buffer_array(ret_subs_used, max_subscript_string);
 	if (!return_NULL) {

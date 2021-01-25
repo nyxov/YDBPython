@@ -15,8 +15,9 @@
 /* A structure that represents a key using ydb c types. used internally for
  * converting between python and ydb c types */
 
-#define YDBPY_DEFAULT_VALUE_LEN		256
-#define YDBPY_DEFAULT_SUBSCRIPT_LEN	32
+#define YDBPY_DEFAULT_VALUE_LEN		32
+#define YDBPY_DEFAULT_SUBSCRIPT_LEN	16
+#define YDBPY_DEFAULT_SUBSCRIPT_COUNT	2
 #define MAX_CONONICAL_NUMBER_STRING_MAX 48
 
 #define YDB_LOCK_ST_INIT_ARG_NUMS	4
