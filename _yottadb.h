@@ -25,8 +25,6 @@
 #define YDB_CALL_VARIADIC_MAX_ARGUMENTS 36
 #define YDB_LOCK_MAX_KEYS		(YDB_CALL_VARIADIC_MAX_ARGUMENTS - YDB_LOCK_ST_INIT_ARG_NUMS) / YDB_LOCK_ST_NUM_ARGS_PER_KEY
 
-#define YDBPY_VALID 0
-
 #define YDBPY_MAX_ERRORMSG    1024
 #define YDBPY_MAX_REASON      YDBPY_MAX_ERRORMSG / 4
 #define YDBPY_TYPE_ERROR_MAX  -100
@@ -136,7 +134,7 @@ typedef struct {
 			char validation_reason_message[YDBPY_MAX_REASON];                                                       \
 			int  validation_status                                                                                  \
 			    = validate_sequence_of_bytes(SEQUENCE, MAX_SEQUENCE_LEN, MAX_BYTES_LEN, validation_reason_message); \
-			if (YDBPY_VALID != validation_status) {                                                                 \
+			if (YDB_OK != validation_status) {                                                                      \
 				char validation_error_message[YDBPY_MAX_ERRORMSG];                                              \
 				snprintf(validation_error_message, YDBPY_MAX_ERRORMSG, OUTER_ERROR_MESSAGE,                     \
 					 validation_reason_message);                                                            \
