@@ -269,6 +269,8 @@ class TransactionData(NamedTuple):
 def process_transaction(
     nested_transaction_data: Tuple[TransactionData], start_time: Optional[datetime.datetime] = None, tp_token: int = NOTTP
 ) -> int:
+    # 'current_data' is used to control the actions of the current transaction.
+    #     It is set by the caller; it should not change.
     current_data = nested_transaction_data[0]
 
     current_data.action(*current_data.action_arguments, tp_token=tp_token)
