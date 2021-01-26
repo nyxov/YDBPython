@@ -526,6 +526,8 @@ def test_tp_nested_raise_standard_python_exception():
     _yottadb.delete(b"^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
+# YDB_MAX_TP_DEPTH is the maximum transaction recursion depth of YottaDB. Any recursive set of transactions greater
+#   than this depth will result in a _yottadb.YDBTPTOODEEPError
 YDB_MAX_TP_DEPTH = 126
 
 
