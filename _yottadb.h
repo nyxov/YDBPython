@@ -25,8 +25,17 @@
 #define YDB_CALL_VARIADIC_MAX_ARGUMENTS 36
 #define YDB_LOCK_MAX_KEYS		(YDB_CALL_VARIADIC_MAX_ARGUMENTS - YDB_LOCK_ST_INIT_ARG_NUMS) / YDB_LOCK_ST_NUM_ARGS_PER_KEY
 
-#define YDBPY_MAX_ERRORMSG    1024
-#define YDBPY_MAX_REASON      YDBPY_MAX_ERRORMSG / 4
+#define YDBPY_MAX_ERRORMSG 1024
+#define YDBPY_MAX_REASON   YDBPY_MAX_ERRORMSG / 4
+
+/*
+ * the following set of macro constants are all related to Python input validation. An invalid Python
+ * argument returns one of 2 Exceptions, a 'TypeError' if the value is of the wrong type or 'ValueError'
+ * if it is of the right type but incorrect in some other way (for example, out of range). Because there
+ * are many ways to reach I have given each unique situation it's own value with TypeErrors being between
+ * -100 and -199 and ValueErrors being between -200 and -299 so that it is easy to know which Exception
+ * type to raise and which message should be applied to that Exception.
+ */
 #define YDBPY_TYPE_ERROR_MAX  -100
 #define YDBPY_TYPE_ERROR_MIN  -199
 #define YDBPY_VALUE_ERROR_MAX -200
