@@ -1599,6 +1599,15 @@ static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
  */
 
 /* Pull everything together into a Python Module */
+/* First we will create an array of structs that represent the methods in the module.
+ * (https://docs.python.org/3/c-api/structures.html#c.PyMethodDef)
+ * Each strict has 4 elements:
+ *      1. The Python name of the method
+ *      2. The C function that is to be called when the method is called
+ *      3. How the function can be called (all these functions allow for calling with both positional and keyword arguments)
+ *      4. The docstring for this method (to be used by help() in the Python REPL)
+ * The final struct is a sentinel value to indicate the end of the array (i.e. {NULL, NULL, 0, NULL})
+ */
 static PyMethodDef methods[] = {
     /* Simple and Simple Threaded API Functions */
     {"data", (PyCFunction)data, METH_VARARGS | METH_KEYWORDS,
@@ -1655,23 +1664,29 @@ static PyMethodDef methods[] = {
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
 
-static struct PyModuleDef _yottadbmodule = {PyModuleDef_HEAD_INIT, "_yottadb",				       /* name of module */
-					    "A module that provides basic access to the YottaDB's Simple API", /* module
-													 documentation,
-													 may be NULL */
-					    -1, /* size of per-interpreter state of the module, or -1 if the module
-						   keeps state in global variables. */
-					    methods};
+/* The _yottadbmodule struct contains the information about the module
+ * (https://docs.python.org/3/c-api/module.html#initializing-c-modules)
+ * The elements are:
+ *      1. PyModuleDef_HEAD_INIT (Python requires that all modules have this as the first value)
+ *      2. The name of the module
+ *      3. The modules Doc string. (For use by help() in the Python REPL)
+ *      4. Size of per-interpreter state or -1 to keep the module state in global variables.
+ *      5. The above defined array of module methods.
+ */
+static struct PyModuleDef _yottadbmodule
+    = {PyModuleDef_HEAD_INIT, "_yottadb", "A module that provides basic access to the YottaDB's Simple API", -1, methods};
 
+/* The initialization function for _yottadb.
+ * This function must be named PyInit_{name of Module}
+ */
 PyMODINIT_FUNC PyInit__yottadb(void) {
+	/* Initialize the module */
 	PyObject *module = PyModule_Create(&_yottadbmodule);
-	if (NULL == module)
-		return NULL;
 
 	/* Defining Module 'Constants' */
 	PyObject *module_dictionary = PyModule_GetDict(module);
 
-	/* Expose constants defined in C */
+	/* Expose constants defined in libyottadb.h */
 	PyDict_SetItemString(module_dictionary, "YDB_DEL_TREE", Py_BuildValue("i", YDB_DEL_TREE));
 	PyDict_SetItemString(module_dictionary, "YDB_DEL_NODE", Py_BuildValue("i", YDB_DEL_NODE));
 
@@ -1709,48 +1724,44 @@ PyMODINIT_FUNC PyInit__yottadb(void) {
 
 	PyDict_SetItemString(module_dictionary, "YDB_NOTTP", Py_BuildValue("i", YDB_NOTTP));
 
+	/* expose useful constants from libydberrors.h or libydberrors2.h */
 	PyDict_SetItemString(module_dictionary, "YDB_ERR_TPTIMEOUT", Py_BuildValue("i", YDB_ERR_TPTIMEOUT));
 
+	/* expose useful constants defined in _yottadb.h */
 	PyDict_SetItemString(module_dictionary, "YDB_LOCK_MAX_KEYS", Py_BuildValue("i", YDB_LOCK_MAX_KEYS));
 
-	/* Exceptions */
-	YDBException = PyErr_NewException("_yottadb.YDBException",
-					  NULL, // use to pick base class
-					  NULL);
+	/* Adding Exceptions */
+	/* Step 1: create exception with PyErr_NewException.
+		Arguments: (https://docs.python.org/3/c-api/exceptions.html#c.PyErr_NewException)
+	 *              1. Name of the exception in 'module.classname' form
+	 *              2. The Base class of the exception (NULL if base class is Pythons base Exception class
+	 *              3. A dictionary of class variables and methods. (Usually NULL)
+	 * Step 2: Add this Exception to the module using PyModule_AddObject
+		(https://docs.python.org/3/c-api/module.html#c.PyModule_AddObject)
+	 */
+	YDBException = PyErr_NewException("_yottadb.YDBException", NULL, NULL);
 	PyModule_AddObject(module, "YDBException", YDBException);
 
-	YDBTPException = PyErr_NewException("_yottadb.YDBTPException",
-					    YDBException, // use to pick base class
-					    NULL);
+	YDBTPException = PyErr_NewException("_yottadb.YDBTPException", YDBException, NULL);
 	PyModule_AddObject(module, "YDBTPException", YDBTPException);
 
-	YDBTPRollback = PyErr_NewException("_yottadb.YDBTPRollback",
-					   YDBTPException, // use to pick base class
-					   NULL);
+	YDBTPRollback = PyErr_NewException("_yottadb.YDBTPRollback", YDBTPException, NULL);
 	PyModule_AddObject(module, "YDBTPRollback", YDBTPRollback);
 
-	YDBTPRestart = PyErr_NewException("_yottadb.YDBTPRestart",
-					  YDBTPException, // use to pick base class
-					  NULL);
+	YDBTPRestart = PyErr_NewException("_yottadb.YDBTPRestart", YDBTPException, NULL);
 	PyModule_AddObject(module, "YDBTPRestart", YDBTPRestart);
 
-	/* setting up YDBTimeoutError */
-	YDBTimeoutError = PyErr_NewException("_yottadb.YDBTimeoutError",
-					     YDBException, // use to pick base class
-					     NULL);
+	YDBTimeoutError = PyErr_NewException("_yottadb.YDBTimeoutError", YDBException, NULL);
 	PyModule_AddObject(module, "YDBTimeoutError", YDBTimeoutError);
 
-	/* setting up YDBPythonError */
-	YDBPythonError = PyErr_NewException("_yottadb.YDBPythonError",
-					    YDBException, // use to pick base class
-					    NULL);
+	YDBPythonError = PyErr_NewException("_yottadb.YDBPythonError", YDBException, NULL);
 	PyModule_AddObject(module, "YDBPythonError", YDBPythonError);
 
-	YDBError = PyErr_NewException("_yottadb.YDBError",
-				      YDBException, // use to pick base class
-				      NULL);
+	YDBError = PyErr_NewException("_yottadb.YDBError", YDBException, NULL);
 	PyModule_AddObject(module, "YDBError", YDBError);
-
+	/* add auto generated Exceptions from libydberrors.h or libydberrors2.h */
 	ADD_YDBERRORS();
+
+	/* return the now fully initialized module */
 	return module;
 }
