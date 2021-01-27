@@ -573,7 +573,6 @@ def bank():
 
 
 def transfer_transaction(from_account, to_account, amount, tp_token=NOTTP):
-
     from_account_balance = int(_yottadb.get(tp_token=tp_token, varname=b"^account", subsarray=(from_account, b"balance")))
     to_account_balance = int(_yottadb.get(tp_token=tp_token, varname=b"^account", subsarray=(to_account, b"balance")))
 
@@ -628,15 +627,11 @@ def test_tp_bank_transfer_rollback(bank):
 
 def callback_for_tp_simple_restart(start_time, tp_token=NOTTP):
     now = datetime.datetime.now()
-    # print(start_time)
-    # print(tp_token)
     _yottadb.incr(b"resetattempt", increment=b"1", tp_token=tp_token)
     _yottadb.incr(b"resetvalue", increment=b"1", tp_token=tp_token)
     if _yottadb.get(b"resetattempt", tp_token=tp_token) == b"2":
-        print("standard")
         return _yottadb.YDB_OK
     elif (now - start_time) > datetime.timedelta(seconds=0.01):
-        print("timeout")
         return _yottadb.YDB_OK
     else:
         return _yottadb.YDB_TP_RESTART
@@ -644,7 +639,7 @@ def callback_for_tp_simple_restart(start_time, tp_token=NOTTP):
     return _yottadb.YDB_TP_RESTART
 
 
-def test_tp_4c_reset_some(ydb):
+def test_tp_reset_some(ydb):
     ydb.set(b"resetattempt", value=b"0")
     ydb.set(b"resetvalue", value=b"0")
     start_time = datetime.datetime.now()
@@ -753,7 +748,6 @@ def test_lock_blocking_other(simple_data):
     t3 = KeyTuple(b"^test3", (b"sub1", b"sub2"))
     keys_to_lock = (t1, t2, t3)
     _yottadb.lock(keys=keys_to_lock, timeout_nsec=0)
-    print(t1)
     assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t1)}") == "Lock Failed"
     assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t2)}") == "Lock Failed"
     assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Failed"
@@ -778,7 +772,6 @@ def test_delete_excel():
     with pytest.raises(_yottadb.YDBLVUNDEFError) as e:
         _yottadb.get(b"testdeleteexcel1")
     with pytest.raises(_yottadb.YDBLVUNDEFError) as e:
-        print("trying to get 2")
         _yottadb.get(b"testdeleteexcel2", (b"sub1",))
     assert _yottadb.get(b"testdeleteexcelexception", (b"sub1",)) == b"3"
 
@@ -880,7 +873,6 @@ def number_to_bytes(number):
 @pytest.mark.parametrize("initial, increment, result", increment_tests, ids=increment_test_ids)
 @pytest.mark.parametrize("key", increment_keys, ids=increment_key_test_ids)
 def test_incr(key, initial, increment, result):
-
     _yottadb.set(*key, value=initial)
     returned_value = _yottadb.incr(*key, increment=number_to_bytes(increment))
 
@@ -894,6 +886,7 @@ increment_error_test = [
     (b"0", "-1E47", _yottadb.YDBNUMOFLOWError),
     # ("0", "1E-47", _yottadb.YDBNUMOFLOWError),
 ]
+
 increment_test_ids = [
     f'"{initial}" | "{type(increment).__name__}({increment})" | {error_type}'
     for initial, increment, error_type in increment_error_test
