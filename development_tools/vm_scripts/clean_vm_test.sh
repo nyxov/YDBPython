@@ -20,10 +20,18 @@
   # * scp to freshly installed VM
   # * On Ubuntu unattended upgrades may cause this script to fail if they are running when this script tries to use 'apt'
   #   * wait for them to finish or disable them
+  #
+  # Usage:
+  # bash clean_vm_test.sh [optional URL to gitlab repository]
 
+repository=$1
+if [ "$repository" == "" ]; then
+  repository="https://gitlab.com/YottaDB/Lang/YDBPython.git"
+fi
 OS=$(awk -F= '$1=="ID" { print $2 ;}' /etc/os-release)
 VERSION=$(awk -F= '$1=="VERSION_ID" { print $2 ;}' /etc/os-release)
 OS_LIKE=$(awk -F= '$1=="ID_LIKE" { print $2 ;}' /etc/os-release)
+echo $repository
 echo $OS
 echo $VERSION
 echo $OS_LIKE
@@ -71,7 +79,7 @@ source $(pkg-config --variable=prefix yottadb)/ydb_env_set
 
 # get YDBPython code
 cd ~
-git clone https://gitlab.com/gossrock/YDBPython.git
+git clone $repository
 
 # install YDBPython
 cd YDBPython
