@@ -1,0 +1,74 @@
+#################################################################
+#                                                               #
+# Copyright (c) 2020-2021 Peter Goss All rights reserved.       #
+#                                                               #
+# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.  #
+# All rights reserved.                                          #
+#                                                               #
+#   This source code contains the intellectual property         #
+#   of its copyright holder(s), and is made available           #
+#   under a license.  If you do not know the terms of           #
+#   the license, please stop and do not read further.           #
+#                                                               #
+#################################################################
+
+
+stages:
+  - formating-checks
+  - test
+
+.ubuntu:
+  image: yottadb/yottadb-base:latest-master
+  before_script:
+    - source $(pkg-config --variable=prefix yottadb)/ydb_env_set
+    - apt update
+    - apt install -y python3-setuptools python3-dev libffi-dev python3-pip
+    - python3 -m pip install pytest-runner
+    - python3 setup.py install --user
+
+
+.centos:
+  image: yottadb/yottadb-centos-base:latest-master
+  before_script:
+    - source $(pkg-config --variable=prefix yottadb)/ydb_env_set
+    - yum install -y python3 gcc python3-devel libffi-devel
+    - python3 setup.py install --user
+
+.test:
+  script:
+    - python3 -m pip install --user pytest psutil
+    - python3 -m pytest tests/
+
+test_ubuntu:
+  stage: test
+  extends:
+    - .ubuntu
+    - .test
+
+test_centos:
+  stage: test
+  extends:
+    - .centos
+    - .test
+
+commit-verify:
+  image: ubuntu:18.04
+  stage: formating-checks
+  before_script:
+    - apt update -qq && apt-get install -y -qq git wget gnupg
+  script:
+    # Copy commit gpg key verify script to build directory and execute
+    - wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/commit_verify.sh
+    - chmod +x commit_verify.sh
+    - chmod +x ./development_tools/ci/needs_copyright.sh
+    - ./commit_verify.sh ./development_tools/ci/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBPython
+
+code-format-check:
+  image: ubuntu:18.04
+  stage: formating-checks
+  before_script:
+    - apt update -qq && apt-get install -y -qq git wget gnupg
+    - apt install -y clang-format-10 python3-pip
+    - python3 -m pip install black
+  script:
+    bash ./development_tools/ci/check_code_format.sh
