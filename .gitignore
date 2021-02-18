@@ -1,0 +1,9 @@
+.eggs/
+.venv/
+__pycache__/
+_yottadbexceptions.h
+build/
+dist/
+*.swp
+tests/__pycache__/
+yottadb.egg-info/

@@ -75,7 +75,7 @@ def ydb():
 
     os.mkdir(TEST_DATA_DIRECTORY)
     os.environ["ydb_gbldir"] = TEST_GLD
-    execute(f"{YDB_INSTALL_DIR}/mumps -run GDE change -segment default -allocation=1000 -file={TEST_DAT}")
+    execute(f"{YDB_INSTALL_DIR}/mumps -run GDE change -segment default -allocation=1000 -file={TEST_DAT} -null_subscripts=always")
     execute(f"{YDB_INSTALL_DIR}/mupip create")
 
     yield yottadb.Context()

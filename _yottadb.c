@@ -739,10 +739,11 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 	YDB_FREE_BUFFER(&error_string_buffer);
 	YDB_FREE_BUFFER(&ret_value_ydb);
 
-	if (return_NULL)
+	if (return_NULL) {
 		return NULL;
-	else
+	} else {
 		return ret_value_py;
+	}
 }
 
 /* Wrapper for ydb_lock_s() and ydb_lock_st() */

@@ -31,6 +31,7 @@ from _yottadb import YDB_DATA_NOVALUE_DESC as DATA_NOVALUE_DESC
 from _yottadb import YDB_DATA_VALUE_DESC as DATA_VALUE_DESC
 
 from _yottadb import YDB_OK, YDBTPRollback, YDBTPRestart
+from _yottadb import YDBNODEENDError
 
 
 class SearchSpace(enum.Enum):
@@ -74,8 +75,10 @@ class Context:
     def get(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> Optional[bytes]:
         return _yottadb.get(varname, subsarray, self.tp_token)
 
+    def incr(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> int:
+        return _yottadb.incr(varname, subsarray, increment=b"1", tp_token=self.tp_token)
+
     """
-    def incr(self): ...
     def lock_decr(self): ...
     def lock_incr(self): ...
     def node_next(self): ...
@@ -88,8 +91,10 @@ class Context:
     def subscript_next(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> bytes:
         return _yottadb.subscript_next(varname, subsarray, self.tp_token)
 
+    def subscript_previous(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> bytes:
+        return _yottadb.subscript_previous(varname, subsarray, self.tp_token)
+
     """
-    def subscript_previous(self): ...
     def tp(self): ...
 
     def delete_excel(self): ...
@@ -110,6 +115,47 @@ class Context:
                 yield var_next
             except _yottadb.YDBNODEENDError as e:
                 return
+
+    class SubscriptsIter:
+        def __init__(self, context, varname: bytes, subsarray: Sequence[bytes] = ()):
+            self.index = 0
+            self.context = context
+            self.varname = varname
+            self.subsarray = list(subsarray)
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            try:
+                if len(self.subsarray) > 0:
+                    sub_next = self.context.subscript_next(self.varname, self.subsarray)
+                else:
+                    sub_next = self.context.subscript_next(self.varname)
+                self.subsarray[-1] = sub_next
+            except _yottadb.YDBNODEENDError:
+                raise StopIteration
+            self.index += 1
+            return (sub_next, self.index)
+
+        def __reversed__(self):
+            result = []
+            index = 0
+            while True:
+                try:
+                    sub_next = self.context.subscript_previous(self.varname, self.subsarray)
+                    if len(self.subsarray) != 0:
+                        self.subsarray[-1] = sub_next
+                    else:
+                        return (sub_next, 1)
+                    index += 1
+                    result.append((sub_next, index))
+                except _yottadb.YDBNODEENDError:
+                    break
+            return result
+
+    def subscripts(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> SubscriptsIter:
+        return self.SubscriptsIter(self, varname, subsarray)
 
     @property
     def local_varnames(self) -> Generator[bytes, None, None]:

@@ -24,7 +24,7 @@ fi
 
 file="$1"
 
-skipextensions="ref rst png zwr html ci csv"	# List of extensions that cannot have copyrights.
+skipextensions="ref rst png zwr html ci csv txt"	# List of extensions that cannot have copyrights.
 	# .rst  -> file used to generate documentation. Since final documentation has
 	#		copyrights, this one does not require it.
 	# .png  -> these are images (i.e. binary files) used in the documentation.
@@ -40,7 +40,7 @@ if echo "$skipextensions" | grep -q -w "$(echo "$file" | awk -F . '{print $NF}')
 fi
 
 # Below is a list of specific files that do not have a copyright so ignore them
-skiplist="COPYING README.md LICENSE"
+skiplist="COPYING README.md LICENSE .gitignore"
 for skipfile in $skiplist; do
 	if [ $file = $skipfile ]; then
 		exit 1
