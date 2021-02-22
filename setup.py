@@ -17,7 +17,12 @@ import pathlib
 import csv
 from typing import Dict
 
-YDB_DIST = os.environ["ydb_dist"]
+YDB_DIST = os.environ.get("ydb_dist")
+if YDB_DIST is None:
+    print("error: $ydb_dist is not set in the environment")
+    print("help: run `source $(pkg-config --variable=prefix yottadb)/ydb_env_set`")
+    exit(1)
+
 ERROR_DEF_FILES = ["libydberrors.h", "libydberrors2.h"]
 ERROR_NAME_ALTERATIONS_FILE = "error_name_alterations.csv"
 
