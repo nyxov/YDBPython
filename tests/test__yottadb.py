@@ -25,7 +25,8 @@ from conftest import execute
 from lock import key_tuple_to_str
 
 import _yottadb
-from yottadb import KeyTuple, NOTTP
+import yottadb
+from yottadb import KeyTuple
 
 YDB_INSTALL_DIR = os.environ["ydb_dist"]
 TEST_DATA_DIRECTORY = "/tmp/test_yottadb/"
@@ -45,7 +46,6 @@ def test_get(simple_data):
 
     # Handling of keyword arguments
     assert _yottadb.get(varname="^test1") == b"test1value"
-    assert _yottadb.get(varname="^test1", tp_token=0) == b"test1value"
     assert _yottadb.get(varname="^test2", subsarray=["sub1"]) == b"test2value"
     assert _yottadb.get(varname="^test3") == b"test3value1"
     assert _yottadb.get(varname="^test3", subsarray=["sub1"]) == b"test3value2"
@@ -248,6 +248,7 @@ def test_lock_incr_varname_and_subscript():
     _yottadb.lock_decr(b"test2", (b"sub1",))
 
 
+@pytest.mark.skip(reason="inconsistent failures due to timing issues in different environments")
 def test_lock_incr_timeout_error_varname_only():
     # Timeout error, varname only
     subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test1"))
@@ -263,6 +264,7 @@ def test_lock_incr_timeout_error_varname_only():
     time.sleep(1)
 
 
+@pytest.mark.skip(reason="inconsistent failures due to timing issues in different environments")
 def test_lock_incr_timeout_error_varname_and_subscript():
     # Timeout error, varname and subscript
     subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test2 sub1"))
@@ -317,30 +319,30 @@ def test_lock_incr_no_timeout():
 # for C calls for use in recursive transaction tests
 
 
-def no_action(tp_token: int) -> None:
+def no_action() -> None:
     pass
 
 
-def set_key(key: KeyTuple, value: str, tp_token: int) -> None:
-    _yottadb.set(*key, value=value, tp_token=tp_token)
+def set_key(key: KeyTuple, value: str) -> None:
+    _yottadb.set(*key, value=value)
 
 
-def incr_key(key: KeyTuple, increment: str, tp_token: int) -> None:
-    _yottadb.incr(*key, increment=increment, tp_token=tp_token)
+def incr_key(key: KeyTuple, increment: str) -> None:
+    _yottadb.incr(*key, increment=increment)
 
 
-def conditional_set_key(key1: KeyTuple, key2: KeyTuple, value: str, traker_key: KeyTuple, tp_token: int) -> None:
-    if _yottadb.data(*traker_key, tp_token) == _yottadb.YDB_DATA_UNDEF:
-        _yottadb.set(*key1, value=value, tp_token=tp_token)
+def conditional_set_key(key1: KeyTuple, key2: KeyTuple, value: str, traker_key: KeyTuple) -> None:
+    if _yottadb.data(*traker_key) == _yottadb.YDB_DATA_UNDEF:
+        _yottadb.set(*key1, value=value)
     else:
-        _yottadb.set(*key2, value=value, tp_token=tp_token)
+        _yottadb.set(*key2, value=value)
 
 
-def raise_YDBError(undefined_key: KeyTuple, tp_token) -> None:
-    _yottadb.get(*undefined_key, tp_token=tp_token)
+def raise_YDBError(undefined_key: KeyTuple) -> None:
+    _yottadb.get(*undefined_key)
 
 
-def raise_standard_python_exception(tp_token) -> None:
+def raise_standard_python_exception() -> None:
     1 / 0
 
 
@@ -358,22 +360,22 @@ class TransactionData(NamedTuple):
 
 # Utility function for handling various transaction scenarios
 # within transaction test cases
-def process_transaction(
-    nested_transaction_data: Tuple[TransactionData], start_time: Optional[datetime.datetime] = None, tp_token: int = NOTTP
-) -> int:
+def process_transaction(nested_transaction_data: Tuple[TransactionData], start_time: Optional[datetime.datetime] = None) -> int:
     # 'current_data' is used to control the actions of the current transaction.
     #     It is set by the caller; it should not change.
     current_data = nested_transaction_data[0]
 
-    current_data.action(*current_data.action_arguments, tp_token=tp_token)
+    current_data.action(*current_data.action_arguments)
 
     sub_data = nested_transaction_data[1:]
     if len(sub_data) > 0:
         try:
             _yottadb.tp(
                 process_transaction,
-                kwargs={"nested_transaction_data": sub_data, "start_time": datetime.datetime.now()},
-                tp_token=tp_token,
+                kwargs={
+                    "nested_transaction_data": sub_data,
+                    "start_time": datetime.datetime.now(),
+                },
                 varnames=current_data.varnames,
             )
         except _yottadb.YDBTPRestart:
@@ -384,8 +386,8 @@ def process_transaction(
             seconds=current_data.restart_timeout
         ):
             return current_data.restart_timeout_return_value
-        elif _yottadb.data(*current_data.restart_key, tp_token=tp_token) == _yottadb.YDB_DATA_UNDEF:
-            _yottadb.incr(*current_data.restart_key, tp_token=tp_token)
+        elif _yottadb.data(*current_data.restart_key) == _yottadb.YDB_DATA_UNDEF:
+            _yottadb.incr(*current_data.restart_key)
             return _yottadb.YDB_TP_RESTART
         else:
             return _yottadb.YDB_OK
@@ -399,11 +401,18 @@ def process_transaction(
 def test_tp_return_YDB_OK():
     key = KeyTuple(varname="^tptests", subsarray=("test_tp_return_YDB_OK",))
     value = b"return YDB_OK"
-    transaction_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=_yottadb.YDB_OK)
+    transaction_data = TransactionData(
+        action=set_key,
+        action_arguments=(key, value),
+        return_value=_yottadb.YDB_OK,
+    )
     _yottadb.delete(*key)
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_UNDEF
 
-    _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
+    _yottadb.tp(
+        process_transaction,
+        kwargs={"nested_transaction_data": (transaction_data,)},
+    )
 
     assert _yottadb.get(*key) == value
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
@@ -545,7 +554,10 @@ def test_tp_return_YDB_TP_RESTART_reset_all():
 
     _yottadb.tp(
         process_transaction,
-        kwargs={"nested_transaction_data": (transaction_data,), "start_time": datetime.datetime.now()},
+        kwargs={
+            "nested_transaction_data": (transaction_data,),
+            "start_time": datetime.datetime.now(),
+        },
         varnames=("*",),
     )
 
@@ -558,7 +570,11 @@ def test_tp_return_YDB_TP_RESTART_reset_all():
 def test_tp_return_YDB_ERR_TPTIMEOUT():
     key = KeyTuple(varname="^tptests", subsarray=("test_tp_return_YDB_ERR_TPTIMEOUT",))
     value = b"return YDB_ERR_TPTIMEOUT"
-    transaction_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=_yottadb.YDB_ERR_TPTIMEOUT)
+    transaction_data = TransactionData(
+        action=set_key,
+        action_arguments=(key, value),
+        return_value=_yottadb.YDB_ERR_TPTIMEOUT,
+    )
     _yottadb.delete(*key)
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_UNDEF
 
@@ -662,16 +678,14 @@ def bank():
     _yottadb.delete(varname="^account", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def transfer_transaction(from_account, to_account, amount, tp_token=NOTTP):
-    from_account_balance = int(_yottadb.get(tp_token=tp_token, varname="^account", subsarray=(from_account, "balance")))
-    to_account_balance = int(_yottadb.get(tp_token=tp_token, varname="^account", subsarray=(to_account, "balance")))
+def transfer_transaction(from_account, to_account, amount):
+    from_account_balance = int(_yottadb.get(varname="^account", subsarray=(from_account, "balance")))
+    to_account_balance = int(_yottadb.get(varname="^account", subsarray=(to_account, "balance")))
 
-    _yottadb.set(
-        tp_token=tp_token, varname="^account", subsarray=(from_account, "balance"), value=str(from_account_balance - amount)
-    )
-    _yottadb.set(tp_token=tp_token, varname="^account", subsarray=(to_account, "balance"), value=str(to_account_balance + amount))
+    _yottadb.set(varname="^account", subsarray=(from_account, "balance"), value=str(from_account_balance - amount))
+    _yottadb.set(varname="^account", subsarray=(to_account, "balance"), value=str(to_account_balance + amount))
 
-    new_from_balance = int(_yottadb.get(tp_token=tp_token, varname="^account", subsarray=(from_account, "balance")))
+    new_from_balance = int(_yottadb.get(varname="^account", subsarray=(from_account, "balance")))
 
     if new_from_balance < 0:
         return _yottadb.YDB_TP_ROLLBACK
@@ -707,11 +721,11 @@ def test_tp_bank_transfer_rollback(bank):
     assert int(_yottadb.get(varname="account", subsarray=(account2, "balance"))) == account2_balance
 
 
-def callback_for_tp_simple_restart(start_time, tp_token=NOTTP):
+def callback_for_tp_simple_restart(start_time):
     now = datetime.datetime.now()
-    _yottadb.incr("resetattempt", increment="1", tp_token=tp_token)
-    _yottadb.incr("resetvalue", increment="1", tp_token=tp_token)
-    if _yottadb.get("resetattempt", tp_token=tp_token) == b"2":
+    _yottadb.incr("resetattempt", increment="1")
+    _yottadb.incr("resetvalue", increment="1")
+    if _yottadb.get("resetattempt") == b"2":
         return _yottadb.YDB_OK
     elif (now - start_time) > datetime.timedelta(seconds=0.01):
         return _yottadb.YDB_OK
@@ -721,16 +735,16 @@ def callback_for_tp_simple_restart(start_time, tp_token=NOTTP):
     return _yottadb.YDB_TP_RESTART
 
 
-def test_tp_reset_some(ydb):
-    ydb.set("resetattempt", value="0")
-    ydb.set("resetvalue", value="0")
+def test_tp_reset_some():
+    yottadb.set("resetattempt", value="0")
+    yottadb.set("resetvalue", value="0")
     start_time = datetime.datetime.now()
     result = _yottadb.tp(callback_for_tp_simple_restart, args=(start_time,), varnames=("resetvalue",))
     assert result == _yottadb.YDB_OK
     assert _yottadb.get("resetattempt") == b"2"
     assert _yottadb.get("resetvalue") == b"1"
-    ydb.delete_node("resetattempt")
-    ydb.delete_node("resetvalue")
+    yottadb.delete_node("resetattempt")
+    yottadb.delete_node("resetvalue")
 
 
 def test_subscript_next_1(simple_data):
@@ -824,6 +838,7 @@ def test_node_previous_long_subscripts():
     assert _yottadb.node_previous("testlong", ("a" * 1025, "a" * 1026, "a")) == ("a" * 1025, "a" * 1026)
 
 
+@pytest.mark.skip(reason="inconsistent failures due to timing issues in different environments")
 def test_lock_blocking_other(simple_data):
     t1 = KeyTuple("^test1")
     t2 = KeyTuple("^test2", ("sub1",))
@@ -839,6 +854,7 @@ def test_lock_blocking_other(simple_data):
     assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Success"
 
 
+@pytest.mark.skip(reason="inconsistent failures due to timing issues in different environments")
 def test_lock_being_blocked():
     subprocess.Popen(shlex.split("python3 tests/lock.py ^test1"))
     time.sleep(1)

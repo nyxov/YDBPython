@@ -11,7 +11,6 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
-from typing import Sequence
 import os
 import shutil
 import subprocess
@@ -62,13 +61,17 @@ def execute(command: str, stdin: str = "") -> str:
     return process.communicate(stdin.encode())[0].decode().strip()
 
 
-@pytest.fixture(scope="session")
-def ydb():
+@pytest.fixture(scope="function")
+def simple_data():
     """
-    A pytest fixture that sets up a test database, yields a yottadb.Context object for
-    the test to use to access that database and then deletes the database when the
-    testing session is complete.
+    A pytest fixture that creates a test database, adds the above SIMPLE_DATA tuple to that
+    database, and deletes the data and database after testing is complete. This fixture is
+    in function scope so it will be executed for each test that uses it.
+
+    Note that pytest runs tests sequentially, so it is safe for the test database to be
+    updated for each test function.
     """
+
     # setup
     if os.path.exists(TEST_DATA_DIRECTORY):  # clean up previous test if it failed to do so previously
         shutil.rmtree(TEST_DATA_DIRECTORY)
@@ -78,23 +81,13 @@ def ydb():
     execute(f"{YDB_INSTALL_DIR}/mumps -run GDE change -segment default -allocation=1000 -file={TEST_DAT} -null_subscripts=always")
     execute(f"{YDB_INSTALL_DIR}/mupip create")
 
-    yield yottadb.Context()
-
-    # teardown
-    shutil.rmtree(TEST_DATA_DIRECTORY)
-
-
-@pytest.fixture(scope="function")
-def simple_data(ydb):
-    """
-    A pytest fixture that adds the above SIMPLE_DATA tuple to the testing database and then
-    deletes that data. This fixture is in function scope so it will be deleted after each
-    test that uses it.
-    """
     for key, value in SIMPLE_DATA:
-        ydb.set(*key, value=value)
+        yottadb.set(*key, value=value)
 
     yield
 
     for key, value in SIMPLE_DATA:
-        ydb.delete_tree(*key)
+        yottadb.delete_tree(*key)
+
+    # teardown
+    shutil.rmtree(TEST_DATA_DIRECTORY)

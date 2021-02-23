@@ -285,10 +285,7 @@ def test_lock_too_many_subs():
     # Case 11: Raises a ValueError if a subsarray is longer than _yottadb.YDB_MAX_SUBS
     with pytest.raises(ValueError):
         subsarray = ["test" + str(x) for x in range(0, _yottadb.YDB_MAX_SUBS + 1)]
-        keys = (
-            "test",
-            subsarray,
-        )
+        keys = ("test", subsarray)
         _yottadb.lock(keys)
 
 
@@ -301,7 +298,6 @@ def test_lock_subscript_wrong_type():
 def test_lock_max_subscript_length():
     # Case 13: Accepts an item in a subsarray of length _yottadb.YDB_MAX_STR without raising an exception
     try:
-        # _yottadb.lock((("test", ["a" * (1000)]),))
         _yottadb.lock((("test", ["a" * (_yottadb.YDB_MAX_STR)]),))
     except _yottadb.YDBError as e:  # Testing C-extention's validation, not YottaDB's
         pass
@@ -422,14 +418,14 @@ def test_subscript_previous_subsarray():
 
 
 # tp()
-def simple_transaction(tp_token: int) -> None:
+def simple_transaction() -> None:
     """
     A simple callback for testing the tp function that does nothing and returns _yottadb.YDB_OK
     """
     return _yottadb.YDB_OK
 
 
-def callback_that_returns_wrong_type(tp_token=None):
+def callback_that_returns_wrong_type():
     """
     A simple callback for testing the tp function that returns the wrong type.
     """

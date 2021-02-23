@@ -8,3 +8,4 @@ dist/
 tests/__pycache__/
 yottadb.egg-info/
 mumps.dat
+*.out

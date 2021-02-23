@@ -26,23 +26,17 @@ MAX_WORD_LEN = 128  # Size increased from the C version which uses 64 here
 TP_TOKEN = yottadb.NOTTP
 
 
-def test_wordfreq(ydb):
+def test_wordfreq():
     # Initialize all array variable names we are planning to use. Randomly use locals vs globals to store word frequencies.
     # If using globals, delete any previous contents
     if os.getpid() % 2:
-        # words_var = ydb[b"words"]
-        # index_var = ydb[b"index"]
         words_var = b"words"
         index_var = b"index"
     else:
-        # words_var = ydb[b"^words"]
-        # words_var.delete_tree()
-        # index_var = ydb[b"^index"]
-        # index_var.delete_tree()
         words_var = b"^words"
-        ydb.delete_tree(words_var)
+        yottadb.delete_tree(words_var)
         index_var = b"^index"
-        ydb.delete_tree(index_var)
+        yottadb.delete_tree(index_var)
 
     # Read lines from input file and count the number of words in each
     with open("tests/wordfreq_input.txt", "r") as input_file:
@@ -51,23 +45,23 @@ def test_wordfreq(ydb):
             line = line.lower()  # Lowercase the current line
             words = line.split()  # Breakup line into words on whitespace
             for word in words:
-                ydb.incr(words_var, (word.encode(),))
+                yottadb.incr(words_var, (word.encode(),))
 
-    for subscript, discard in ydb.subscripts(words_var, (b"",)):
-        count = ydb.get(words_var, (subscript,))
-        ydb.set(index_var, (count, subscript), b"")
+    for subscript, discard in yottadb.subscripts(words_var, (b"",)):
+        count = yottadb.get(words_var, (subscript,))
+        yottadb.set(index_var, (count, subscript), b"")
 
-    for word, discard in reversed(ydb.subscripts(index_var, (b"",))):
-        for count, discard in ydb.subscripts(index_var, (word, b"")):
+    for word, discard in reversed(yottadb.subscripts(index_var, (b"",))):
+        for count, discard in yottadb.subscripts(index_var, (word, b"")):
             print("{}\t{}".format(word, count))
 
 
-def test_wordfreq_key(ydb):
-    ydb["^words"].delete_tree()
-    ydb["^index"].delete_tree()
+def test_wordfreq_key():
+    yottadb.Key("^words").delete_tree()
+    yottadb.Key("^index").delete_tree()
     try:
         with open("tests/wordfreq_input.txt", "r") as input_file:
-            words = ydb["^words"]
+            words = yottadb.Key("^words")
             for line in input_file.readlines():
                 for word in line.split(" "):
                     word = word.strip().lower()
@@ -75,14 +69,13 @@ def test_wordfreq_key(ydb):
                         words[word].incr()
 
             # Iterate through words and store based on frequency
-            index = ydb["^index"]
+            index = yottadb.Key("^index")
             for word in words:
-                # print(index[words[word.value]])
                 index[words[word.name].value][word.name].value = ""
 
             # Print the keys ordered by amount
             for key1 in reversed(index):
-                for key2 in ydb["^index"][key1.name]:
+                for key2 in yottadb.Key("^index")[key1.name]:
                     print("{}\t{}".format(key1.name, key2.name))
     except IOError:
         print("Failed to open file")

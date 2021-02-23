@@ -11,7 +11,7 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
-from typing import Optional, List, Union, Generator, Sequence, NamedTuple, cast, Tuple, AnyStr
+from typing import Optional, List, Generator, Sequence, NamedTuple, AnyStr, Union, Callable
 import enum
 from builtins import property
 
@@ -54,154 +54,106 @@ class KeyTuple(NamedTuple):
         return return_value
 
 
-class Context:
-    tp_token: int
+def get(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Optional[bytes]:
+    try:
+        return _yottadb.get(varname, subsarray)
+    except (_yottadb.YDBLVUNDEFError, _yottadb.YDBGVUNDEFError):
+        return None
 
-    def __init__(self, tp_token=NOTTP):
-        self.tp_token = tp_token
 
-    def __getitem__(self, item: AnyStr) -> "Key":
-        return Key(name=item, context=self)
+def set(varname: Union[AnyStr, KeyTuple], subsarray: Sequence[AnyStr] = (), value: AnyStr = "") -> None:
+    # Derive call-in arguments from KeyTuple if passed,
+    # otherwise use arguments as is
+    if isinstance(varname, KeyTuple):
+        subsarray = varname.subsarray
+        varname = varname.varname
+    _yottadb.set(varname, subsarray, value)
 
-    def data(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> int:
-        return _yottadb.data(varname, subsarray, self.tp_token)
 
-    def delete_node(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
-        _yottadb.delete(varname, subsarray, DEL_NODE, self.tp_token)
+def data(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> int:
+    return _yottadb.data(varname, subsarray)
 
-    def delete_tree(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
-        _yottadb.delete(varname, subsarray, DEL_TREE, self.tp_token)
 
-    def get(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Optional[bytes]:
-        return _yottadb.get(varname, subsarray, self.tp_token)
+def delete_node(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
+    _yottadb.delete(varname, subsarray, DEL_NODE)
 
-    def incr(self, varname: AnyStr, subsarray: Sequence[bytes] = ()) -> int:
-        return _yottadb.incr(varname, subsarray, increment=b"1", tp_token=self.tp_token)
 
-    """
-    def lock_decr(self): ...
-    def lock_incr(self): ...
-    def node_next(self): ...
-    def node_previous(self): ...
-    """
+def delete_tree(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
+    _yottadb.delete(varname, subsarray, DEL_TREE)
 
-    def set(self, varname: AnyStr, subsarray: Sequence[AnyStr] = (), value: AnyStr = "") -> None:
-        _yottadb.set(varname, subsarray, value, self.tp_token)
 
-    def subscript_next(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> AnyStr:
-        return _yottadb.subscript_next(varname, subsarray, self.tp_token)
+def incr(varname: AnyStr, subsarray: Sequence[bytes] = (), increment: Union[int, str] = "1") -> int:
+    if isinstance(increment, int):
+        # Implicitly convert integers to string for passage to API
+        increment = str(increment)
+    return int(_yottadb.incr(varname, subsarray, increment))
 
-    def subscript_previous(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> bytes:
-        return _yottadb.subscript_previous(varname, subsarray, self.tp_token)
 
-    """
-    def tp(self): ...
+def subscript_next(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> AnyStr:
+    return _yottadb.subscript_next(varname, subsarray)
 
-    def delete_excel(self): ...
-    def lock(self): ...
 
-    def str2zwr(self): ...
-    def zwr2str(self): ...
-    """
+def subscript_previous(varname: bytes, subsarray: Sequence[bytes] = ()) -> bytes:
+    return _yottadb.subscript_previous(varname, subsarray)
 
-    def _varnames(self, first: AnyStr = "^") -> Generator[AnyStr, None, None]:
-        var_next: AnyStr = f"{first}%"
-        if self.data(var_next) != 0:
-            yield var_next
 
+def tp(
+    callback: object,
+    args: tuple = None,
+    transid: str = "BATCH",
+    varnames: Sequence[AnyStr] = None,
+    **kwargs,
+):
+    return _yottadb.tp(callback, args, kwargs, transid, varnames)
+
+
+class SubscriptsIter:
+    def __init__(self, varname: bytes, subsarray: Sequence[bytes] = ()):
+        self.index = 0
+        self.varname = varname
+        self.subsarray = list(subsarray)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            if len(self.subsarray) > 0:
+                sub_next = subscript_next(self.varname, self.subsarray)
+            else:
+                sub_next = subscript_next(self.varname)
+            self.subsarray[-1] = sub_next
+        except _yottadb.YDBNODEENDError:
+            raise StopIteration
+        self.index += 1
+        return (sub_next, self.index)
+
+    def __reversed__(self):
+        result = []
+        index = 0
         while True:
             try:
-                var_next = self.subscript_next(var_next)
-                yield var_next
-            except _yottadb.YDBNODEENDError as e:
-                return
-
-    class SubscriptsIter:
-        def __init__(self, context, varname: bytes, subsarray: Sequence[bytes] = ()):
-            self.index = 0
-            self.context = context
-            self.varname = varname
-            self.subsarray = list(subsarray)
-
-        def __iter__(self):
-            return self
-
-        def __next__(self):
-            try:
-                if len(self.subsarray) > 0:
-                    sub_next = self.context.subscript_next(self.varname, self.subsarray)
+                sub_next = subscript_previous(self.varname, self.subsarray)
+                if len(self.subsarray) != 0:
+                    self.subsarray[-1] = sub_next
                 else:
-                    sub_next = self.context.subscript_next(self.varname)
-                self.subsarray[-1] = sub_next
+                    return (sub_next, 1)
+                index += 1
+                result.append((sub_next, index))
             except _yottadb.YDBNODEENDError:
-                raise StopIteration
-            self.index += 1
-            return (sub_next, self.index)
+                break
+        return result
 
-        def __reversed__(self):
-            result = []
-            index = 0
-            while True:
-                try:
-                    sub_next = self.context.subscript_previous(self.varname, self.subsarray)
-                    if len(self.subsarray) != 0:
-                        self.subsarray[-1] = sub_next
-                    else:
-                        return (sub_next, 1)
-                    index += 1
-                    result.append((sub_next, index))
-                except _yottadb.YDBNODEENDError:
-                    break
-            return result
 
-    def subscripts(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> SubscriptsIter:
-        return self.SubscriptsIter(self, varname, subsarray)
-
-    @property
-    def local_varnames(self) -> Generator[AnyStr, None, None]:
-        for var in self._varnames(first=""):
-            yield var
-
-    @property
-    def local_varname_keys(self) -> Generator["Key", None, None]:
-        for var in self.local_varnames:
-            yield self[var]
-
-    @property
-    def global_varnames(self) -> Generator[AnyStr, None, None]:
-        for var in self._varnames(first="^"):
-            yield var
-
-    @property
-    def global_varname_keys(self) -> Generator["Key", None, None]:
-        for var in self.global_varnames:
-            yield self[var]
-
-    @property
-    def all_varnames(self) -> Generator[AnyStr, None, None]:
-        for var in self.global_varnames:
-            yield var
-        for var in self.local_varnames:
-            yield var
-
-    @property
-    def all_varname_keys(self) -> Generator["Key", None, None]:
-        for var in self.all_varnames:
-            yield self[var]
+def subscripts(varname: bytes, subsarray: Sequence[bytes] = ()) -> SubscriptsIter:
+    return SubscriptsIter(varname, subsarray)
 
 
 class Key:
-    context: Context
     name: AnyStr
     parent: Optional["Key"]
 
-    def __init__(self, name: AnyStr, parent: Optional["Key"] = None, context: Context = None) -> None:
-        if isinstance(context, Context):
-            self.context = context
-        elif context is None:
-            self.context = Context()
-        else:
-            raise TypeError("'context' must be an instance of yottadb.Context")
+    def __init__(self, name: AnyStr, parent: Optional["Key"] = None) -> None:
         if isinstance(name, str) or isinstance(name, bytes):
             self.name = name
         else:
@@ -222,10 +174,10 @@ class Key:
         return f"{self.__class__.__name__}:{self}"
 
     def __setitem__(self, item, value):
-        Key(name=item, parent=self, context=self.context).value = value
+        Key(name=item, parent=self).value = value
 
     def __getitem__(self, item):
-        return Key(name=item, parent=self, context=self.context)
+        return Key(name=item, parent=self)
 
     def __eq__(self, other) -> bool:
         if isinstance(other, Key):
@@ -241,10 +193,10 @@ class Key:
         subscript_subsarray.append("")
         while True:
             try:
-                sub_next = self.context.subscript_next(self.varname, subscript_subsarray)
+                sub_next = subscript_next(self.varname, subscript_subsarray)
                 subscript_subsarray[-1] = sub_next
                 yield Key(sub_next, self)
-            except _yottadb.YDBNODEENDError:
+            except YDBNODEENDError:
                 return
 
     def __reversed__(self) -> Generator:
@@ -255,11 +207,50 @@ class Key:
         subscript_subsarray.append("")
         while True:
             try:
-                sub_next = self.context.subscript_previous(self.varname, subscript_subsarray)
+                sub_next = subscript_previous(self.varname, subscript_subsarray)
                 subscript_subsarray[-1] = sub_next
                 yield Key(sub_next, self)
-            except _yottadb.YDBNODEENDError:
+            except YDBNODEENDError:
                 return
+
+    def get(self) -> Optional[bytes]:
+        return get(self.varname, self.subsarray)
+
+    def set(self, value: AnyStr = "") -> None:
+        return set(self.varname, self.subsarray, value)
+
+    @property
+    def data(self) -> int:
+        return data(self.varname, self.subsarray)
+
+    def delete_node(self) -> None:
+        delete_node(self.varname, self.subsarray)
+
+    def delete_tree(self) -> None:
+        delete_tree(self.varname, self.subsarray)
+
+    def incr(self, increment: Union[int, str] = "1") -> int:
+        return int(incr(self.varname, self.subsarray, increment))
+
+    def subscript_next(self, varname: AnyStr = None, subsarray: Sequence[AnyStr] = ()) -> AnyStr:
+        if varname is None:
+            varname = self.varname
+        return subscript_next(varname, subsarray)
+
+    def subscript_previous(self, varname: AnyStr = None, subsarray: Sequence[bytes] = ()) -> bytes:
+        if varname is None:
+            varname = self.varname
+        return subscript_previous(varname, subsarray)
+
+    def tp(
+        self,
+        callback: Callable,
+        args: tuple = None,
+        transid: str = "BATCH",
+        varnames: Sequence[AnyStr] = None,
+        **kwargs,
+    ):
+        return tp(callback, args, kwargs, transid, varnames)
 
     @property
     def varname_key(self) -> "Key":
@@ -294,28 +285,12 @@ class Key:
 
     @property
     def value(self) -> Optional[AnyStr]:
-        try:
-            return self.context.get(self.varname, self.subsarray)
-        except (_yottadb.YDBLVUNDEFError, _yottadb.YDBGVUNDEFError):
-            return None
+        return get(self.varname, self.subsarray)
 
     @value.setter
     def value(self, value: AnyStr) -> None:
         # Value must be str or bytes
-        self.context.set(self.varname, self.subsarray, value)
-
-    def delete_node(self):
-        self.context.delete_node(self.varname, self.subsarray)
-
-    def delete_tree(self):
-        self.context.delete_tree(self.varname, self.subsarray)
-
-    @property
-    def data(self):
-        return self.context.data(self.varname, self.subsarray)
-
-    def incr(self):
-        self.context.incr(self.varname, self.subsarray)
+        set(self.varname, self.subsarray, value)
 
     @property
     def has_value(self):
@@ -340,10 +315,10 @@ class Key:
         subscript_subsarray.append("")
         while True:
             try:
-                sub_next = self.context.subscript_next(self.varname, subscript_subsarray)
+                sub_next = subscript_next(self.varname, subscript_subsarray)
                 subscript_subsarray[-1] = sub_next
                 yield sub_next
-            except _yottadb.YDBNODEENDError:
+            except YDBNODEENDError:
                 return
 
     @property
@@ -351,35 +326,32 @@ class Key:
         for sub in self.subscripts:
             yield self[sub]
 
+    """
+    def lock_decr(self): ...
+    def lock_incr(self): ...
+    def node_next(self): ...
+    def node_previous(self): ...
+
+    def delete_excel(self): ...
+    def lock(self): ...
+
+    def str2zwr(self): ...
+    def zwr2str(self): ...
+    """
+
 
 def transaction(function):
-    def get_context(*args, **kwargs):
-        if "context" in kwargs.keys():
-            return kwargs["context"]
-        else:
-            return args[-1]
-
     def wrapper(*args, **kwargs):
-        context = get_context(*args, **kwargs)
-
         def wrapped_transaction(*args, **kwargs):
-            tp_token = kwargs["tp_token"]
-            del kwargs["tp_token"]
-            old_token = None
-            context = get_context(*args, **kwargs)
-            old_token = context.tp_token
-            context.tp_token = tp_token
-            ret_val = _yottadb.YDB_OK
+            ret_val = YDB_OK
             try:
                 ret_val = function(*args, **kwargs)
-                if ret_val == None:
-                    ret_val = _yottadb.YDB_OK
-            except _yottadb.YDBTPRestart:
+                if ret_val is None:
+                    ret_val = YDB_OK
+            except YDBTPRestart:
                 ret_val = _yottadb.YDB_TP_RESTART
-            finally:
-                context.tp_token = old_token
             return ret_val
 
-        return _yottadb.tp(wrapped_transaction, args=args, kwargs=kwargs, tp_token=context.tp_token)
+        return _yottadb.tp(wrapped_transaction, args=args, kwargs=kwargs)
 
     return wrapper

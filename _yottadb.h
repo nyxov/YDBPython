@@ -20,12 +20,12 @@
 #define YDBPY_DEFAULT_SUBSCRIPT_COUNT	2
 #define MAX_CONONICAL_NUMBER_STRING_MAX 48
 
-#define YDB_LOCK_MIN_ARGS		4
+#define YDB_LOCK_MIN_ARGS		2
 #define YDB_LOCK_ARGS_PER_KEY		3
 #define YDB_CALL_VARIADIC_MAX_ARGUMENTS 36
 #define YDB_LOCK_MAX_KEYS		(YDB_CALL_VARIADIC_MAX_ARGUMENTS - YDB_LOCK_MIN_ARGS) / YDB_LOCK_ARGS_PER_KEY
 
-#define YDBPY_MAX_ERRORMSG 1024
+#define YDBPY_MAX_ERRORMSG 2048
 
 /* Set of acceptable Python error types. Each type is named by prefixing a Python error name with `YDBPython`,
  * with the exception of YDBPython_NoError. This item doesn't represent a Python error, but is included at enum value 0
@@ -48,6 +48,7 @@ typedef enum YDBPythonSequenceType {
 
 // TypeError messages
 #define YDBPY_ERR_NOT_LIST_OR_TUPLE		    "value must be list or tuple."
+#define YDBPY_ERR_VARNAME_NOT_BYTES_LIKE	    "varname argument is not a bytes-like object (bytes or str)"
 #define YDBPY_ERR_ITEM_NOT_BYTES_LIKE		    "item %ld is not a bytes-like object (bytes or str)"
 #define YDBPY_ERR_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE "item %ld is not a list or tuple."
 #define YDBPY_ERR_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES "item %ld in key sequence invalid: first element must be of type 'bytes'"
@@ -113,8 +114,10 @@ typedef struct {
 
 #define FREE_BUFFER_ARRAY(ARRAY, LEN)                                 \
 	{                                                             \
-		for (int i = 0; i < (LEN); i++)                       \
+		for (int i = 0; i < (LEN); i++) {                     \
 			YDB_FREE_BUFFER(&((ydb_buffer_t *)ARRAY)[i]); \
+		}                                                     \
+		free(ARRAY);                                          \
 	}
 
 /* Safely downcasts SRC_LEN (Py_ssize_t) and stores in DEST_LEN (unsigned int).
@@ -155,6 +158,7 @@ typedef struct {
 #define FIX_BUFFER_LENGTH(BUFFER)                           \
 	{                                                   \
 		int correct_length = BUFFER.len_used;       \
+                                                            \
 		YDB_FREE_BUFFER(&BUFFER);                   \
 		YDB_MALLOC_BUFFER(&BUFFER, correct_length); \
 	}

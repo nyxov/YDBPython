@@ -5,6 +5,7 @@
 YDBPython provides a Pythonic API for accessing YottaDB databases.
 
 # Requirements
+
 1. Ubuntu Server 18.04 (or similar)
 2. Python > 3.6 (f-string and type annotation used)
     1. including the 'python3-dev' package that contains `Python.h`
@@ -12,6 +13,7 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 3. YottaDB
 
 # Installation
+
 0. Install Ubuntu Server 18.04
 
 1. Install YottaDB per the [Quick Start](https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#quick-start) guide instructions or from [source](https://gitlab.com/YottaDB/DB/YDB)
@@ -127,3 +129,15 @@ simple_transaction(b'test', db)
 print(f"{db[b'test1']}: {db[b'test1'].value}")
 print(f"{db[b'test2']}: {db[b'test2'].value}")
 ```
+
+# Frequently Asked Questions
+
+## Does YDBPython support multi-threading?
+
+No, YDBPython does not support multithreading. This is due to the limitations of the Python Global Interpreter Lock for CPU-intensive multithreading. For background, see the following resources:
++ Python documentation: [Thread State and the Global Interpreter Lock](https://docs.python.org/3/c-api/init.html#thread-state-and-the-global-interpreter-lock)
++ [Python’s GIL — A Hurdle to Multithreaded Program](https://medium.com/python-features/pythons-gil-a-hurdle-to-multithreaded-program-d04ad9c1a63)
++ [Grok the GIL: How to write fast and thread-safe Python](https://opensource.com/article/17/4/grok-gil)
++ YDBPython GitLab discussion: [Issue #7](https://gitlab.com/YottaDB/Lang/YDBPython/-/issues/7)
+
+Accordingly, the Python `threading` and `multithreading` should be avoided when developing applications with YDBPython. However, YDBPython does support multiprocessing and may be safely used with the Python `multiprocessing` library for parallelism. For an example of `multiprocessing` usage, see `tests/test_threeenp1.py`.

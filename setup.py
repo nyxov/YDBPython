@@ -54,7 +54,30 @@ def create_exceptions_from_error_codes():
                     if error_id in alterations.keys():
                         error_id = alterations[error_id]
                     exception_info["python_name"] = f"YDB{error_id}Error"
+                    exception_info["exception_type"] = "YDBError"
                     exception_data.append(exception_info)
+
+    # Extract special exceptions from libyottadb.h
+    file_path = YDB_Dir / "libyottadb.h"
+    with file_path.open() as file:
+        for line in file.readlines():
+            if line[:7] == "#define":
+                parts = line.split()
+                exception_info = {"c_name": parts[1]}
+                # Each of these "errors" has its own unique exception type
+                # to allow each to be treated as a special case by users
+                if "YDB_TP_RESTART" == parts[1]:
+                    exception_info["python_name"] = "YDBTPRestart"
+                    exception_info["exception_type"] = "YDBTPRestart"
+                elif "YDB_TP_ROLLBACK" == parts[1]:
+                    exception_info["python_name"] = f"YDBTPRollback"
+                    exception_info["exception_type"] = "YDBTPRollback"
+                elif "YDB_LOCK_TIMEOUT" == parts[1]:
+                    exception_info["python_name"] = f"YDBTimeoutError"
+                    exception_info["exception_type"] = "YDBTimeoutError"
+                else:
+                    continue
+                exception_data.append(exception_info)
 
     header_file_text = ""
     # define exceptions
@@ -64,11 +87,13 @@ def create_exceptions_from_error_codes():
     # create macro to add exceptions to module
     header_file_text += "#define ADD_YDBERRORS() { \\\n"
     add_exception_template = (
-        '    {python_name} = PyErr_NewException("_yottadb.{python_name}", YDBError, NULL); \\\n'
+        '    {python_name} = PyErr_NewException("_yottadb.{python_name}", {exception_type}, NULL); \\\n'
         + '    PyModule_AddObject(module, "{python_name}", {python_name}); \\\n'
     )
     for exception_info in exception_data:
-        header_file_text += add_exception_template.replace("{python_name}", exception_info["python_name"])
+        header_file_text += add_exception_template.replace("{python_name}", exception_info["python_name"]).replace(
+            "{exception_type}", exception_info["exception_type"]
+        )
     header_file_text += "}\n"
     header_file_text += "\n"
     # create macro to test for and raise exception
@@ -100,8 +125,9 @@ setup(
             sources=["_yottadb.c"],
             include_dirs=[YDB_DIST],
             library_dirs=[YDB_DIST],
+            undef_macros=["NDEBUG"],
             extra_link_args=["-l", "yottadb", "-l", "ffi"],
-            extra_compile_args=["--std=c99"],
+            extra_compile_args=["--std=c99", "-Wall", "-Wextra", "-pedantic"],
         )
     ],
     py_modules=["_yottadb", "yottadb"],
