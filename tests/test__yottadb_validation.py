@@ -32,70 +32,73 @@ import psutil
 
 def varname_invalid(function):
     """
-    This function is used to test the function passed does correct validation of a variable name.
-    It tests that the function will:
-        1) Raise a TypeError when the varname is not of type bytes
-        2) That a varname may be as long as _yottadb.YDB_MAX_IDENT without raising ValueError
-        3) That if a varname is longer than _yottadb.YDB_MAX_IDENT it will raise a ValueError
+    Tests whether the function passed correctly validates variable names by
+    verifying behavior under the following conditions:
+        1) varname is of incorrect type (i.e. not str or bytes): Raise a TypeError
+        2) length of varname > _yottadb.YDB_MAX_IDENT: Raise ValueError
+        3) length of varname <= _yottadb.YDB_MAX_IDENT: No error
 
     :param function: Any function that takes "varname" as a parameter.
     """
-    # Case 1: varname must be bytes type, if not raise TypeError
+    # Case 1: varname is not str or bytes: Raise TypeError
     with pytest.raises(TypeError):
-        function(varname="b")
+        function(varname=1)
 
-    # Case 2: almost too long so should not raise ValueError
-    try:
-        function(varname=b"b" * (_yottadb.YDB_MAX_IDENT))
-    except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
-        pass
-
-    # Case 3:  varname must not be longer than _yottadb.YDB_MAX_IDENT. if not, raise ValueError
+    # Case 2: length of varname > _yottadb.YDB_MAX_IDENT: Raise ValueError
     with pytest.raises(ValueError):
-        function(varname=b"b" * (_yottadb.YDB_MAX_IDENT + 1))
+        function(varname="b" * (_yottadb.YDB_MAX_IDENT + 1))
+
+    # Case 3: length of varname == _yottadb.YDB_MAX_IDENT: No Error
+    try:
+        function(varname="b" * (_yottadb.YDB_MAX_IDENT))
+    except _yottadb.YDBError:  # Testing C-extention's validation, not YottaDB's
+        pass
 
 
 def subsarray_invalid(function):
     """
-    This function is used to test the function passed does correct validation of a list of subscripts.
-    A subsarray must be a sequence (such as list or tuple but not bytes) of bytes objects.
-    It tests that the function will:
-        1) Raise a TypeError if the subsarray parameter is a bytes object.
-        2) Not raise a ValueError when it has a sequence that is equal to _yottadb.YDB_MAX_SUBS in length
-        3) Raises a ValueError when the sequence's length exceeds _yottab.YDB_MAX_SUBS
-        4) Raises a TypeError when a value in the sequence is not of type bytes
-        5) Not raise a ValueError when a bytes object is of length _yottadb.YDB_MAX_STR
-        6) Raises a ValueError when a bytes object exceeds _yottadb.YDB_MAX_STR
+    Tests whether the function passed does correct validation of a list of
+    subscripts, i.e. a subsarray. A subsarray must be a non-bytes-like
+    sequence, e.g. a list or tuple, of str objects. This means that str and
+    bytes, though technically sequences, should not be accepted.
+
+    The following conditions are tested:
+        1) Subsarray parameter is not a valid sequence: Raise TypeError
+        2) Sequence length == _yottadb.YDB_MAX_SUBS: No Error
+        3) Sequence length > _yottadb.YDB_MAX_SUBS: Raise ValueError
+        4) Any value in the sequence is not of type str: Raise TypeError
+        5) Length of str object == _yottadb.YDB_MAX_STR: No Error
+        6) Length of str object > _yottadb.YDB_MAX_STR: Raise ValueError
 
     :param function: Any function that takes "varname"  and "subsarray" as a parameters.
     """
-    # Case 1: must raise TypeError if subsarray is a bytes object
+    # Case 1: subsarray is not a valid sequence: raise TypeError
     with pytest.raises(TypeError):
-        function(varname=b"test", subsarray=b"this is the wrong kind of sequence")
+        function(varname="test", subsarray="this is the wrong kind of sequence")
 
-    # Case 2: almost too many so will not raise ValueError
+    # Case 2: subsarray length == _yottadb.YDB_MAX_SUBS: no error
     try:
-        function(varname=b"test", subsarray=(b"b",) * (_yottadb.YDB_MAX_SUBS))
-    except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
+        function(varname="test", subsarray=("b",) * (_yottadb.YDB_MAX_SUBS))
+    except _yottadb.YDBError:  # Testing C-extention's validation, not YottaDB's
         pass
 
-    # Case 3: too many items in subsarray parameter so raise ValueError
+    # Case 3: subsarray length > _yottadb.YDB_MAX_SUBS: raise ValueError
     with pytest.raises(ValueError):
-        function(varname=b"test", subsarray=(b"b",) * (_yottadb.YDB_MAX_SUBS + 1))
+        function(varname="test", subsarray=("b",) * (_yottadb.YDB_MAX_SUBS + 1))
 
-    # Case 4: items in subsarray must be bytes so raise TypeError if not
+    # Case 4: items in subsarray not of type str: raise TypeError
     with pytest.raises(TypeError):
-        function(varname=b"test", subsarray=("not a bytes object",))
+        function(varname="test", subsarray=(1,))
 
-    # Case 5: almost too long so do not raise ValueError
+    # Case 5: str length == _yottadb.YDB_MAX_STR: raise ValueError
     try:
-        function(b"test", (b"b" * (_yottadb.YDB_MAX_STR),))
-    except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
+        function("test", ("b" * (_yottadb.YDB_MAX_STR),))
+    except _yottadb.YDBError:  # Testing C-extention's validation, not YottaDB's
         pass
 
-    # Case 6: item in subsarray sequence is too long so raise ValueError
+    # Case 6: str length > _yottadb.YDB_MAX_STR: raise ValueError
     with pytest.raises(ValueError):
-        function(b"test", (b"b" * (_yottadb.YDB_MAX_STR + 1),))
+        function("test", ("b" * (_yottadb.YDB_MAX_STR + 1),))
 
 
 # data()
@@ -122,7 +125,7 @@ def test_delete_excel_varnames():
     This function tests the validation of the delete_excel function's varnames parameter.
     It tests that the delete_excel function:
         1) Raises a TypeError if the varnames parameter is not a proper Sequence (list or tuple)
-        2) Raises a TypeError if the contents of the varname list or tuple is not a bytes object
+        2) Raises a TypeError if the contents of the varname list or tuple is not a str object
         3) Accepts up to _yottadb.YDB_MAX_NAMES without raising an exception
         4) Raise a ValueError if varnames is longer than _yottadb.YDB_MAX_NAMES
         5) Accept item in varnames up to _yottadb.YDB_MAX_IDENT without raising exception
@@ -132,23 +135,23 @@ def test_delete_excel_varnames():
     with pytest.raises(TypeError):
         _yottadb.delete_excel(varnames="not a sequence")
 
-    # Case 2: Raises a TypeError if the contents of the varname list or tuple is not a bytes object
+    # Case 2: Raises a TypeError if the contents of the varname list or tuple is not a str object
     with pytest.raises(TypeError):
-        _yottadb.delete_excel(varnames=("not a sequence of bytes",))
+        _yottadb.delete_excel(varnames=(1,))
 
     # Case 3: Accepts up to _yottadb.YDB_MAX_NAMES without raising an exception
-    _yottadb.delete_excel(varnames=[b"test" + bytes(str(x), encoding="utf-8") for x in range(0, _yottadb.YDB_MAX_NAMES)])
+    _yottadb.delete_excel(varnames=["test" + str(x) for x in range(0, _yottadb.YDB_MAX_NAMES)])
 
     # Case 4: Raise a ValueError if varnames is longer than _yottadb.YDB_MAX_NAMES
     with pytest.raises(ValueError):
-        _yottadb.delete_excel(varnames=[b"test" + bytes(str(x), encoding="utf-8") for x in range(0, _yottadb.YDB_MAX_NAMES + 1)])
+        _yottadb.delete_excel(varnames=["test" + str(x) for x in range(0, _yottadb.YDB_MAX_NAMES + 1)])
 
     # Case 5: Accept item in varnames up to _yottadb.YDB_MAX_IDENT without raising exception
-    _yottadb.delete_excel(varnames=[b"b" * (_yottadb.YDB_MAX_IDENT)])
+    _yottadb.delete_excel(varnames=["b" * (_yottadb.YDB_MAX_IDENT)])
 
     # Case 6: Raises a ValueError if an item in the varnames list or tuple is longer than _yottadb.YDB_MAX_IDENT
     with pytest.raises(ValueError):
-        _yottadb.delete_excel(varnames=[b"b" * (_yottadb.YDB_MAX_IDENT + 1)])
+        _yottadb.delete_excel(varnames=["b" * (_yottadb.YDB_MAX_IDENT + 1)])
 
 
 # get()
@@ -173,24 +176,24 @@ def test_incr_increment():
     """
     This function tests the validation of the incr function's increment parameter.
     It tests that the incr function:
-        1) Raises a TypeError if the value that is passed to it is not a bytes object
+        1) Raises a TypeError if the value that is passed to it is not a str object
         2) Accepts a value up to _yottadb.YDB_MAX_STR in length without raising an exception
         3) Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
     """
-    key = {"varname": b"test", "subsarray": (b"b",)}
-    # Case 1: Raises a TypeError if the value that is passed to it is not a bytes object
+    key = {"varname": "test", "subsarray": ("b",)}
+    # Case 1: Raises a TypeError if the value that is passed to it is not a str object
     with pytest.raises(TypeError):
-        _yottadb.incr(**key, increment="not bytes")
+        _yottadb.incr(**key, increment=1)
 
     # Case 2: Accepts a value up to _yottadb.YDB_MAX_STR in length without raising an exception
     try:
-        _yottadb.incr(**key, increment=b"1" * (_yottadb.YDB_MAX_STR))
+        _yottadb.incr(**key, increment="1" * (_yottadb.YDB_MAX_STR))
     except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
         pass
 
     # Case 3: Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
     with pytest.raises(ValueError):
-        _yottadb.incr(**key, increment=b"1" * (_yottadb.YDB_MAX_STR + 1))
+        _yottadb.incr(**key, increment="1" * (_yottadb.YDB_MAX_STR + 1))
 
 
 # lock()
@@ -200,119 +203,124 @@ It tests that the lock function:
     1)  Raises a Type Error if the value is a not a list or tuple.
     2)  Accepts a list of keys as long as _yottadb.YDB_LOCK_MAX_KEYS without raising a exception
     3)  Raises a ValueError if the list passed to it is longer than _yottadb.YDB_LOCK_MAX_KEYS
-    4)  Raises a TypeError if the first element of a key is not a bytes object
+    4)  Raises a TypeError if the first element of a key is not a str object
     5)  Raises a ValueError if a key doesn't have any element
     6)  Raise a ValueError if a key has more than 2 elements
-    7)  Raises a TypeError if the first element of a key (representing a varname) is not a bytes object
+    7)  Raises a TypeError if the first element of a key (representing a
+    varname) is not a str object
     8)  The first element of a key (varname) may be up to _yottadb.YDB_MAX_IDENT in length without raising an exception
     9)  Raises a TypeError if the second element of a key is not a list or tuple
-    10) Accepts a subsarray list of bytes up to _yottadb.YDB_MAX_SUBS without raising an exception
+    10) Accepts a subsarray list of str up to _yottadb.YDB_MAX_SUBS without raising an exception
     11) Raises a ValueError if a subsarray is longer than _yottadb.YDB_MAX_SUBS
-    12) Raises a TypeError if an element of a subsarray is not a bytes object
+    12) Raises a TypeError if an element of a subsarray is not a str object
     13) Accepts an item in a subsarray of length _yottadb.YDB_MAX_STR without raising an exception
     14) Raises a Value Error if a subsarray has an element that is longer than _yottadb.YDB_MAX_STR
     """
 
 
-def test_lock_keys_case1():
+def test_lock_typeerror():
     # Case 1: Raises a Type Error if the value is a not a list or tuple.
     with pytest.raises(TypeError):
         _yottadb.lock("not list or tuple")
 
 
-def test_lock_keys_case2():
+def test_lock_max_keys_ok():
     # Case 2: Accepts a list of keys as long as _yottadb.YDB_LOCK_MAX_KEYS without raising a exception
-    keys = [[b"test" + bytes(str(x), encoding="utf-8")] for x in range(0, _yottadb.YDB_LOCK_MAX_KEYS)]
+    keys = [["test" + str(x)] for x in range(0, _yottadb.YDB_LOCK_MAX_KEYS)]
     _yottadb.lock(keys)
 
 
-def test_lock_keys_case3():
+def test_lock_too_many_keys():
     # Case 3: Raises a ValueError if the list passed to it is longer than _yottadb.YDB_LOCK_MAX_KEYS
     with pytest.raises(ValueError):
-        keys = [[b"test" + bytes(str(x), encoding="utf-8")] for x in range(0, _yottadb.YDB_LOCK_MAX_KEYS + 1)]
+        keys = [["test" + str(x)] for x in range(0, _yottadb.YDB_LOCK_MAX_KEYS + 1)]
         _yottadb.lock(keys)
 
-    # Case 4: Raises a type Error if the first element of a key is not a bytes object
 
-
-def test_lock_keys_case4():
+def test_lock_first_key_wrong_type():
+    # Case 4: Raises a type Error if the first element of a key is not a str object
     with pytest.raises(TypeError):
         _yottadb.lock(("not list or tuple",))
 
+
+def test_lock_empty_key():
     # Case 5: Raises a ValueError if a key doesn't have any element
-
-
-def test_lock_keys_case5():
     with pytest.raises(ValueError):
         _yottadb.lock(([],))
 
+
+def test_lock_too_many_key_args():
     # Case 6: Raise a ValueError if a key has more than 2 elements
-
-
-def test_lock_keys_case6():
     with pytest.raises(ValueError):
-        _yottadb.lock(([b"varname", [b"subscript"], b"extra"],))  # too many
-
-    # Case 7: Raises a TypeError if the first element of a key (representing a varname) is not a bytes object
+        _yottadb.lock((["varname", ["subscript"], "extra"],))  # too many
 
 
-def test_lock_keys_case7():
+def test_lock_varname_wrong_type():
+    # Case 7: Raises a TypeError if the first element of a key (representing a
+    # varname) is not a str object
     with pytest.raises(TypeError):
-        _yottadb.lock((("test",),))
+        _yottadb.lock(((1,),))
 
+
+def test_lock_varname_max_ident():
     # Case 8: The first element of a key (varname) may be up to _yottadb.YDB_MAX_IDENT in length without raising an exception
-
-
-def test_lock_keys_case8():
-    _yottadb.lock(((b"a" * (_yottadb.YDB_MAX_IDENT),),))
+    _yottadb.lock((("a" * (_yottadb.YDB_MAX_IDENT),),))
     with pytest.raises(ValueError):
-        _yottadb.lock(((b"a" * (_yottadb.YDB_MAX_IDENT + 1),),))
+        _yottadb.lock((("a" * (_yottadb.YDB_MAX_IDENT + 1),),))
 
+
+def test_lock_subsarray_wrong_type():
     # Case 9: Raises a TypeError if the second element of a key is not a list or tuple
-
-
-def test_lock_keys_case9():
     with pytest.raises(TypeError):
-        _yottadb.lock(((b"test", "not list or tuple"),))
-
-    # Case 10: Accepts a subsarray list of bytes up to _yottadb.YDB_MAX_SUBS without raising an exception
+        _yottadb.lock((("test", "not list or tuple"),))
 
 
-def test_lock_keys_case10():
-    subsarray = [b"test" + bytes(str(x), encoding="utf-8") for x in range(0, _yottadb.YDB_MAX_SUBS)]
-    _yottadb.lock(((b"test", subsarray),))
+def test_lock_subsarray_max_subs():
+    # Case 10: Accepts a subsarray list of str up to _yottadb.YDB_MAX_SUBS without raising an exception
+    subsarray = ["test" + str(x) for x in range(0, _yottadb.YDB_MAX_SUBS)]
+    _yottadb.lock(
+        (
+            (
+                "test",
+                subsarray,
+            ),
+        )
+    )
 
+
+def test_lock_too_many_subs():
     # Case 11: Raises a ValueError if a subsarray is longer than _yottadb.YDB_MAX_SUBS
-
-
-def test_lock_keys_case11():
     with pytest.raises(ValueError):
-        subsarray = [b"test" + bytes(str(x), encoding="utf-8") for x in range(0, _yottadb.YDB_MAX_SUBS + 1)]
-        _yottadb.lock(((b"test", subsarray),))
+        subsarray = ["test" + str(x) for x in range(0, _yottadb.YDB_MAX_SUBS + 1)]
+        _yottadb.lock(
+            (
+                (
+                    "test",
+                    subsarray,
+                ),
+            )
+        )
 
-    # Case 12: Raises a TypeError if an element of a subsarray is not a bytes object
 
-
-def test_lock_keys_case12():
+def test_lock_subscript_wrong_type():
+    # Case 12: Raises a TypeError if an element of a subsarray is not a str object
     with pytest.raises(TypeError):
-        _yottadb.lock(((b"test", ["not bytes"]),))
+        _yottadb.lock((("test", [1]),))
 
+
+def test_lock_max_subscript_length():
     # Case 13: Accepts an item in a subsarray of length _yottadb.YDB_MAX_STR without raising an exception
-
-
-def test_lock_keys_case13():
     try:
-        # _yottadb.lock(((b"test", [b"a" * (256)]),))
-        _yottadb.lock(((b"test", [b"a" * (_yottadb.YDB_MAX_STR)]),))
-    except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
+        # _yottadb.lock((("test", ["a" * (1000)]),))
+        _yottadb.lock((("test", ["a" * (_yottadb.YDB_MAX_STR)]),))
+    except _yottadb.YDBError as e:  # Testing C-extention's validation, not YottaDB's
         pass
-
-    # Case 14: Raises a Value Error if a subsarray has an element that is longer than _yottadb.YDB_MAX_STR
 
 
 def test_lock_keys_case14():
+    # Case 14: Raises a Value Error if a subsarray has an element that is longer than _yottadb.YDB_MAX_STR
     with pytest.raises(ValueError):
-        _yottadb.lock(((b"test", [b"a" * (_yottadb.YDB_MAX_STR + 1)]),))
+        _yottadb.lock((("test", ["a" * (_yottadb.YDB_MAX_STR + 1)]),))
 
 
 # lock_decr()
@@ -364,21 +372,21 @@ def test_set_value():
     """
     This function tests the validation of the set function's value parameter.
     It tests that the set function:
-        1) Raises a TypeError if the value that is passed to it is not a bytes object
+        1) Raises a TypeError if the value that is passed to it is not a str object
         2) Accepts a value up to _yottadb.YDB_MAX_STR in length without raising an exception
         3) Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
     """
-    key = {"varname": b"test", "subsarray": (b"b",)}
-    # Case 1: Raises a TypeError if the value that is passed to it is not a bytes object
+    key = {"varname": "test", "subsarray": ("b",)}
+    # Case 1: Raises a TypeError if the value that is passed to it is not a str object
     with pytest.raises(TypeError):
-        _yottadb.set(**key, value="not bytes")
+        _yottadb.set(**key, value=1)
 
     # Case 2: Accepts a value up to _yottadb.YDB_MAX_STR in length without raising an exception
-    _yottadb.set(**key, value=b"b" * (_yottadb.YDB_MAX_STR))
+    _yottadb.set(**key, value="b" * (_yottadb.YDB_MAX_STR))
 
     # Case 3: Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
     with pytest.raises(ValueError):
-        _yottadb.set(**key, value=b"b" * (_yottadb.YDB_MAX_STR + 1))
+        _yottadb.set(**key, value="b" * (_yottadb.YDB_MAX_STR + 1))
 
 
 # str2zwr()
@@ -386,23 +394,23 @@ def test_str2zwr_input():
     """
     This function tests the validation of the str2zwr function's input parameter.
     It tests that the str2zwr function:
-        1) Raises a TypeError if input is not of type bytes
+        1) Raises a TypeError if input is not of type str
         2) Accepts a value up to _yottadb.YDB_MAX_STR without raising an exception
         3) Raises a ValueError if input is longer than _yottadb.YDB_MAX_STR
     """
-    # Case 1: Raises a TypeError if input is not of type bytes
+    # Case 1: Raises a TypeError if input is not of type str
     with pytest.raises(TypeError):
-        _yottadb.str2zwr("not bytes")
+        _yottadb.str2zwr(1)
 
     # Case 2: Accepts a value up to _yottadb.YDB_MAX_STR without raising an exception
     try:
-        _yottadb.str2zwr(b"b" * _yottadb.YDB_MAX_STR)
+        _yottadb.str2zwr("b" * _yottadb.YDB_MAX_STR)
     except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
         pass
 
     # Case 3: Raises a ValueError if input is longer than _yottadb.YDB_MAX_STR
     with pytest.raises(ValueError):
-        _yottadb.str2zwr(b"b" * (_yottadb.YDB_MAX_STR + 1))
+        _yottadb.str2zwr("b" * (_yottadb.YDB_MAX_STR + 1))
 
 
 # subscript_next()
@@ -475,7 +483,8 @@ def test_tp_varnames():
     This function tests the validation of the tp function's varnames parameter.
     It tests that the tp function:
         1) Raises a TypeError if the varnames parameter is not a proper Sequence (list or tuple)
-        2) Raises a TypeError if the contents of the varname list or tuple is not a bytes object
+        2) Raises a TypeError if the contents of the varname list or tuple is
+            not a str object
         3) Accepts up to _yottadb.YDB_MAX_NAMES without raising an exception
         4) Raise a ValueError if varnames is longer than _yottadb.YDB_MAX_NAMES
         5) Accept item in varnames up to _yottadb.YDB_MAX_IDENT without raising exception
@@ -485,25 +494,25 @@ def test_tp_varnames():
     with pytest.raises(TypeError):
         _yottadb.tp(callback=simple_transaction, varnames="not a sequence")
 
-    # Case 2: Raises a TypeError if the contents of the varname list or tuple is not a bytes object
+    # Case 2: Raises a TypeError if the contents of the varname list or tuple is not a str object
     with pytest.raises(TypeError):
-        _yottadb.tp(callback=simple_transaction, varnames=("not a sequence of bytes",))
+        _yottadb.tp(callback=simple_transaction, varnames=(1,))
 
     # Case 3: Accepts up to _yottadb.YDB_MAX_NAMES without raising an exception
-    varnames = [b"test" + bytes(str(x), encoding="utf-8") for x in range(0, _yottadb.YDB_MAX_NAMES)]
+    varnames = ["test" + str(x) for x in range(0, _yottadb.YDB_MAX_NAMES)]
     _yottadb.tp(callback=simple_transaction, varnames=varnames)
 
     # case 4: Raise a ValueError if varnames is longer than _yottadb.YDB_MAX_NAMES
-    varnames = [b"test" + bytes(str(x), encoding="utf-8") for x in range(0, _yottadb.YDB_MAX_NAMES + 1)]
+    varnames = ["test" + str(x) for x in range(0, _yottadb.YDB_MAX_NAMES + 1)]
     with pytest.raises(ValueError):
         _yottadb.tp(callback=simple_transaction, varnames=varnames)
 
     # Case 5: Accept item in varnames up to _yottadb.YDB_MAX_IDENT without raising exception
-    _yottadb.tp(callback=simple_transaction, varnames=[b"b" * (_yottadb.YDB_MAX_IDENT)])
+    _yottadb.tp(callback=simple_transaction, varnames=["b" * (_yottadb.YDB_MAX_IDENT)])
 
     # Case 6: Raises a ValueError if an item in the varnames list or tuple is longer than _yottadb.YDB_MAX_IDENT
     with pytest.raises(ValueError):
-        _yottadb.tp(callback=simple_transaction, varnames=[b"b" * (_yottadb.YDB_MAX_IDENT + 1)])
+        _yottadb.tp(callback=simple_transaction, varnames=["b" * (_yottadb.YDB_MAX_IDENT + 1)])
 
 
 # zwr2str()
@@ -511,27 +520,28 @@ def test_zwr2str_input():
     """
     This function tests the validation of the zwr2str function's input parameter.
     It tests that the zwr2str function:
-        1) Raises a TypeError if input is not of type bytes
+        1) Raises a TypeError if input is not of type str
         2) Accepts a value up to _yottadb.YDB_MAX_STR without raising an exception
         3) Raises a ValueError if input is longer than _yottadb.YDB_MAX_STR
     """
-    # Case 1: Raises a TypeError if input is not of type bytes
+    # Case 1: Raises a TypeError if input is not of type str
     with pytest.raises(TypeError):
-        _yottadb.zwr2str("not bytes")
+        _yottadb.zwr2str(1)
 
     # Case 2: Accepts a value up to _yottadb.YDB_MAX_STR without raising an exception
     try:
-        _yottadb.zwr2str(b"b" * _yottadb.YDB_MAX_STR)
+        _yottadb.zwr2str("b" * _yottadb.YDB_MAX_STR)
     except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
         pass
 
     # Case 3: Raises a ValueError if input is longer than _yottadb.YDB_MAX_STR
     with pytest.raises(ValueError):
-        _yottadb.zwr2str(b"b" * (_yottadb.YDB_MAX_STR + 1))
+        _yottadb.zwr2str("b" * (_yottadb.YDB_MAX_STR + 1))
 
 
 # This test requires a lot of memory and will fail if there is not enough memory on the system that running
-# the tests so this test will be skipped if the available memory is less than ((2 ** 32) + 1) bytes.
+# the tests so this test will be skipped if the available memory is less than
+# ((2 ** 32) + 1) str.
 @pytest.mark.skipif(psutil.virtual_memory().available < ((2 ** 32) + 1), reason="not enough memory for this test.")
 def test_unsigned_int_length_bytes_overflow():
     """
@@ -540,7 +550,7 @@ def test_unsigned_int_length_bytes_overflow():
     long bytes object. This tests all scenarios where that could happen and that when that happens the
     function will raise a ValueError instead of continuing as if a single byte was passed to it.
     """
-    BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = b"1" * ((2 ** 32) + 1)  # works for python 3.8/Ubuntu 20.04
+    BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = "1" * ((2 ** 32) + 1)  # works for python 3.8/Ubuntu 20.04
     varname_subsarray_functions = (
         _yottadb.data,
         _yottadb.delete,
@@ -559,9 +569,9 @@ def test_unsigned_int_length_bytes_overflow():
             function(varname=BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
 
         with pytest.raises(ValueError):
-            function(b"test", (BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH,))
+            function("test", (BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH,))
 
-    key = {"varname": b"test", "subsarray": (b"b",)}
+    key = {"varname": "test", "subsarray": ("b",)}
     with pytest.raises(ValueError):
         _yottadb.incr(**key, increment=BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
 

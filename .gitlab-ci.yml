@@ -60,8 +60,8 @@ commit-verify:
     # Copy commit gpg key verify script to build directory and execute
     - wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/commit_verify.sh
     - chmod +x commit_verify.sh
-    - chmod +x ./development_tools/ci/needs_copyright.sh
-    - ./commit_verify.sh ./development_tools/ci/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBPython
+    - chmod +x ./tools/ci/needs_copyright.sh
+    - ./commit_verify.sh ./tools/ci/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBPython
 
 code-format-check:
   image: ubuntu:18.04
@@ -71,4 +71,4 @@ code-format-check:
     - apt install -y clang-format-10 python3-pip
     - python3 -m pip install black
   script:
-    bash ./development_tools/ci/check_code_format.sh
+    bash ./tools/ci/check_code_format.sh

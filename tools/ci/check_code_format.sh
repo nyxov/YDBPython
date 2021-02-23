@@ -31,3 +31,11 @@ for file in $files_to_check ; do
   fi
 done
 exit $exit_code
+
+# `clang-tidy` is not available on CentOS 7, and YDB tests on 7 to ensure backwards-compatibility.
+if ! [ -x "$(command -v yum)" ]; then
+	echo "# Check for unexpected warning(s) from clang-tidy ..."
+	tools/ci/clang-tidy-all.sh > clang_tidy_warnings.txt 2>/dev/null
+	tools/ci/sort_warnings.sh clang_tidy_warnings.txt
+		compare tools/ci/clang_tidy_warnings.ref sorted_warnings.txt
+fi

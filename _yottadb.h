@@ -20,62 +20,53 @@
 #define YDBPY_DEFAULT_SUBSCRIPT_COUNT	2
 #define MAX_CONONICAL_NUMBER_STRING_MAX 48
 
-#define YDB_LOCK_ST_INIT_ARG_NUMS	4
-#define YDB_LOCK_ST_NUM_ARGS_PER_KEY	3
+#define YDB_LOCK_MIN_ARGS		4
+#define YDB_LOCK_ARGS_PER_KEY		3
 #define YDB_CALL_VARIADIC_MAX_ARGUMENTS 36
-#define YDB_LOCK_MAX_KEYS		(YDB_CALL_VARIADIC_MAX_ARGUMENTS - YDB_LOCK_ST_INIT_ARG_NUMS) / YDB_LOCK_ST_NUM_ARGS_PER_KEY
+#define YDB_LOCK_MAX_KEYS		(YDB_CALL_VARIADIC_MAX_ARGUMENTS - YDB_LOCK_MIN_ARGS) / YDB_LOCK_ARGS_PER_KEY
 
 #define YDBPY_MAX_ERRORMSG 1024
-#define YDBPY_MAX_REASON   YDBPY_MAX_ERRORMSG / 4
 
-/*
- * the following set of macro constants are all related to Python input validation. An invalid Python
- * argument returns one of 2 Exceptions, a 'TypeError' if the value is of the wrong type or 'ValueError'
- * if it is of the right type but incorrect in some other way (for example, out of range). Because there
- * are many ways to reach I have given each unique situation it's own value with TypeErrors being between
- * -100 and -199 and ValueErrors being between -200 and -299 so that it is easy to know which Exception
- * type to raise and which message should be applied to that Exception.
+/* Set of acceptable Python error types. Each type is named by prefixing a Python error name with `YDBPython`,
+ * with the exception of YDBPython_NoError. This item doesn't represent a Python error, but is included at enum value 0
+ * to prevent conflicts with YDB_OK which signals no error with a value of 0.
  */
-#define YDBPY_TYPE_ERROR_MAX  -100
-#define YDBPY_TYPE_ERROR_MIN  -199
-#define YDBPY_VALUE_ERROR_MAX -200
-#define YDBPY_VALUE_ERROR_MIN -299
+typedef enum YDBPythonErrorType {
+	YDBPython_TypeError = 1,
+	YDBPython_ValueError,
+} YDBPythonErrorType;
 
-#define YDBPY_INVALID_NOT_LIST_OR_TUPLE -101
-#define YDBPY_ERRMSG_NOT_LIST_OR_TUPLE	"value must be list or tuple."
+/* Set of acceptable Python Sequence types. Used to enforce correct limits and
+ * emit relevant errors when processing Python Sequences passed down from
+ * yottadb.py.
+ */
+typedef enum YDBPythonSequenceType {
+	YDBPython_VarnameSequence,
+	YDBPython_SubsarraySequence,
+	YDBPython_KeySequence,
+} YDBPythonSequenceType;
 
-#define YDBPY_INVALID_ITEM_IN_SEQUENCE_NOT_BYTES -102
-#define YDBPY_ERRMSG_ITEM_IN_SEQUENCE_NOT_BYTES	 "item %ld is not of type 'bytes'"
+// TypeError messages
+#define YDBPY_ERR_NOT_LIST_OR_TUPLE		    "value must be list or tuple."
+#define YDBPY_ERR_ITEM_NOT_BYTES_LIKE		    "item %ld is not a bytes-like object (bytes or str)"
+#define YDBPY_ERR_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE "item %ld is not a list or tuple."
+#define YDBPY_ERR_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES "item %ld in key sequence invalid: first element must be of type 'bytes'"
 
-#define YDBPY_INVALID_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE -103
-#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE	"item %ld is not a list or tuple."
+// ValueError messages
+#define YDBPY_ERR_VARNAME_TOO_LONG		   "invalid varname length %ld: max %d"
+#define YDBPY_ERR_SEQUENCE_TOO_LONG		   "invalid sequence length %ld: max %d"
+#define YDBPY_ERR_BYTES_TOO_LONG		   "invalid bytes length %ld: max %d"
+#define YDBPY_ERR_KEY_IN_SEQUENCE_INCORRECT_LENGTH "item %ld must be length 1 or 2."
+#define YDBPY_ERR_KEY_IN_SEQUENCE_VARNAME_TOO_LONG "item %ld in key sequence has invalid varname length %ld: max %d."
 
-#define YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES -104
-#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES	"item %ld in key sequence invalid: first element must be of type 'bytes'"
+#define YDBPY_ERR_KEY_IN_SEQUENCE_SUBSARRAY_INVALID "item %ld in key sequence has invalid subsarray: "
 
-#define YDBPY_INVALID_VARNAME_TOO_LONG -201
-#define YDBPY_ERRMSG_VARNAME_TOO_LONG  "invalid varname length %ld: max %d"
+#define YDBPY_ERR_VARNAME_INVALID   "'varnames' argument invalid: %s"
+#define YDBPY_ERR_SUBSARRAY_INVALID "'subsarray' argument invalid: %s"
+#define YDBPY_ERR_KEYS_INVALID	    "'keys' argument invalid: %s"
 
-#define YDBPY_INVALID_SEQUENCE_TOO_LONG -202
-#define YDBPY_ERRMSG_SEQUENCE_TOO_LONG	"invalid sequence length %ld: max %d"
-
-#define YDBPY_INVALID_BYTES_TOO_LONG -203
-#define YDBPY_ERRMSG_BYTES_TOO_LONG  "invalid bytes length %ld: max %d"
-#define YDBPY_ERRMSG_BYTES_TOO_LONG2 "invalid bytes length %ld: max %u"
-
-#define YDBPY_INVALID_KEY_IN_SEQUENCE_INCORECT_LENGTH -204
-#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_INCORECT_LENGTH  "item %ld must be length 1 or 2."
-
-#define YDBPY_INVALID_KEY_IN_SEQUENCE_VARNAME_TOO_LONG -205
-#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_VARNAME_TOO_LONG  "item %ld in key sequence has invalid varname length %ld: max %d."
-
-#define YDBPY_ERRMSG_KEY_IN_SEQUENCE_SUBSARRAY_INVALID "item %ld in key sequence has invalid subsarray: %s"
-
-#define YDBPY_ERRMSG_VARNAME_INVALID   "'varnames' argument invalid: %s"
-#define YDBPY_ERRMSG_SUBSARRAY_INVALID "'subsarray' argument invalid: %s"
-#define YDBPY_ERRMSG_KEYS_INVALID      "'keys' argument invalid: %s"
-
-#define FORMAT_ERROR_MESSAGE(...) snprintf(error_message, YDBPY_MAX_REASON, __VA_ARGS__);
+// Prevents compiler warnings for variables used only in asserts
+#define UNUSED(x) (void)(x)
 
 typedef struct {
 	ydb_buffer_t *varname;
@@ -105,18 +96,19 @@ typedef struct {
 		}                                                                                              \
 	}
 
-#define POPULATE_SUBS_USED_AND_SUBSARRAY(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB, RETURN_NULL)                            \
-	{                                                                                                               \
-		bool success = true;                                                                                    \
-		SUBSUSED = 0;                                                                                           \
-		SUBSARRAY_YDB = NULL;                                                                                   \
-		if (Py_None != SUBSARRAY_PY) {                                                                          \
-			SUBSUSED = PySequence_Length(SUBSARRAY_PY);                                                     \
-			SUBSARRAY_YDB = (ydb_buffer_t *)calloc(SUBSUSED, sizeof(ydb_buffer_t));                         \
-			success = convert_py_bytes_sequence_to_ydb_buffer_array(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB); \
-			if (!success)                                                                                   \
-				RETURN_NULL = true;                                                                     \
-		}                                                                                                       \
+#define POPULATE_SUBS_USED_AND_SUBSARRAY(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB, RETURN_NULL)                      \
+	{                                                                                                         \
+		bool success = true;                                                                              \
+                                                                                                                  \
+		SUBSUSED = 0;                                                                                     \
+		SUBSARRAY_YDB = NULL;                                                                             \
+		if (Py_None != SUBSARRAY_PY) {                                                                    \
+			SUBSUSED = PySequence_Length(SUBSARRAY_PY);                                               \
+			SUBSARRAY_YDB = (ydb_buffer_t *)calloc(SUBSUSED, sizeof(ydb_buffer_t));                   \
+			success = convert_py_sequence_to_ydb_buffer_array(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB); \
+			if (!success)                                                                             \
+				RETURN_NULL = true;                                                               \
+		}                                                                                                 \
 	}
 
 #define FREE_BUFFER_ARRAY(ARRAY, LEN)                                 \
@@ -125,39 +117,40 @@ typedef struct {
 			YDB_FREE_BUFFER(&((ydb_buffer_t *)ARRAY)[i]); \
 	}
 
-#define VALIDATE_AND_CONVERT_BYTES_LEN(ORIGINAL_LEN, CONVERTED_LEN, MAX_LEN, LEN_ERR, LEN_ERR_MSG)                  \
-	{                                                                                                           \
-		if ((MAX_LEN) < (ORIGINAL_LEN)) {                                                                   \
-			char validation_error_message[YDBPY_MAX_ERRORMSG];                                          \
-			snprintf(validation_error_message, YDBPY_MAX_ERRORMSG, LEN_ERR_MSG, ORIGINAL_LEN, MAX_LEN); \
-			raise_ValidationError(LEN_ERR, validation_error_message);                                   \
-			return NULL;                                                                                \
-		} else {                                                                                            \
-			CONVERTED_LEN = Py_SAFE_DOWNCAST(ORIGINAL_LEN, Py_ssize_t, unsigned int);                   \
-		}                                                                                                   \
+/* Safely downcasts SRC_LEN (Py_ssize_t) and stores in DEST_LEN (unsigned int).
+ *
+ * First checks that the value of SRC_LEN is within bounds of the YDB limit signaled
+ * by IS_VARNAME, i.e. YDB_MAX_IDENT for variable names (IS_VARNAME) or YDB_MAX_STR
+ * for string values (!IS_VARNAME). If this check succeeds, Py_SAFE_DOWNCAST is invoked.
+ * Otherwise, a Python ValueError is raised.
+ */
+#define INVOKE_PY_SAFE_DOWNCAST(DEST_LEN, SRC_LEN, IS_VARNAME)                                        \
+	{                                                                                             \
+		Py_ssize_t max_len, src_len;                                                          \
+		char *	   err_msg;                                                                   \
+                                                                                                      \
+		src_len = SRC_LEN;                                                                    \
+		if (IS_VARNAME) {                                                                     \
+			max_len = YDB_MAX_IDENT;                                                      \
+			err_msg = YDBPY_ERR_VARNAME_TOO_LONG;                                         \
+		} else {                                                                              \
+			max_len = YDB_MAX_STR;                                                        \
+			err_msg = YDBPY_ERR_BYTES_TOO_LONG;                                           \
+		}                                                                                     \
+		if (max_len < (src_len)) {                                                            \
+			raise_ValidationError(YDBPython_ValueError, NULL, err_msg, src_len, max_len); \
+			return NULL;                                                                  \
+		} else {                                                                              \
+			DEST_LEN = Py_SAFE_DOWNCAST(src_len, Py_ssize_t, unsigned int);               \
+		}                                                                                     \
 	}
 
-#define VALIDATE_SEQUENCE_OF_BYTES_INPUT(SEQUENCE, MAX_SEQUENCE_LEN, MAX_BYTES_LEN, OUTER_ERROR_MESSAGE)                        \
-	{                                                                                                                       \
-		if (Py_None != SEQUENCE) { /* allow None */                                                                     \
-			char validation_reason_message[YDBPY_MAX_REASON];                                                       \
-			int  validation_status                                                                                  \
-			    = validate_sequence_of_bytes(SEQUENCE, MAX_SEQUENCE_LEN, MAX_BYTES_LEN, validation_reason_message); \
-			if (YDB_OK != validation_status) {                                                                      \
-				char validation_error_message[YDBPY_MAX_ERRORMSG];                                              \
-				snprintf(validation_error_message, YDBPY_MAX_ERRORMSG, OUTER_ERROR_MESSAGE,                     \
-					 validation_reason_message);                                                            \
-				raise_ValidationError(validation_status, validation_error_message);                             \
-				return NULL;                                                                                    \
-			}                                                                                                       \
-		}                                                                                                               \
+#define RETURN_IF_INVALID_SEQUENCE(SEQUENCE, SEQUENCE_TYPE)              \
+	{                                                                \
+		if (!is_valid_sequence(SEQUENCE, SEQUENCE_TYPE, NULL)) { \
+			return NULL;                                     \
+		}                                                        \
 	}
-
-#define VALIDATE_SUBSARRAY(SUBSARRAY) \
-	{ VALIDATE_SEQUENCE_OF_BYTES_INPUT(SUBSARRAY, YDB_MAX_SUBS, YDB_MAX_STR, YDBPY_ERRMSG_SUBSARRAY_INVALID) }
-
-#define VALIDATE_VARNAMES(VARNAMES) \
-	{ VALIDATE_SEQUENCE_OF_BYTES_INPUT(VARNAMES, YDB_MAX_NAMES, YDB_MAX_IDENT, YDBPY_ERRMSG_VARNAME_INVALID) }
 
 #define FIX_BUFFER_LENGTH(BUFFER)                           \
 	{                                                   \

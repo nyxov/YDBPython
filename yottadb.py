@@ -11,7 +11,7 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
-from typing import Optional, List, Union, Generator, Sequence, NamedTuple, cast, Tuple
+from typing import Optional, List, Union, Generator, Sequence, NamedTuple, cast, Tuple, AnyStr
 import enum
 from builtins import property
 
@@ -41,8 +41,8 @@ class SearchSpace(enum.Enum):
 
 
 class KeyTuple(NamedTuple):
-    varname: bytes
-    subsarray: Sequence[bytes] = ()
+    varname: AnyStr
+    subsarray: Sequence[AnyStr] = ()
 
     def __str__(self) -> str:
         return_value = str(self.varname)
@@ -60,22 +60,22 @@ class Context:
     def __init__(self, tp_token=NOTTP):
         self.tp_token = tp_token
 
-    def __getitem__(self, item: bytes) -> "Key":
+    def __getitem__(self, item: AnyStr) -> "Key":
         return Key(name=item, context=self)
 
-    def data(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> int:
+    def data(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> int:
         return _yottadb.data(varname, subsarray, self.tp_token)
 
-    def delete_node(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> None:
+    def delete_node(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
         _yottadb.delete(varname, subsarray, DEL_NODE, self.tp_token)
 
-    def delete_tree(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> None:
+    def delete_tree(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
         _yottadb.delete(varname, subsarray, DEL_TREE, self.tp_token)
 
-    def get(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> Optional[bytes]:
+    def get(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Optional[AnyStr]:
         return _yottadb.get(varname, subsarray, self.tp_token)
 
-    def incr(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> int:
+    def incr(self, varname: AnyStr, subsarray: Sequence[bytes] = ()) -> int:
         return _yottadb.incr(varname, subsarray, increment=b"1", tp_token=self.tp_token)
 
     """
@@ -85,10 +85,10 @@ class Context:
     def node_previous(self): ...
     """
 
-    def set(self, varname: bytes, subsarray: Sequence[bytes] = (), value: bytes = b"") -> None:
+    def set(self, varname: AnyStr, subsarray: Sequence[AnyStr] = (), value: AnyStr = "") -> None:
         _yottadb.set(varname, subsarray, value, self.tp_token)
 
-    def subscript_next(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> bytes:
+    def subscript_next(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> AnyStr:
         return _yottadb.subscript_next(varname, subsarray, self.tp_token)
 
     def subscript_previous(self, varname: bytes, subsarray: Sequence[bytes] = ()) -> bytes:
@@ -104,8 +104,8 @@ class Context:
     def zwr2str(self): ...
     """
 
-    def _varnames(self, first: bytes = b"^") -> Generator[bytes, None, None]:
-        var_next: bytes = f"{first}%"
+    def _varnames(self, first: AnyStr = "^") -> Generator[AnyStr, None, None]:
+        var_next: AnyStr = f"{first}%"
         if self.data(var_next) != 0:
             yield var_next
 
@@ -158,8 +158,8 @@ class Context:
         return self.SubscriptsIter(self, varname, subsarray)
 
     @property
-    def local_varnames(self) -> Generator[bytes, None, None]:
-        for var in self._varnames(first=b""):
+    def local_varnames(self) -> Generator[AnyStr, None, None]:
+        for var in self._varnames(first=""):
             yield var
 
     @property
@@ -168,8 +168,8 @@ class Context:
             yield self[var]
 
     @property
-    def global_varnames(self) -> Generator[bytes, None, None]:
-        for var in self._varnames(first=b"^"):
+    def global_varnames(self) -> Generator[AnyStr, None, None]:
+        for var in self._varnames(first="^"):
             yield var
 
     @property
@@ -178,7 +178,7 @@ class Context:
             yield self[var]
 
     @property
-    def all_varnames(self) -> Generator[bytes, None, None]:
+    def all_varnames(self) -> Generator[AnyStr, None, None]:
         for var in self.global_varnames:
             yield var
         for var in self.local_varnames:
@@ -192,38 +192,31 @@ class Context:
 
 class Key:
     context: Context
-    name: bytes
+    name: AnyStr
     parent: Optional["Key"]
 
-    def __init__(self, name: bytes, parent: Optional["Key"] = None, context: Context = None) -> None:
+    def __init__(self, name: AnyStr, parent: Optional["Key"] = None, context: Context = None) -> None:
         if isinstance(context, Context):
             self.context = context
         elif context is None:
             self.context = Context()
         else:
             raise TypeError("'context' must be an instance of yottadb.Context")
-        if isinstance(name, bytes):
+        if isinstance(name, str) or isinstance(name, bytes):
             self.name = name
         else:
-            raise TypeError("'name' must be an instance of bytes")
+            raise TypeError("'name' must be an instance of str or bytes")
 
         if parent is not None and not isinstance(parent, Key):
             raise TypeError("'parent' must be of type Key")
         self.parent = parent
 
     def __str__(self) -> str:
-        def encode_sub(sub):
-            try:
-                return str(sub, encoding="utf-8")
-            except UnicodeDecodeError:
-                return str(sub)
-
-        varname = str(self.varname, encoding="ascii")
-        subscripts = ",".join([encode_sub(sub) for sub in self.subsarray])
+        subscripts = ",".join([sub for sub in self.subsarray])
         if subscripts == "":
-            return varname
+            return self.varname
         else:
-            return f"{varname}({subscripts})"
+            return f"{self.varname}({subscripts})"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}:{self}"
@@ -249,8 +242,8 @@ class Key:
         return ancestor
 
     @property
-    def varname(self) -> bytes:
-        return self.varname_key.name
+    def varname(self) -> AnyStr:
+        return self.varname_key.name  # str or bytes
 
     @property
     def subsarray_keys(self) -> List["Key"]:
@@ -264,21 +257,22 @@ class Key:
         return subs_array
 
     @property
-    def subsarray(self) -> List[bytes]:
+    def subsarray(self) -> List[AnyStr]:
         ret_list = []
         for key in self.subsarray_keys:
             ret_list.append(key.name)
-        return ret_list
+        return ret_list  # Returns List of str or bytes
 
     @property
-    def value(self) -> Optional[str]:
+    def value(self) -> Optional[AnyStr]:
         try:
             return self.context.get(self.varname, self.subsarray)
         except (_yottadb.YDBLVUNDEFError, _yottadb.YDBGVUNDEFError):
             return None
 
     @value.setter
-    def value(self, value: bytes) -> None:
+    def value(self, value: AnyStr) -> None:
+        # Value must be str or bytes
         self.context.set(self.varname, self.subsarray, value)
 
     def delete_node(self):
@@ -307,10 +301,11 @@ class Key:
 
     @property
     def subscripts(self) -> Generator:
-        subscript_subsarray: List[bytes] = []
         if len(self.subsarray) > 0:
             subscript_subsarray = list(self.subsarray)
-        subscript_subsarray.append(b"")
+        else:
+            subscript_subsarray: List[AnyStr] = []
+        subscript_subsarray.append("")
         while True:
             try:
                 sub_next = self.context.subscript_next(self.varname, subscript_subsarray)

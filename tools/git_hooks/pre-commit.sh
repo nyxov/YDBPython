@@ -32,7 +32,7 @@ fi
 echo "Checking that files to be committed have a YottaDB copyright ..."
 if [[ $exit_value -eq 0 ]] ; then
   for file in $committed_files ; do
-    if [ -e $file ] && bash ./development_tools/ci/needs_copyright.sh $file && ! grep -q 'Copyright (c) .* YottaDB LLC' $file; then
+    if [ -e $file ] && bash ./tools/ci/needs_copyright.sh $file && ! grep -q 'Copyright (c) .* YottaDB LLC' $file; then
       echo "    $file requires a YottaDB copyright notice but does not have one."
       exit_value=1
     fi
@@ -44,7 +44,7 @@ if [[ exit_value -eq 0 ]] ; then
   for file in $committed_files ; do
     file_modified=false
     # Deleted files don't need a copyright notice, hence -e check
-    if [ -e $file ] && bash ./development_tools/ci/needs_copyright.sh $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
+    if [ -e $file ] && bash ./tools/ci/needs_copyright.sh $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
         echo "    Updating copyright date in $file"
         cat "$file" | python3 copyright.py > "temp-$file"
         mv "temp-$file" "$file"

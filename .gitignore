@@ -7,3 +7,4 @@ dist/
 *.swp
 tests/__pycache__/
 yottadb.egg-info/
+mumps.dat

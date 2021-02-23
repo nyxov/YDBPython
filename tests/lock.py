@@ -17,9 +17,9 @@ import argparse
 
 
 def key_tuple_to_str(self) -> str:
-    ret_str = f'{str(self.varname, encoding="utf-8")}'
+    ret_str = f"{str(self.varname)}"
     if self.subsarray != None:
-        ret_str += f' {str(b" ".join(self.subsarray), encoding="utf-8")}'
+        ret_str += f' {str(" ".join(self.subsarray))}'
     return ret_str
 
 
@@ -36,19 +36,14 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    varname = bytes(args.keys[0], encoding="utf-8")
+    varname = args.keys[0]
     subsarray = args.keys[1:]
     if len(subsarray) == 0:
         subsarray = None
-    subsarray_bytes = None
-    if subsarray != None:
-        subsarray_bytes = []
-        for sub in subsarray:
-            subsarray_bytes.append(bytes(sub, encoding="utf-8"))
 
     has_lock = False
     try:
-        _yottadb.lock_incr(varname, subsarray_bytes, timeout_nsec=(args.locktimeout * 1_000_000_000))
+        _yottadb.lock_incr(varname, subsarray, timeout_nsec=(args.locktimeout * 1_000_000_000))
     except _yottadb.YDBTimeoutError as e:
         print("Lock Failed")
     except Exception as e:
@@ -59,6 +54,6 @@ if __name__ == "__main__":
 
     if has_lock:
         time.sleep(args.time)
-        _yottadb.lock_decr(varname, subsarray_bytes)
+        _yottadb.lock_decr(varname, subsarray)
         if args.locktimeout != 0 or args.time != 0:
             print("Lock Released")
