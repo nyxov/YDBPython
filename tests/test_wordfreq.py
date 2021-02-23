@@ -60,3 +60,29 @@ def test_wordfreq(ydb):
     for word, discard in reversed(ydb.subscripts(index_var, (b"",))):
         for count, discard in ydb.subscripts(index_var, (word, b"")):
             print("{}\t{}".format(word, count))
+
+
+def test_wordfreq_key(ydb):
+    ydb["^words"].delete_tree()
+    ydb["^index"].delete_tree()
+    try:
+        with open("tests/wordfreq_input.txt", "r") as input_file:
+            words = ydb["^words"]
+            for line in input_file.readlines():
+                for word in line.split(" "):
+                    word = word.strip().lower()
+                    if word != "":
+                        words[word].incr()
+
+            # Iterate through words and store based on frequency
+            index = ydb["^index"]
+            for word in words:
+                # print(index[words[word.value]])
+                index[words[word.name].value][word.name].value = ""
+
+            # Print the keys ordered by amount
+            for key1 in reversed(index):
+                for key2 in ydb["^index"][key1.name]:
+                    print("{}\t{}".format(key1.name, key2.name))
+    except IOError:
+        print("Failed to open file")

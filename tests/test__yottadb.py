@@ -629,10 +629,7 @@ YDB_MAX_TP_DEPTH = 126
 @pytest.mark.parametrize("depth", range(1, YDB_MAX_TP_DEPTH + 1))
 def test_tp_return_YDB_OK_to_depth(depth):
     def key_at_level(level: int) -> KeyTuple:
-        return KeyTuple(
-            varname="^tptests",
-            subsarray=(f"test_tp_return_YDB_to_depth{depth}", f"level{level}"),
-        )
+        return KeyTuple(varname="^tptests", subsarray=(f"test_tp_return_YDB_to_depth{depth}", f"level{level}"))
 
     def value_at_level(level: int) -> bytes:
         return bytes(f"level{level} returns YDB_OK", encoding="utf-8")
@@ -672,17 +669,9 @@ def transfer_transaction(from_account, to_account, amount, tp_token=NOTTP):
     to_account_balance = int(_yottadb.get(tp_token=tp_token, varname="^account", subsarray=(to_account, "balance")))
 
     _yottadb.set(
-        tp_token=tp_token,
-        varname="^account",
-        subsarray=(from_account, "balance"),
-        value=str(from_account_balance - amount),
+        tp_token=tp_token, varname="^account", subsarray=(from_account, "balance"), value=str(from_account_balance - amount)
     )
-    _yottadb.set(
-        tp_token=tp_token,
-        varname="^account",
-        subsarray=(to_account, "balance"),
-        value=str(to_account_balance + amount),
-    )
+    _yottadb.set(tp_token=tp_token, varname="^account", subsarray=(to_account, "balance"), value=str(to_account_balance + amount))
 
     new_from_balance = int(_yottadb.get(tp_token=tp_token, varname="^account", subsarray=(from_account, "balance")))
 
@@ -956,20 +945,20 @@ increment_keys = [
 increment_key_test_ids = [f'"{key.varname}({key.subsarray})' for key in increment_keys]
 
 
-def number_to_bytes(number):
+def number_to_str(number):
     number_str = number
     if not isinstance(number, str):
         number_str = f"{number}".upper().replace("+", "")
     if len(number_str) >= 7 and "E" not in number_str:  # bug workaround
         number_str += "E0"
-    return bytes(number_str, encoding="ascii")
+    return number_str
 
 
 @pytest.mark.parametrize("initial, increment, result", increment_tests, ids=increment_test_ids)
 @pytest.mark.parametrize("key", increment_keys, ids=increment_key_test_ids)
 def test_incr(key, initial, increment, result):
     _yottadb.set(*key, value=initial)
-    returned_value = _yottadb.incr(*key, increment=number_to_bytes(increment))
+    returned_value = _yottadb.incr(*key, increment=number_to_str(increment))
 
     assert returned_value == result
     assert _yottadb.get(*key) == bytes(result, encoding="ascii")
@@ -977,8 +966,8 @@ def test_incr(key, initial, increment, result):
 
 
 increment_error_test = [
-    (b"0", "1E47", _yottadb.YDBNUMOFLOWError),
-    (b"0", "-1E47", _yottadb.YDBNUMOFLOWError),
+    ("0", "1E47", _yottadb.YDBNUMOFLOWError),
+    ("0", "-1E47", _yottadb.YDBNUMOFLOWError),
     # ("0", "1E-47", _yottadb.YDBNUMOFLOWError),
 ]
 
@@ -994,7 +983,7 @@ def test_incr_errors(key, initial, increment, error_type):
     _yottadb.set(*key, value=initial)
 
     with pytest.raises(error_type):
-        _yottadb.incr(*key, increment=number_to_bytes(increment))
+        _yottadb.incr(*key, increment=number_to_str(increment))
         assert _yottadb.get(*key) == initial
     _yottadb.delete(*key, _yottadb.YDB_DEL_TREE)
 

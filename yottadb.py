@@ -221,16 +221,45 @@ class Key:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}:{self}"
 
+    def __setitem__(self, item, value):
+        Key(name=item, parent=self, context=self.context).value = value
+
     def __getitem__(self, item):
         return Key(name=item, parent=self, context=self.context)
 
     def __eq__(self, other) -> bool:
-        if not isinstance(other, Key):
-            return False
-        if self.varname == other.varname and self.subsarray == other.subsarray:
-            return True
+        if isinstance(other, Key):
+            return self.varname == other.varname and self.subsarray == other.subsarray
         else:
-            return False
+            return self.value == other
+
+    def __iter__(self) -> Generator:
+        if len(self.subsarray) > 0:
+            subscript_subsarray = list(self.subsarray)
+        else:
+            subscript_subsarray: List[AnyStr] = []
+        subscript_subsarray.append("")
+        while True:
+            try:
+                sub_next = self.context.subscript_next(self.varname, subscript_subsarray)
+                subscript_subsarray[-1] = sub_next
+                yield Key(sub_next, self)
+            except _yottadb.YDBNODEENDError:
+                return
+
+    def __reversed__(self) -> Generator:
+        if len(self.subsarray) > 0:
+            subscript_subsarray = list(self.subsarray)
+        else:
+            subscript_subsarray: List[AnyStr] = []
+        subscript_subsarray.append("")
+        while True:
+            try:
+                sub_next = self.context.subscript_previous(self.varname, subscript_subsarray)
+                subscript_subsarray[-1] = sub_next
+                yield Key(sub_next, self)
+            except _yottadb.YDBNODEENDError:
+                return
 
     @property
     def varname_key(self) -> "Key":
@@ -284,6 +313,9 @@ class Key:
     @property
     def data(self):
         return self.context.data(self.varname, self.subsarray)
+
+    def incr(self):
+        self.context.incr(self.varname, self.subsarray)
 
     @property
     def has_value(self):

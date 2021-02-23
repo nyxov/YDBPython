@@ -20,14 +20,14 @@ import yottadb
 def test_key_object(ydb, simple_data):
     # Key creation, varname only
     key = ydb["^test1"]
-    assert key.value == b"test1value"
+    assert key == b"test1value"
     assert key.name == "^test1"
     assert key.varname_key == key
     assert key.varname == "^test1"
     assert key.subsarray == []
     # Using bytes argument
     key = ydb[b"^test1"]
-    assert key.value == b"test1value"
+    assert key == b"test1value"
     assert key.name == b"^test1"
     assert key.varname_key == key
     assert key.varname == b"^test1"
@@ -35,14 +35,14 @@ def test_key_object(ydb, simple_data):
 
     # Key creation, varname and subscript
     key = ydb["^test2"]["sub1"]
-    assert key.value == b"test2value"
+    assert key == b"test2value"
     assert key.name == "sub1"
     assert key.varname_key == ydb["^test2"]
     assert key.varname == "^test2"
     assert key.subsarray == ["sub1"]
     # Using bytes arguments
     key = ydb[b"^test2"][b"sub1"]
-    assert key.value == b"test2value"
+    assert key == b"test2value"
     assert key.name == b"sub1"
     assert key.varname_key == ydb[b"^test2"]
     assert key.varname == b"^test2"
@@ -51,7 +51,7 @@ def test_key_object(ydb, simple_data):
     # Key creation and value update, varname and subscript
     key = ydb["test3local"]["sub1"]
     key.value = "smoketest3local"
-    assert key.value == b"smoketest3local"
+    assert key == b"smoketest3local"
     assert key.name == "sub1"
     assert key.varname_key == ydb["test3local"]
     assert key.varname == "test3local"
@@ -59,11 +59,21 @@ def test_key_object(ydb, simple_data):
     # Using bytes arguments
     key = ydb[b"test3local"][b"sub1"]
     key.value = b"smoketest3local"
-    assert key.value == b"smoketest3local"
+    assert key == b"smoketest3local"
     assert key.name == b"sub1"
     assert key.varname_key == ydb[b"test3local"]
     assert key.varname == b"test3local"
     assert key.subsarray == [b"sub1"]
+
+    # Key comparison via __eq__ (Key/value comparisons tested in various other
+    # test cases below)
+    key = ydb["testeroni"]["sub1"]
+    key_copy = ydb["testeroni"]["sub1"]
+    key2 = ydb["testeroni"]["sub2"]
+    # Same varname/subscripts, but different object should be equal
+    assert key == key_copy
+    # Different varname/subscripts should not be equal
+    assert key != key2
 
 
 def test_Key_construction_error(ydb):
@@ -78,17 +88,17 @@ def test_Key__str__(ydb):
 
 
 def test_Key_get_value1(ydb, simple_data):
-    assert ydb["^test1"].value == b"test1value"
+    assert ydb["^test1"] == b"test1value"
 
 
 def test_Key_get_value2(ydb, simple_data):
-    assert ydb["^test2"]["sub1"].value == b"test2value"
+    assert ydb["^test2"]["sub1"] == b"test2value"
 
 
 def test_Key_get_value3(ydb, simple_data):
-    assert ydb["^test3"].value == b"test3value1"
-    assert ydb["^test3"]["sub1"].value == b"test3value2"
-    assert ydb["^test3"]["sub1"]["sub2"].value == b"test3value3"
+    assert ydb["^test3"] == b"test3value1"
+    assert ydb["^test3"]["sub1"] == b"test3value2"
+    assert ydb["^test3"]["sub1"]["sub2"] == b"test3value3"
 
 
 def test_Key_subsarray(ydb, simple_data):
@@ -109,14 +119,19 @@ def test_Key_varname(ydb, simple_data):
 def test_Key_set_value1(ydb):
     testkey = ydb["test4"]
     testkey.value = "test4value"
-    assert testkey.value == b"test4value"
+    assert testkey == b"test4value"
 
 
 def test_Key_set_value2(ydb):
     testkey = ydb["test5"]["sub1"]
     testkey.value = "test5value"
-    assert testkey.value == b"test5value"
-    assert ydb["test5"]["sub1"].value == b"test5value"
+    assert testkey == b"test5value"
+    assert ydb["test5"]["sub1"] == b"test5value"
+
+
+def test_Key_set_value3(ydb):
+    ydb["test5"]["sub1"] = "test5value"
+    assert ydb["test5"]["sub1"] == b"test5value"
 
 
 def test_Key_delete_node(ydb):
@@ -125,13 +140,13 @@ def test_Key_delete_node(ydb):
     testkey.value = "test6value"
     subkey.value = "test6 subvalue"
 
-    assert testkey.value == b"test6value"
-    assert subkey.value == b"test6 subvalue"
+    assert testkey == b"test6value"
+    assert subkey == b"test6 subvalue"
 
     testkey.delete_node()
 
-    assert testkey.value == None
-    assert subkey.value == b"test6 subvalue"
+    assert testkey == None
+    assert subkey == b"test6 subvalue"
 
 
 def test_Key_delete_tree(ydb):
@@ -140,13 +155,13 @@ def test_Key_delete_tree(ydb):
     testkey.value = "test7value"
     subkey.value = "test7 subvalue"
 
-    assert testkey.value == b"test7value"
-    assert subkey.value == b"test7 subvalue"
+    assert testkey == b"test7value"
+    assert subkey == b"test7 subvalue"
 
     testkey.delete_tree()
 
-    assert testkey.value == None
-    assert subkey.value == None
+    assert testkey == None
+    assert subkey == None
 
 
 def test_Key_data(ydb, simple_data):
@@ -198,8 +213,8 @@ def test_transaction_smoke_test1(ydb) -> None:
 
     simple_transaction(key1, value1, key2, value2, ydb)
 
-    assert key1.value == value1
-    assert key2.value == value2
+    assert key1 == value1
+    assert key2 == value2
     test_base_key.delete_tree()
 
 
@@ -260,9 +275,9 @@ def test_transaction_smoke_test3(ydb) -> None:
 
     simple_restart_transaction(key1, key2, value, restart_tracker, ydb)
 
-    assert key1.value == None
-    assert key2.value == value
-    assert restart_tracker.value == b"1"
+    assert key1 == None
+    assert key2 == value
+    assert restart_tracker == b"1"
 
     test_base_global_key.delete_tree()
     test_base_local_key.delete_tree()
@@ -318,10 +333,10 @@ def test_transaction_return_YDB_OK(ydb):
     transaction_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=yottadb._yottadb.YDB_OK)
 
     key.delete_tree()
-    assert key.value == None
+    assert key == None
 
     process_transaction((transaction_data,), context=ydb)
-    assert key.value == value
+    assert key == value
     key.delete_tree()
 
 
@@ -335,8 +350,8 @@ def test_nested_transaction_return_YDB_OK(ydb):
 
     process_transaction((outer_transaction, inner_transaction), context=ydb)
 
-    assert key1.value == value1
-    assert key2.value == value2
+    assert key1 == value1
+    assert key2 == value2
     key1.delete_tree()
     key2.delete_tree()
 
@@ -361,7 +376,7 @@ def test_transaction_return_YDB_OK_to_depth(ydb, depth):
     process_transaction(transaction_data, context=ydb)
 
     for level in range(1, depth + 1):
-        assert key_at_level(level).value == value_at_level(level)
+        assert key_at_level(level) == value_at_level(level)
 
     sub1 = f"test_transaction_return_YDB_OK_to_depth{depth}"
     ydb["^tptests"][sub1].delete_tree()

@@ -278,28 +278,14 @@ def test_lock_subsarray_wrong_type():
 def test_lock_subsarray_max_subs():
     # Case 10: Accepts a subsarray list of str up to _yottadb.YDB_MAX_SUBS without raising an exception
     subsarray = ["test" + str(x) for x in range(0, _yottadb.YDB_MAX_SUBS)]
-    _yottadb.lock(
-        (
-            (
-                "test",
-                subsarray,
-            ),
-        )
-    )
+    _yottadb.lock((("test", subsarray),))
 
 
 def test_lock_too_many_subs():
     # Case 11: Raises a ValueError if a subsarray is longer than _yottadb.YDB_MAX_SUBS
     with pytest.raises(ValueError):
         subsarray = ["test" + str(x) for x in range(0, _yottadb.YDB_MAX_SUBS + 1)]
-        _yottadb.lock(
-            (
-                (
-                    "test",
-                    subsarray,
-                ),
-            )
-        )
+        _yottadb.lock((("test", subsarray),))
 
 
 def test_lock_subscript_wrong_type():
