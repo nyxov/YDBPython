@@ -280,14 +280,7 @@ def test_lock_keys_case9():
 
 def test_lock_keys_case10():
     subsarray = [b"test" + bytes(str(x), encoding="utf-8") for x in range(0, _yottadb.YDB_MAX_SUBS)]
-    _yottadb.lock(
-        (
-            (
-                b"test",
-                subsarray,
-            ),
-        )
-    )
+    _yottadb.lock(((b"test", subsarray),))
 
     # Case 11: Raises a ValueError if a subsarray is longer than _yottadb.YDB_MAX_SUBS
 
@@ -295,14 +288,7 @@ def test_lock_keys_case10():
 def test_lock_keys_case11():
     with pytest.raises(ValueError):
         subsarray = [b"test" + bytes(str(x), encoding="utf-8") for x in range(0, _yottadb.YDB_MAX_SUBS + 1)]
-        _yottadb.lock(
-            (
-                (
-                    b"test",
-                    subsarray,
-                ),
-            )
-        )
+        _yottadb.lock(((b"test", subsarray),))
 
     # Case 12: Raises a TypeError if an element of a subsarray is not a bytes object
 
