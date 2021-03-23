@@ -17,7 +17,7 @@ else
 fi
 
 find . -name '*.c' -o -name '*.h' | xargs "$CLANG_FORMAT" -i
-find . -name '*.py' | xargs black -i
+find . -name '*.py' | grep -v venv | xargs black
 if ! [ $(git diff --stat | wc -l) = 0 ]; then
   echo " -> Formatting differences found!"
   git diff
