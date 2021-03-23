@@ -81,9 +81,7 @@ static void raise_ValidationError(YDBPythonErrorType err_type, char *format_pref
 		size_t ellipsis_len;
 
 		ellipsis_len = strlen(ellipsis);
-		memcpy(&prefixed_err_message[YDBPY_MAX_ERRORMSG - (ellipsis_len + sizeof(char))], ellipsis, ellipsis_len);
-		// copied = snprintf(&prefixed_err_message[YDBPY_MAX_ERRORMSG - (ellipsis_len + sizeof(char))], ellipsis_len, "%s",
-		// ellipsis);
+		memcpy(&prefixed_err_message[YDBPY_MAX_ERRORMSG - (ellipsis_len + 1)], ellipsis, ellipsis_len);
 		assert('\0' == prefixed_err_message[YDBPY_MAX_ERRORMSG]);
 	}
 
@@ -791,7 +789,7 @@ static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
 		/* Create Python object to return */
 		if (!return_NULL) {
 			/* New Reference */
-			ret_value_py = Py_BuildValue("s#", ret_value_ydb.buf_addr, (Py_ssize_t)ret_value_ydb.len_used);
+			ret_value_py = Py_BuildValue("y#", ret_value_ydb.buf_addr, (Py_ssize_t)ret_value_ydb.len_used);
 		}
 	}
 
@@ -1337,7 +1335,7 @@ static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
 		/* Create Python object to return */
 		if (!return_NULL) {
 			/* New Reference */
-			zwr_py = Py_BuildValue("s#", zwr_ydb.buf_addr, (Py_ssize_t)zwr_ydb.len_used);
+			zwr_py = Py_BuildValue("y#", zwr_ydb.buf_addr, (Py_ssize_t)zwr_ydb.len_used);
 		}
 	}
 	/* free allocated memory */
@@ -1686,7 +1684,7 @@ static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
 		}
 		if (!return_NULL) {
 			/* New Reference */
-			str_py = Py_BuildValue("s#", str_ydb.buf_addr, (Py_ssize_t)str_ydb.len_used);
+			str_py = Py_BuildValue("y#", str_ydb.buf_addr, (Py_ssize_t)str_ydb.len_used);
 		}
 	}
 	YDB_FREE_BUFFER(&zwr_ydb);

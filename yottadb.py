@@ -72,7 +72,7 @@ class Context:
     def delete_tree(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
         _yottadb.delete(varname, subsarray, DEL_TREE, self.tp_token)
 
-    def get(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Optional[AnyStr]:
+    def get(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Optional[bytes]:
         return _yottadb.get(varname, subsarray, self.tp_token)
 
     def incr(self, varname: AnyStr, subsarray: Sequence[bytes] = ()) -> int:

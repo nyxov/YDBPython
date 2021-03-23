@@ -20,14 +20,14 @@ import yottadb
 def test_key_object(ydb, simple_data):
     # Key creation, varname only
     key = ydb["^test1"]
-    assert key.value == "test1value"
+    assert key.value == b"test1value"
     assert key.name == "^test1"
     assert key.varname_key == key
     assert key.varname == "^test1"
     assert key.subsarray == []
     # Using bytes argument
     key = ydb[b"^test1"]
-    assert key.value == "test1value"
+    assert key.value == b"test1value"
     assert key.name == b"^test1"
     assert key.varname_key == key
     assert key.varname == b"^test1"
@@ -35,14 +35,14 @@ def test_key_object(ydb, simple_data):
 
     # Key creation, varname and subscript
     key = ydb["^test2"]["sub1"]
-    assert key.value == "test2value"
+    assert key.value == b"test2value"
     assert key.name == "sub1"
     assert key.varname_key == ydb["^test2"]
     assert key.varname == "^test2"
     assert key.subsarray == ["sub1"]
     # Using bytes arguments
     key = ydb[b"^test2"][b"sub1"]
-    assert key.value == "test2value"
+    assert key.value == b"test2value"
     assert key.name == b"sub1"
     assert key.varname_key == ydb[b"^test2"]
     assert key.varname == b"^test2"
@@ -51,7 +51,7 @@ def test_key_object(ydb, simple_data):
     # Key creation and value update, varname and subscript
     key = ydb["test3local"]["sub1"]
     key.value = "smoketest3local"
-    assert key.value == "smoketest3local"
+    assert key.value == b"smoketest3local"
     assert key.name == "sub1"
     assert key.varname_key == ydb["test3local"]
     assert key.varname == "test3local"
@@ -59,7 +59,7 @@ def test_key_object(ydb, simple_data):
     # Using bytes arguments
     key = ydb[b"test3local"][b"sub1"]
     key.value = b"smoketest3local"
-    assert key.value == "smoketest3local"
+    assert key.value == b"smoketest3local"
     assert key.name == b"sub1"
     assert key.varname_key == ydb[b"test3local"]
     assert key.varname == b"test3local"
@@ -78,17 +78,17 @@ def test_Key__str__(ydb):
 
 
 def test_Key_get_value1(ydb, simple_data):
-    assert ydb["^test1"].value == "test1value"
+    assert ydb["^test1"].value == b"test1value"
 
 
 def test_Key_get_value2(ydb, simple_data):
-    assert ydb["^test2"]["sub1"].value == "test2value"
+    assert ydb["^test2"]["sub1"].value == b"test2value"
 
 
 def test_Key_get_value3(ydb, simple_data):
-    assert ydb["^test3"].value == "test3value1"
-    assert ydb["^test3"]["sub1"].value == "test3value2"
-    assert ydb["^test3"]["sub1"]["sub2"].value == "test3value3"
+    assert ydb["^test3"].value == b"test3value1"
+    assert ydb["^test3"]["sub1"].value == b"test3value2"
+    assert ydb["^test3"]["sub1"]["sub2"].value == b"test3value3"
 
 
 def test_Key_subsarray(ydb, simple_data):
@@ -109,14 +109,14 @@ def test_Key_varname(ydb, simple_data):
 def test_Key_set_value1(ydb):
     testkey = ydb["test4"]
     testkey.value = "test4value"
-    assert testkey.value == "test4value"
+    assert testkey.value == b"test4value"
 
 
 def test_Key_set_value2(ydb):
     testkey = ydb["test5"]["sub1"]
     testkey.value = "test5value"
-    assert testkey.value == "test5value"
-    assert ydb["test5"]["sub1"].value == "test5value"
+    assert testkey.value == b"test5value"
+    assert ydb["test5"]["sub1"].value == b"test5value"
 
 
 def test_Key_delete_node(ydb):
@@ -125,13 +125,13 @@ def test_Key_delete_node(ydb):
     testkey.value = "test6value"
     subkey.value = "test6 subvalue"
 
-    assert testkey.value == "test6value"
-    assert subkey.value == "test6 subvalue"
+    assert testkey.value == b"test6value"
+    assert subkey.value == b"test6 subvalue"
 
     testkey.delete_node()
 
     assert testkey.value == None
-    assert subkey.value == "test6 subvalue"
+    assert subkey.value == b"test6 subvalue"
 
 
 def test_Key_delete_tree(ydb):
@@ -140,8 +140,8 @@ def test_Key_delete_tree(ydb):
     testkey.value = "test7value"
     subkey.value = "test7 subvalue"
 
-    assert testkey.value == "test7value"
-    assert subkey.value == "test7 subvalue"
+    assert testkey.value == b"test7value"
+    assert subkey.value == b"test7 subvalue"
 
     testkey.delete_tree()
 
@@ -190,9 +190,9 @@ def test_transaction_smoke_test1(ydb) -> None:
     test_base_key = ydb["^TransactionDecoratorTests"]["smoke test 1"]
     test_base_key.delete_tree()
     key1 = test_base_key["key1"]
-    value1 = "v1"
+    value1 = b"v1"
     key2 = test_base_key["key2"]
-    value2 = "v2"
+    value2 = b"v2"
     assert key1.data == yottadb.DATA_UNDEF
     assert key2.data == yottadb.DATA_UNDEF
 
@@ -251,7 +251,7 @@ def test_transaction_smoke_test3(ydb) -> None:
 
     key1 = test_base_global_key["key1"]
     key2 = test_base_global_key["key2"]
-    value = "val"
+    value = b"val"
     restart_tracker = test_base_local_key["restart tracker"]
 
     assert key1.data == yottadb.DATA_UNDEF
@@ -262,7 +262,7 @@ def test_transaction_smoke_test3(ydb) -> None:
 
     assert key1.value == None
     assert key2.value == value
-    assert restart_tracker.value == "1"
+    assert restart_tracker.value == b"1"
 
     test_base_global_key.delete_tree()
     test_base_local_key.delete_tree()
@@ -314,7 +314,7 @@ def process_transaction(nested_transaction_data: Tuple[TransactionData], context
 
 def test_transaction_return_YDB_OK(ydb):
     key = ydb["^transactiontests"]["test_transaction_return_YDB_OK"]
-    value = "return YDB_OK"
+    value = b"return YDB_OK"
     transaction_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=yottadb._yottadb.YDB_OK)
 
     key.delete_tree()
@@ -327,10 +327,10 @@ def test_transaction_return_YDB_OK(ydb):
 
 def test_nested_transaction_return_YDB_OK(ydb):
     key1 = ydb["^transactiontests"]["test_transaction_return_YDB_OK"]["outer"]
-    value1 = "return YDB_OK"
+    value1 = b"return YDB_OK"
     outer_transaction = TransactionData(action=set_key, action_arguments=(key1, value1), return_value=yottadb._yottadb.YDB_OK)
     key2 = ydb["^transactiontests"]["test_transaction_return_YDB_OK"]["inner"]
-    value2 = "neseted return YDB_OK"
+    value2 = b"neseted return YDB_OK"
     inner_transaction = TransactionData(action=set_key, action_arguments=(key2, value2), return_value=yottadb._yottadb.YDB_OK)
 
     process_transaction((outer_transaction, inner_transaction), context=ydb)
@@ -351,8 +351,8 @@ def test_transaction_return_YDB_OK_to_depth(ydb, depth):
         sub2 = f"level{level}"
         return ydb["^tptests"][sub1][sub2]
 
-    def value_at_level(level: int) -> str:
-        return f"level{level} returns YDB_OK"
+    def value_at_level(level: int) -> bytes:
+        return bytes(f"level{level} returns YDB_OK", encoding="utf-8")
 
     transaction_data = []
     for level in range(1, depth + 1):
