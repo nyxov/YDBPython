@@ -62,6 +62,33 @@ str2zwr_tests = [
 ]
 
 
+# Set ydb_ci and ydb_routines for testing and return a dictionary
+# containing the previous values of these environment variables
+# to facilitate resetting the environment when testing is complete
+def set_ci_environment(cur_dir: str, ydb_ci: str) -> dict:
+    previous = {}
+    previous["calltab"] = os.environ.get("ydb_ci")
+    previous["routines"] = os.environ.get("ydb_routines")
+    os.environ["ydb_ci"] = ydb_ci
+    os.environ["ydb_routines"] = cur_dir + "/tests/m_routines"
+
+    return previous
+
+
+# Reset ydb_ci and ydb_routines to the previous values specified
+# by the "calltab" and "routines" members of a dictionary, respectively
+def reset_ci_environment(previous: dict):
+    # Reset environment
+    if previous["calltab"] is not None:
+        os.environ["ydb_ci"] = previous["calltab"]
+    else:
+        os.environ["ydb_ci"] = ""
+    if previous["routines"] is not None:
+        os.environ["ydb_routines"] = previous["routines"]
+    else:
+        os.environ["ydb_routines"] = ""
+
+
 # Lock a value in the database
 def lock_value(key: Union[yottadb.Key, KeyTuple], interval: int = 2, timeout: int = 1):
     if isinstance(key, yottadb.Key):

@@ -12,20 +12,25 @@
  *                                                              *
  ****************************************************************/
 
-/* A structure that represents a key using ydb c types. used internally for
- * converting between python and ydb c types */
-
-#define YDBPY_DEFAULT_VALUE_LEN		32
-#define YDBPY_DEFAULT_SUBSCRIPT_LEN	16
-#define YDBPY_DEFAULT_SUBSCRIPT_COUNT	2
-#define MAX_CONONICAL_NUMBER_STRING_MAX 48
+#define YDBPY_DEFAULT_VALUE_LEN	       32
+#define YDBPY_DEFAULT_SUBSCRIPT_LEN    16
+#define YDBPY_DEFAULT_SUBSCRIPT_COUNT  2
+#define CANONICAL_NUMBER_TO_STRING_MAX 48
 
 #define YDB_LOCK_MIN_ARGS		2
 #define YDB_LOCK_ARGS_PER_KEY		3
 #define YDB_CALL_VARIADIC_MAX_ARGUMENTS 36
 #define YDB_LOCK_MAX_KEYS		(YDB_CALL_VARIADIC_MAX_ARGUMENTS - YDB_LOCK_MIN_ARGS) / YDB_LOCK_ARGS_PER_KEY
 
+/* Large enough to fit any YDB error message, per
+ * https://docs.yottadb.com/ProgrammersGuide/extrout.html#ydb-zstatus
+ */
 #define YDBPY_MAX_ERRORMSG 2048
+
+// Default size to allocate for ci() output parameters
+#define YDBPY_DEFAULT_OUTBUF 2048
+
+#define YDBPY_CHECK_TYPE 2
 
 /* Set of acceptable Python error types. Each type is named by prefixing a Python error name with `YDBPython`,
  * with the exception of YDBPython_NoError. This item doesn't represent a Python error, but is included at enum value 0
@@ -34,6 +39,7 @@
 typedef enum YDBPythonErrorType {
 	YDBPython_TypeError = 1,
 	YDBPython_ValueError,
+	YDBPython_OSError,
 } YDBPythonErrorType;
 
 /* Set of acceptable Python Sequence types. Used to enforce correct limits and
@@ -47,6 +53,14 @@ typedef enum YDBPythonSequenceType {
 } YDBPythonSequenceType;
 
 // TypeError messages
+#define YDBPY_ERR_IMMUTABLE_OUTPUT_ARGS                                                                                           \
+	"YottaDB call-in argument list is immutable, but routine has output argument(s). Pass argument list as a Python List to " \
+	"allow output argument updates."
+#define YDBPY_ERR_CALLIN_ARGS_NOT_SEQ "YottaDB call-in arguments must be passed as a Sequence"
+#define YDBPY_ERR_INVALID_ARGS	      "YottaDB call-in routine '%s' has incorrect number of parameters: %u expected, got %u"
+#define YDBPY_ERR_INVALID_CI_ARG_TYPE \
+	"YottaDB call-in routine '%s' parameter %d has invalid type: must be str, bytes, int, or float"
+#define YDBPY_ERR_CI_PARM_UNDEFINED		    "YottaDB call-in routine %s parameter %d not defined in call-in table"
 #define YDBPY_ERR_NOT_LIST_OR_TUPLE		    "key must be list or tuple."
 #define YDBPY_ERR_VARNAME_NOT_BYTES_LIKE	    "varname argument is not a bytes-like object (bytes or str)"
 #define YDBPY_ERR_ITEM_NOT_BYTES_LIKE		    "item %ld is not a bytes-like object (bytes or str)"
@@ -54,6 +68,7 @@ typedef enum YDBPythonSequenceType {
 #define YDBPY_ERR_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES "item %ld in key sequence invalid: first element must be of type 'bytes'"
 
 // ValueError messages
+#define YDBPY_ERR_EMPTY_FILENAME		   "YottaDB filenames must be one character or longer"
 #define YDBPY_ERR_VARNAME_TOO_LONG		   "invalid varname length %ld: max %d"
 #define YDBPY_ERR_SEQUENCE_TOO_LONG		   "invalid sequence length %ld: max %d"
 #define YDBPY_ERR_BYTES_TOO_LONG		   "invalid bytes length %ld: max %d"
@@ -62,13 +77,21 @@ typedef enum YDBPythonSequenceType {
 
 #define YDBPY_ERR_KEY_IN_SEQUENCE_SUBSARRAY_INVALID "item %ld in key sequence has invalid subsarray: %s"
 
-#define YDBPY_ERR_VARNAME_INVALID   "'varnames' argument invalid: %s"
-#define YDBPY_ERR_SUBSARRAY_INVALID "'subsarray' argument invalid: %s"
-#define YDBPY_ERR_KEYS_INVALID	    "'keys' argument invalid: %s"
+#define YDBPY_ERR_VARNAME_INVALID     "'varnames' argument invalid: %s"
+#define YDBPY_ERR_SUBSARRAY_INVALID   "'subsarray' argument invalid: %s"
+#define YDBPY_ERR_KEYS_INVALID	      "'keys' argument invalid: %s"
+#define YDBPY_ERR_ROUTINE_UNSPECIFIED "No call-in routine specified. Routine name required for M call-in."
+
+#define YDBPY_ERR_SYSCALL "System call failed: %s, return %d (%s)"
+
+#define YDBPY_ERR_FAILED_NUMERIC_CONVERSION "Failed to convert Python numeric value to internal representation"
 
 // Prevents compiler warnings for variables used only in asserts
 #define UNUSED(x) (void)(x)
 
+/* A structure that represents a key using YDB C types. used internally for
+ * converting between Python and YDB C types.
+ */
 typedef struct {
 	ydb_buffer_t *varname;
 	int	      subs_used;
@@ -89,7 +112,8 @@ typedef struct {
 #define POPULATE_NEW_BUFFER(PYVARNAME, YDBVARNAME, VARNAMELEN, FUNCTIONNAME, RETURN_NULL)                      \
 	{                                                                                                      \
 		bool copy_success;                                                                             \
-		YDB_MALLOC_BUFFER(&(YDBVARNAME), (VARNAMELEN));                                                \
+                                                                                                               \
+		YDB_MALLOC_BUFFER(&(YDBVARNAME), (VARNAMELEN + 1));                                            \
 		YDB_COPY_BYTES_TO_BUFFER((PYVARNAME), (VARNAMELEN), &(YDBVARNAME), copy_success);              \
 		if (!copy_success) {                                                                           \
 			PyErr_Format(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in %s", (FUNCTIONNAME)); \
@@ -105,19 +129,33 @@ typedef struct {
 		SUBSARRAY_YDB = NULL;                                                                             \
 		if (Py_None != SUBSARRAY_PY) {                                                                    \
 			SUBSUSED = PySequence_Length(SUBSARRAY_PY);                                               \
-			SUBSARRAY_YDB = (ydb_buffer_t *)calloc(SUBSUSED, sizeof(ydb_buffer_t));                   \
+			SUBSARRAY_YDB = malloc(SUBSUSED * sizeof(ydb_buffer_t));                                  \
 			success = convert_py_sequence_to_ydb_buffer_array(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB); \
-			if (!success)                                                                             \
+			if (!success) {                                                                           \
+				FREE_BUFFER_ARRAY(SUBSARRAY_YDB, SUBSUSED);                                       \
 				RETURN_NULL = true;                                                               \
+			}                                                                                         \
 		}                                                                                                 \
 	}
 
-#define FREE_BUFFER_ARRAY(ARRAY, LEN)                                 \
-	{                                                             \
-		for (int i = 0; i < (LEN); i++) {                     \
-			YDB_FREE_BUFFER(&((ydb_buffer_t *)ARRAY)[i]); \
-		}                                                     \
-		free(ARRAY);                                          \
+#define FREE_BUFFER_ARRAY(ARRAY, LEN)                                         \
+	{                                                                     \
+		if (NULL != ARRAY) {                                          \
+			for (int i = 0; i < (LEN); i++) {                     \
+				YDB_FREE_BUFFER(&((ydb_buffer_t *)ARRAY)[i]); \
+			}                                                     \
+			free(ARRAY);                                          \
+		}                                                             \
+	}
+
+#define FREE_STRING_ARRAY(ARRAY, LEN)                              \
+	{                                                          \
+		if (NULL != ARRAY) {                               \
+			for (unsigned int i = 0; i < (LEN); i++) { \
+				free(ARRAY[i].address);            \
+			}                                          \
+			free(ARRAY);                               \
+		}                                                  \
 	}
 
 /* Safely downcasts SRC_LEN (Py_ssize_t) and stores in DEST_LEN (unsigned int).
@@ -132,7 +170,7 @@ typedef struct {
 		Py_ssize_t max_len, src_len;                                                          \
 		char *	   err_msg;                                                                   \
                                                                                                       \
-		src_len = SRC_LEN;                                                                    \
+		src_len = (SRC_LEN);                                                                  \
 		if (IS_VARNAME) {                                                                     \
 			max_len = YDB_MAX_IDENT;                                                      \
 			err_msg = YDBPY_ERR_VARNAME_TOO_LONG;                                         \
@@ -140,7 +178,7 @@ typedef struct {
 			max_len = YDB_MAX_STR;                                                        \
 			err_msg = YDBPY_ERR_BYTES_TOO_LONG;                                           \
 		}                                                                                     \
-		if (max_len < (src_len)) {                                                            \
+		if (max_len < src_len) {                                                              \
 			raise_ValidationError(YDBPython_ValueError, NULL, err_msg, src_len, max_len); \
 			return NULL;                                                                  \
 		} else {                                                                              \

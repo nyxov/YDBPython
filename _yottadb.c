@@ -12,6 +12,8 @@
  *                                                              *
  ****************************************************************/
 
+#define _POSIX_C_SOURCE 200809L // Provide access to strnlen, per https://man7.org/linux/man-pages/man7/feature_test_macros.7.html
+#include <string.h>
 #include <assert.h>
 #include <stdbool.h>
 #include <stdarg.h>
@@ -32,6 +34,195 @@
 		return RET;                   \
 	}
 
+/* Utility structure for maintaining call-in information
+ * used in ydb_cip calls.
+ *
+ * This struct serves as an anchor point for the C call-in routine descriptor
+ * used by cip() that provides for less call-in overhead than ci() as the descriptor
+ * contains fastpath information filled in by YottaDB after the first call. This allows
+ * subsequent calls to have minimal overhead. Because this structure's contents contain
+ * pointers to C allocated storage, it is not exposed to Python-level users.
+ */
+typedef struct {
+	char *		   routine_name;
+	bool		   has_parm_types;
+	ci_name_descriptor ci_info;
+	ci_parm_type	   parm_types;
+} py_ci_name_descriptor;
+
+// Initialize a global struct to store call-in information
+py_ci_name_descriptor ci_info = {.routine_name = NULL, .has_parm_types = FALSE, .ci_info = {.handle = NULL}};
+
+/* Counts the total number of arguments between two integer bitmaps,
+ * one representing input arguments and another representing output
+ * arguments by bitwise ORing the two integers together and ANDing
+ * on each bit in this combined bitmap.
+ */
+static unsigned int count_args(unsigned int in, unsigned int out) {
+	unsigned int count, total;
+
+	total = in | out;
+	count = 0;
+	while (total) {
+		count += (total & 1);
+		total >>= 1;
+	}
+
+	return count;
+}
+
+static int anystr_to_buffer(PyObject *object, ydb_buffer_t *buffer) {
+	char *	     bytes;
+	bool	     decref_object;
+	Py_ssize_t   bytes_ssize;
+	unsigned int bytes_len;
+	int	     done;
+
+	if (PyUnicode_Check(object)) {
+		// Convert Unicode object into Python bytes object
+		object = PyUnicode_AsEncodedString(object, "utf-8", "strict"); // New reference
+		if (NULL == object) {
+			PyErr_SetString(YDBPythonError, "failed to encode Unicode string to bytes object");
+			return !YDB_OK;
+		}
+		decref_object = TRUE;
+	} else if (PyBytes_Check(object)) {
+		// Object is a bytes object, no Unicode encoding needed
+		decref_object = FALSE;
+	} else {
+		/* Object is not bytes or str (Unicode). Signal this to
+		 * the caller and let it decide whether to issue an error
+		 * or check for additional Python types.
+		 */
+		return YDBPY_CHECK_TYPE;
+	}
+
+	// Convert Python bytes object to C character string (char *)
+	bytes_ssize = PyBytes_Size(object);
+	bytes_len = Py_SAFE_DOWNCAST(bytes_ssize, Py_ssize_t, unsigned int);
+	bytes = PyBytes_AsString(object);
+
+	// Allocate and populate YDB buffer
+	YDB_MALLOC_BUFFER(buffer, bytes_len + 1); // Null terminator used in some scenarios
+	YDB_COPY_BYTES_TO_BUFFER(bytes, bytes_len, buffer, done);
+	buffer->buf_addr[buffer->len_used] = '\0';
+
+	// Optionally cleanup new reference
+	if (decref_object) {
+		Py_DECREF(object);
+	}
+
+	// Defer error emission until after optional cleanup to reduce duplication
+	if (!done) {
+		PyErr_SetString(YDBPythonError, "failed to copy bytes object to buffer array");
+		return !YDB_OK;
+	}
+
+	return YDB_OK;
+}
+
+static int anystr_to_ydb_string_t(PyObject *object, ydb_string_t *buffer) {
+	char *	     bytes;
+	bool	     decref_object;
+	Py_ssize_t   bytes_ssize;
+	unsigned int bytes_len;
+
+	if (PyUnicode_Check(object)) {
+		// Convert Unicode object into Python bytes object
+		object = PyUnicode_AsEncodedString(object, "utf-8", "strict"); // New reference
+		if (NULL == object) {
+			PyErr_SetString(YDBPythonError, "failed to encode Unicode string to bytes object");
+			return !YDB_OK;
+		}
+		decref_object = TRUE;
+	} else if (PyBytes_Check(object)) {
+		// Object is a bytes object, no Unicode encoding needed
+		decref_object = FALSE;
+	} else {
+		/* Object is not bytes or str (Unicode). Signal this to
+		 * the caller and let it decide whether to issue an error
+		 * or check for additional Python types.
+		 */
+		return YDBPY_CHECK_TYPE;
+	}
+
+	// Convert Python bytes object to C character string (char *)
+	bytes_ssize = PyBytes_Size(object);
+	bytes_len = Py_SAFE_DOWNCAST(bytes_ssize, Py_ssize_t, unsigned int);
+	bytes = PyBytes_AsString(object);
+
+	// Allocate and populate YDB buffer
+	buffer->address = malloc((bytes_len + 1) * sizeof(char)); // Null terminator used in some scenarios
+	memcpy(buffer->address, bytes, bytes_len);
+	buffer->address[bytes_len] = '\0';
+	buffer->length = bytes_len;
+
+	// Optionally cleanup new reference
+	if (decref_object) {
+		Py_DECREF(object);
+	}
+
+	return YDB_OK;
+}
+
+/* Check if a numeric conversion error occurred in Python API code.
+ * If so, raise an exception and return TRUE, otherwise just return FALSE.
+ */
+static int is_conversion_error() {
+	PyObject *err_type;
+
+	err_type = PyErr_Occurred();
+	if (NULL != err_type) {
+		// A non-overflow Python error occurred, so raise a matching exception manually
+		PyErr_SetString(err_type, YDBPY_ERR_FAILED_NUMERIC_CONVERSION);
+		return TRUE;
+	} else {
+		return FALSE;
+	}
+}
+
+static int object_to_ydb_string_t(PyObject *object, ydb_string_t *buffer) {
+	int status;
+
+	status = anystr_to_ydb_string_t(object, buffer);
+	if (YDBPY_CHECK_TYPE == status) {
+		status = YDB_OK;
+		buffer->address = calloc(CANONICAL_NUMBER_TO_STRING_MAX, sizeof(char));
+		if (PyLong_Check(object)) {
+			long num;
+
+			num = PyLong_AsLong(object); // Raises exception if Python int doesn't fit in C long
+			if ((-1 == num) && is_conversion_error()) {
+				free(buffer->address);
+				status = !YDB_OK;
+			} else {
+				buffer->length = snprintf(buffer->address, CANONICAL_NUMBER_TO_STRING_MAX, "%ld", num);
+				assert(buffer->length < CANONICAL_NUMBER_TO_STRING_MAX);
+			}
+		} else if (PyFloat_Check(object)) {
+			double num;
+
+			num = PyFloat_AsDouble(object);
+			if ((-1 == num) && is_conversion_error()) {
+				free(buffer->address);
+				status = !YDB_OK;
+			} else {
+				buffer->length = snprintf(buffer->address, CANONICAL_NUMBER_TO_STRING_MAX, "%lf", num);
+				assert(buffer->length < CANONICAL_NUMBER_TO_STRING_MAX);
+			}
+		} else {
+			/* Object is not str, bytes, int, or float, and so cannot be converted to
+			 * a C type accepted by ydb_ci. Cleanup and signal error to caller, who will
+			 * raise an exception based on context.
+			 */
+			free(buffer->address);
+			status = !YDB_OK;
+		}
+	}
+
+	return status;
+}
+
 /* Local Utility Functions */
 /* Routine to create an array of empty ydb_buffer_ts with num elements each with
  * an allocated length of len
@@ -46,7 +237,7 @@ static ydb_buffer_t *create_empty_buffer_array(int num, int len) {
 	int	      i;
 	ydb_buffer_t *return_buffer_array;
 
-	return_buffer_array = (ydb_buffer_t *)calloc(num, sizeof(ydb_buffer_t));
+	return_buffer_array = malloc(num * sizeof(ydb_buffer_t));
 	for (i = 0; i < num; i++)
 		YDB_MALLOC_BUFFER(&return_buffer_array[i], len);
 
@@ -96,6 +287,9 @@ static void raise_ValidationError(YDBPythonErrorType err_type, char *format_pref
 	case YDBPython_ValueError:
 		PyErr_SetString(PyExc_ValueError, prefixed_err_message);
 		break;
+	case YDBPython_OSError:
+		PyErr_SetString(PyExc_OSError, err_message);
+		break;
 	default:
 		// Only TypeError and ValueError are possible, so we should never get here.
 		assert(FALSE);
@@ -104,6 +298,78 @@ static void raise_ValidationError(YDBPythonErrorType err_type, char *format_pref
 }
 
 /* Conversion Utilities */
+
+/* Returns a new PyObject set to the value contained in a YDB buffer.
+ *
+ * This is accomplished by determining the type of an existing Python object
+ * and generating a new PyObject from the value of the YDB buffer via
+ * an appropriate intermediate C type.
+ *
+ * Python types supported are: int, float, bytes, and str.
+ *
+ * On success, this function creates a new PyObject reference.
+ * On error, no references will be created and the error will be signalled
+ * by a NULL return value. Note that this function will only raise its own
+ * exceptions for failed system calls, while any other exceptions will have
+ * occurred within Python library calls and will be raised there. In either
+ * case, the caller need not raise any exceptions.
+ *
+ * Parameters:
+ *   object    - the Python object to be type checked
+ *   value    - the YDB string containing the value to which the object is to be set
+ *
+ * Returns:
+ *   ret	- a new PyObject, or NULL in case of error
+ */
+static PyObject *new_object_from_object_and_string(PyObject *object, ydb_string_t *value) {
+	PyObject *ret;
+
+	/* Add null terminator at new length, as it may have been
+	 * shortened during an M call-in.
+	 */
+	value->address[value->length] = '\0';
+	if (PyLong_Check(object)) {
+		long val;
+
+		val = strtol(value->address, NULL, 10);
+		if ((ERANGE != errno) && (0 <= val) && (LONG_MAX >= val)) {
+			ret = PyLong_FromLong(val);
+		} else {
+			raise_ValidationError(YDBPython_OSError, NULL, YDBPY_ERR_SYSCALL, "strtol", errno, strerror(errno));
+			ret = NULL;
+		}
+	} else if (PyFloat_Check(object)) {
+		double val;
+
+		val = strtod(value->address, NULL);
+		if ((ERANGE != errno) && (HUGE_VAL != val) && (-HUGE_VAL != val)) {
+			ret = PyFloat_FromDouble(val);
+		} else {
+			raise_ValidationError(YDBPython_OSError, NULL, YDBPY_ERR_SYSCALL, "strtod", errno, strerror(errno));
+			ret = NULL;
+		}
+	} else if (PyUnicode_Check(object)) {
+		ret = PyUnicode_FromStringAndSize(value->address, value->length);
+	} else if (PyBytes_Check(object)) {
+		ret = PyBytes_FromStringAndSize(value->address, value->length);
+	} else {
+		/* Any unacceptable type should have been detected during initial
+		 * validation of any PyObjects passed from Python to the C API,
+		 * so we should never get here. So, assert this.
+		 */
+		assert(FALSE);
+		ret = NULL;
+	}
+
+	/* Conversion was successful and a new object was created,
+	 * so cleanup the previous object before returning.
+	 */
+	if (NULL != ret) {
+		Py_DECREF(object);
+	}
+
+	return ret;
+}
 
 /* Confirm that the passed PyObject is a valid Python Sequence,
  * i.e. a Sequence of Python `str` (i.e. Unicode) objects.
@@ -214,57 +480,29 @@ static bool is_valid_sequence(PyObject *object, YDBPythonSequenceType sequence_t
  *    sequence    - a Python Object that is expected to be a Python Sequence containing Strings.
  */
 bool convert_py_sequence_to_ydb_buffer_array(PyObject *sequence, int sequence_len, ydb_buffer_t *buffer_array) {
-	bool	     done, free_bytes;
-	Py_ssize_t   bytes_ssize;
-	unsigned int bytes_len;
-	char *	     bytes_c;
-	PyObject *   bytes, *seq;
+	PyObject *bytes, *seq;
+	int	  status;
 
 	seq = PySequence_Fast(sequence, "argument must be iterable"); // New Reference
 	if (!seq) {
 		PyErr_SetString(YDBPythonError, "Can't convert none sequence to buffer array.");
-		return false;
+		return FALSE;
 	}
 
 	for (int i = 0; i < sequence_len; i++) {
 
-		bytes = PySequence_Fast_GET_ITEM(seq, i); // Borrowed Reference
-		if (PyUnicode_Check(bytes)) {
-			// Convert Unicode object into Python bytes object
-			bytes = PyUnicode_AsEncodedString(bytes, "utf-8", "strict"); // New reference
-			if (NULL == bytes) {
-				FREE_BUFFER_ARRAY(buffer_array, i);
-				Py_DECREF(seq);
-				PyErr_SetString(YDBPythonError, "failed to encode Unicode string to bytes object");
-				return false;
-			}
-			free_bytes = true;
-		} else {
-			// This should be a bytes object per validation by is_valid_sequence
-			assert(PyBytes_Check(bytes));
-			free_bytes = false;
-		}
-
-		// Convert Python bytes object to C character string (char *)
-		bytes_ssize = PyBytes_Size(bytes);
-		bytes_len = Py_SAFE_DOWNCAST(bytes_ssize, Py_ssize_t, unsigned int);
-		bytes_c = PyBytes_AsString(bytes);
-
-		YDB_MALLOC_BUFFER(&buffer_array[i], bytes_len);
-		YDB_COPY_BYTES_TO_BUFFER(bytes_c, bytes_len, &buffer_array[i], done);
-		if (free_bytes) {
-			Py_DECREF(bytes);
-		}
-		if (!done) {
+		bytes = PySequence_GetItem(seq, i);		    // New reference
+		status = anystr_to_buffer(bytes, &buffer_array[i]); // Allocates buffer
+		Py_DECREF(bytes);
+		if (YDB_OK != status) {
 			FREE_BUFFER_ARRAY(buffer_array, i);
 			Py_DECREF(seq);
-			PyErr_SetString(YDBPythonError, "failed to copy bytes object to buffer array");
-			return false;
+			return FALSE;
 		}
 	}
 
 	Py_DECREF(seq);
-	return true;
+	return TRUE;
 }
 
 /* converts an array of ydb_buffer_ts into a sequence (Tuple) of Python strings.
@@ -312,7 +550,7 @@ static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
 	len = Py_SAFE_DOWNCAST(len_ssize, Py_ssize_t, unsigned int);
 	bytes_c = PyBytes_AsString(varname);
 
-	varname_y = (ydb_buffer_t *)calloc(1, sizeof(ydb_buffer_t));
+	varname_y = malloc(1 * sizeof(ydb_buffer_t));
 	YDB_MALLOC_BUFFER(varname_y, len);
 	YDB_COPY_BYTES_TO_BUFFER(bytes_c, len, varname_y, done);
 	if (!done) {
@@ -326,18 +564,20 @@ static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
 	if (Py_None != subsarray) {
 		sequence_len_ssize = PySequence_Length(subsarray);
 		dest->subs_used = Py_SAFE_DOWNCAST(sequence_len_ssize, Py_ssize_t, unsigned int);
-		subsarray_y = (ydb_buffer_t *)calloc(dest->subs_used, sizeof(ydb_buffer_t));
+		subsarray_y = malloc(dest->subs_used * sizeof(ydb_buffer_t));
 		convert_success = convert_py_sequence_to_ydb_buffer_array(subsarray, dest->subs_used, subsarray_y);
 		if (convert_success) {
 			dest->subsarray = subsarray_y;
 		} else {
 			YDB_FREE_BUFFER(varname_y);
-			FREE_BUFFER_ARRAY(varname_y, dest->subs_used);
+			free(varname_y);
+			FREE_BUFFER_ARRAY(subsarray_y, dest->subs_used);
 			PyErr_SetString(YDBPythonError, "failed to covert sequence to buffer array");
 			return false;
 		}
 	} else {
 		dest->subs_used = 0;
+		dest->subsarray = NULL;
 	}
 	return true;
 }
@@ -436,11 +676,6 @@ static int is_valid_key_sequence(PyObject *keys_sequence, int max_len) {
 		} else if ((!PyUnicode_Check(varname)) && (!PyBytes_Check(varname))) {
 			/* validate item/key first element (varname) type */
 			raise_ValidationError(YDBPython_TypeError, YDBPY_ERR_KEYS_INVALID, YDBPY_ERR_ITEM_NOT_BYTES_LIKE, i);
-			error_encountered = TRUE;
-		} else if (YDB_MAX_IDENT < len_varname) {
-			/* validate item/key first element (varname) length */
-			raise_ValidationError(YDBPython_ValueError, YDBPY_ERR_KEYS_INVALID,
-					      YDBPY_ERR_KEY_IN_SEQUENCE_VARNAME_TOO_LONG, i, len_varname, YDB_MAX_IDENT);
 			error_encountered = TRUE;
 		} else if (2 == len_key_seq) {
 			/* validate item/key second element (subsarray) if it exists */
@@ -551,11 +786,17 @@ static void raise_YDBError(int status) {
 	PyObject *  message;
 	int	    copied = 0, zstatus;
 	char	    full_error_message[YDBPY_MAX_ERRORMSG];
-	char *	    error_status, *api, *error_name, *error_message;
+	char *	    error_name, *error_message;
 	char *	    next_field = NULL;
 	const char *delim = ",";
 
-	if (YDB_TP_ROLLBACK == status) {
+	zstatus = ydb_zstatus(error_string, YDB_MAX_ERRORMSG);
+	if ((YDB_OK == zstatus) || (YDB_ERR_INVSTRLEN == zstatus)) {
+		/* Normal error message format */
+		error_name = strtok_r(error_string, delim, &next_field);
+		error_message = strtok_r(NULL, delim, &next_field);
+		assert(NULL != error_message);
+	} else if (YDB_TP_ROLLBACK == status) {
 		error_name = "%YDB-TP-ROLLBACK";
 		error_message = " Transaction callback function returned YDB_TP_ROLLBACK.";
 	} else if (YDB_TP_RESTART == status) {
@@ -565,21 +806,9 @@ static void raise_YDBError(int status) {
 		error_name = "%YDB-LOCK-TIMEOUT";
 		error_message = " Lock attempt timed out.";
 	} else {
-		zstatus = ydb_zstatus(error_string, YDBPY_MAX_ERRORMSG);
-		if ((YDB_ERR_INVSTRLEN == zstatus) || (YDB_OK == zstatus)) {
-			/* Normal error message format */
-			error_name = strtok_r(error_string, delim, &next_field);
-			error_message = strtok_r(NULL, delim, &next_field);
-			if (NULL == error_message) {
-				/* Alternate error message case */
-				error_name = (NULL == error_status) ? error_status : "UNKNOWN";
-				error_message = (NULL == api) ? api : "";
-			}
-		} else {
-			assert(FALSE);
-			error_name = "UNKNOWN";
-			error_message = "";
-		}
+		assert(FALSE);
+		error_name = "UNKNOWN";
+		error_message = "";
 	}
 
 	copied = snprintf(full_error_message, YDBPY_MAX_ERRORMSG, "%s (%d):%s", error_name, status, error_message);
@@ -603,6 +832,412 @@ static void raise_YDBError(int status) {
  *    args        - a Python tuple of the positional arguments passed to the function.
  *    kwds        - a Python dictionary of the keyword arguments passed to the function.
  */
+
+/* Initialize a py_ci_name_descriptor struct with the name of a call-in routine.
+ * Used by cip() to prepare for a YottaDB call-in.
+ */
+static int set_routine_name(char *routine_name) {
+	assert(NULL != routine_name);
+	ci_info.ci_info.rtn_name.length = strnlen(routine_name, YDB_MAX_IDENT);
+	if (0 >= ci_info.ci_info.rtn_name.length) {
+		PyErr_Format(YDBPythonError, "Failed to initialize call-in information for routine: %s", routine_name);
+		return !YDB_OK;
+	}
+	ci_info.ci_info.rtn_name.length++; // Null terminator
+	if (NULL != ci_info.ci_info.rtn_name.address) {
+		free(ci_info.ci_info.rtn_name.address);
+	}
+	ci_info.ci_info.rtn_name.address = malloc((ci_info.ci_info.rtn_name.length + 1) * sizeof(char));
+	memcpy(ci_info.ci_info.rtn_name.address, routine_name, ci_info.ci_info.rtn_name.length + 1);
+	ci_info.ci_info.handle = NULL;
+	ci_info.has_parm_types = FALSE;
+
+	return YDB_OK;
+}
+
+/* Cleans up a ci_name_descriptor struct by freeing memory and resetting
+ * member values of the global ci_info struct.
+ */
+static void free_ci_name_descriptor() {
+	if (NULL != ci_info.ci_info.rtn_name.address) {
+		free(ci_info.ci_info.rtn_name.address);
+		ci_info.ci_info.rtn_name.address = NULL;
+	}
+	ci_info.ci_info.rtn_name.length = 0;
+	ci_info.ci_info.handle = NULL;
+	ci_info.has_parm_types = FALSE;
+}
+
+static PyObject *ci_wrapper(PyObject *args, PyObject *kwds, bool is_cip) {
+	bool	      return_null = false;
+	int	      status, cur_index, has_retval;
+	PyObject *    routine, *routine_args, *seq, *py_arg, *ret_value_py;
+	unsigned int  inmask, outmask, routine_name_len, io_args, num_args, cur_arg;
+	ydb_buffer_t  routine_name;
+	ydb_string_t *args_ydb;
+	Py_ssize_t    routine_len;
+	ydb_string_t  ret_val;
+	void **	      arg_values;
+	ci_parm_type  parm_types;
+
+	seq = routine_args = NULL;
+	has_retval = FALSE;
+
+	// Parse and validate
+	static char *kwlist[] = {"routine", "args", "has_retval", NULL};
+	// Parsed values are borrowed references, do not Py_DECREF them.
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|Op", kwlist, &routine, &routine_len, &routine_args, &has_retval)) {
+		return NULL;
+	}
+	if (Py_None == routine) {
+		raise_ValidationError(YDBPython_ValueError, NULL, YDBPY_ERR_ROUTINE_UNSPECIFIED);
+		return NULL;
+	}
+
+	// Lookup routine parameter information for construction of argument array
+	INVOKE_PY_SAFE_DOWNCAST(routine_name_len, routine_len, TRUE);
+	if (is_cip) {
+		POPULATE_NEW_BUFFER(routine, routine_name, routine_name_len, "cip() routine name", return_null);
+	} else {
+		POPULATE_NEW_BUFFER(routine, routine_name, routine_name_len, "ci() routine name", return_null);
+	}
+	if (return_null) {
+		return NULL;
+	}
+	assert(routine_name.len_used < routine_name.len_alloc);
+	routine_name.buf_addr[routine_name.len_used] = '\0';
+	/* Update routine information on initial call to cip() or when
+	 * a different routine name is used on a subsequent call.
+	 */
+	if (is_cip) {
+		if ((!ci_info.has_parm_types) || (NULL == ci_info.routine_name)
+		    || (!strncmp(ci_info.routine_name, routine_name.buf_addr, YDB_MAX_IDENT))) {
+			free_ci_name_descriptor();
+			status = set_routine_name(routine_name.buf_addr);
+			if (YDB_OK != status) {
+				YDB_FREE_BUFFER(&routine_name);
+				return NULL;
+			}
+			status = ydb_ci_get_info(routine_name.buf_addr, &ci_info.parm_types);
+			if (YDB_OK != status) {
+				raise_YDBError(status);
+				YDB_FREE_BUFFER(&routine_name);
+				return NULL;
+			}
+			ci_info.has_parm_types = TRUE;
+			parm_types = ci_info.parm_types;
+		}
+	} else {
+		status = ydb_ci_get_info(routine_name.buf_addr, &parm_types);
+		if (YDB_OK != status) {
+			raise_YDBError(status);
+			YDB_FREE_BUFFER(&routine_name);
+			return NULL;
+		}
+	}
+
+	if (NULL == routine_args) {
+		num_args = 0;
+	} else {
+		seq = PySequence_Fast(routine_args, "argument must be iterable"); // New Reference
+		if ((!seq) || PyUnicode_Check(routine_args) || PyBytes_Check(routine_args)) {
+			if (NULL != seq) {
+				Py_DECREF(seq);
+			}
+			raise_ValidationError(YDBPython_TypeError, NULL, YDBPY_ERR_CALLIN_ARGS_NOT_SEQ);
+			return NULL;
+		}
+		INVOKE_PY_SAFE_DOWNCAST(num_args, PySequence_Length(seq), FALSE);
+	}
+
+	// Setup for Call
+	inmask = parm_types.input_mask;
+	outmask = parm_types.output_mask;
+	// Get total number of expected arguments
+	io_args = count_args(inmask, outmask);
+	if ((io_args != num_args) || ((NULL == routine_args) && (0 != io_args))) {
+		raise_ValidationError(YDBPython_ValueError, NULL, YDBPY_ERR_INVALID_ARGS, routine_name.buf_addr, io_args, num_args);
+		if (NULL != seq) {
+			Py_DECREF(seq);
+		}
+		return NULL;
+	}
+	/* In the case of output arguments to ci(), as specified in the call-in table,
+	 * an update will be required to the Python object containing the arguments to
+	 * be passed to ydb_ci() with the output value for that argument. In that case,
+	 * this Python object must be a List, i.e. mutable, and not a Tuple, i.e. immutable.
+	 *
+	 * Accordingly, check that here and raise an error if there is an output argument
+	 * to be updated, but the argument list is immutable.
+	 */
+	if (!PyList_Check(routine_args) && (0 != outmask)) {
+		if (NULL != seq) {
+			Py_DECREF(seq);
+		}
+		raise_ValidationError(YDBPython_TypeError, NULL, YDBPY_ERR_IMMUTABLE_OUTPUT_ARGS);
+		return NULL;
+	}
+	if (0 < num_args) {
+		args_ydb = malloc(num_args * sizeof(ydb_string_t));
+		for (cur_arg = 0; cur_arg < num_args; cur_arg++) {
+			py_arg = PySequence_GetItem(seq, cur_arg);			     // Borrowed Reference
+			if (1 == (1 & inmask)) {					     // cur_arg is an input argument
+				status = object_to_ydb_string_t(py_arg, &args_ydb[cur_arg]); // Allocates buffer
+				if (YDB_OK != status) {
+					raise_ValidationError(YDBPython_TypeError, NULL, YDBPY_ERR_INVALID_CI_ARG_TYPE,
+							      routine_name.buf_addr, cur_arg + 1);
+					FREE_STRING_ARRAY(args_ydb, cur_arg);
+					Py_DECREF(seq);
+					return NULL;
+				}
+			} else {			  // cur_arg is an output argument
+				if (0 == (1 & outmask)) { // Check for unexpected parameter
+					raise_ValidationError(YDBPython_ValueError, NULL, YDBPY_ERR_CI_PARM_UNDEFINED,
+							      routine_name.buf_addr, cur_arg + 1);
+					FREE_STRING_ARRAY(args_ydb, cur_arg);
+					Py_DECREF(seq);
+					return NULL;
+				}
+				/* Python caller cannot allocate C variables, so do that here.
+				 * Any return value will later be converted into a Python object
+				 * to be returned to caller, allowing this string to be freed then.
+				 *
+				 * Note that the call to object_to_ydb_string_t() is needed to derive
+				 * a pre-allocation for output parameters. In the case where the user
+				 * passes an empty string, we use a default value.
+				 */
+				status = object_to_ydb_string_t(py_arg, &args_ydb[cur_arg]); // Allocates buffer
+				if (YDB_OK != status) {
+					raise_ValidationError(YDBPython_TypeError, NULL, YDBPY_ERR_INVALID_CI_ARG_TYPE,
+							      routine_name.buf_addr, cur_arg + 1);
+					FREE_STRING_ARRAY(args_ydb, cur_arg);
+					Py_DECREF(seq);
+					return NULL;
+				}
+				/* This is an output only parameter passed as an empty string,
+				 * so an initial length cannot be derived from the argument
+				 * received from Python. So, allocate a default here.
+				 */
+				if (0 == args_ydb[cur_arg].length) {
+					free(args_ydb[cur_arg].address);
+					args_ydb[cur_arg].address = malloc(YDBPY_DEFAULT_OUTBUF * sizeof(char));
+					args_ydb[cur_arg].length = YDBPY_DEFAULT_OUTBUF;
+				}
+			}
+			inmask = inmask >> 1;
+			outmask = outmask >> 1;
+		}
+	} else {
+		args_ydb = NULL;
+	}
+
+	if (has_retval) {
+		ret_val.address = malloc(YDB_MAX_STR * sizeof(char));
+		ret_val.length = YDB_MAX_STR;
+		num_args++; // Include the return value in the variadic argument list
+	} else {
+		ret_val.address = NULL;
+	}
+	num_args++; // Include ci_name_descriptor in argument list
+	arg_values
+	    = (void **)malloc(sizeof(void *) * (num_args + 1 + 1)); // +1 for num_args variable itself, +1 for ci_name_descriptor
+	arg_values[0] = (void *)(uintptr_t)num_args;
+	num_args--; // Exclude routine name from loops over argument list
+
+	// Populate array of variadic arguments for function call
+	cur_index = 1; // +1 for num_args variable
+	if (is_cip) {
+		arg_values[cur_index] = (void *)(uintptr_t)&ci_info.ci_info;
+	} else {
+		arg_values[cur_index] = (void *)(uintptr_t)routine_name.buf_addr;
+	}
+	cur_index++;
+	if (has_retval) {
+		arg_values[cur_index] = (void *)(uintptr_t)&ret_val;
+		num_args--; // Exclude ret_val from argument loop
+		cur_index++;
+	}
+	for (cur_arg = 0; cur_arg < num_args; cur_arg++, cur_index++) {
+		arg_values[cur_index] = (void *)&args_ydb[cur_arg];
+	}
+
+	if (is_cip) {
+		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_cip, (uintptr_t)arg_values);
+	} else {
+		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_ci, (uintptr_t)arg_values);
+	}
+	if (YDB_OK != status) {
+		FREE_STRING_ARRAY(args_ydb, num_args);
+		raise_YDBError(status);
+		if (NULL != seq) {
+			Py_DECREF(seq);
+		}
+		if (NULL != ret_val.address) {
+			free(ret_val.address);
+		}
+		return NULL;
+	}
+
+	// Update any output parameters in the argument list passed from Python
+	outmask = parm_types.output_mask;
+	for (cur_arg = 0; cur_arg < num_args; cur_arg++) {
+		if (1 == (1 & outmask)) { // This is an output parameter, so update Python object with output value
+			PyObject *new_item, *old_item;
+
+			old_item = PySequence_GetItem(seq, cur_arg);				    // Borrowed Reference
+			new_item = new_object_from_object_and_string(old_item, &args_ydb[cur_arg]); // New reference
+			if (NULL == new_item) {
+				// Exception raised in new_object_from_object_and_string
+				return_null = TRUE;
+				break;
+			}
+			PySequence_SetItem(seq, (Py_ssize_t)cur_arg, new_item); // Replace old item with object containing new value
+		}
+		outmask = outmask >> 1;
+	}
+	if (!return_null) {
+		// Construct Python return value, if a return value was issued. See above comment for details.
+		if (has_retval) {
+			assert(NULL != ret_val.address);
+			ret_value_py = Py_BuildValue("s#", ret_val.address, (Py_ssize_t)ret_val.length);
+			free(ret_val.address);
+		} else {
+			Py_INCREF(Py_None);
+			ret_value_py = Py_None;
+		}
+	}
+	FREE_STRING_ARRAY(args_ydb, num_args);
+	free(arg_values);
+
+	if (return_null) {
+		return NULL;
+	} else {
+		return ret_value_py;
+	}
+}
+
+/* Wrapper for ydb_cip() */
+static PyObject *cip(PyObject *self, PyObject *args, PyObject *kwds) {
+	UNUSED(self);
+
+	return ci_wrapper(args, kwds, TRUE);
+}
+
+/* Wrapper for ydb_ci() */
+static PyObject *ci(PyObject *self, PyObject *args, PyObject *kwds) {
+	UNUSED(self);
+
+	return ci_wrapper(args, kwds, FALSE);
+}
+
+static PyObject *open_ci_table(PyObject *self, PyObject *args, PyObject *kwds) {
+	char *	   filename;
+	int	   status;
+	Py_ssize_t filename_len;
+	PyObject * ret_value_py;
+	uintptr_t  ret_value;
+
+	UNUSED(self);
+
+	/* Parse and validate */
+	static char *kwlist[] = {"filename", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#", kwlist, &filename, &filename_len))
+		return NULL;
+
+	if (0 < filename_len) {
+		/* Call the wrapped function */
+		status = ydb_ci_tab_open(filename, &ret_value);
+		if (YDB_OK != status) {
+			raise_YDBError(status);
+			return NULL;
+		}
+		/* Create Python object to return */
+		ret_value_py = Py_BuildValue("k", ret_value); // New Reference
+	} else {
+		raise_ValidationError(YDBPython_ValueError, NULL, YDBPY_ERR_EMPTY_FILENAME);
+		return NULL;
+	}
+
+	return ret_value_py;
+}
+
+static PyObject *switch_ci_table(PyObject *self, PyObject *args, PyObject *kwds) {
+	int	  status;
+	PyObject *ret_value_py;
+	uintptr_t ret_value, handle;
+
+	UNUSED(self);
+
+	/* parse and validate */
+	static char *kwlist[] = {"handle", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "k", kwlist, &handle))
+		return NULL;
+
+	/* Call the wrapped function */
+	status = ydb_ci_tab_switch(handle, &ret_value);
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+		return NULL;
+	}
+	/* Create Python object to return */
+	ret_value_py = Py_BuildValue("k", ret_value); // New Reference
+
+	return ret_value_py;
+}
+
+static PyObject *message(PyObject *self, PyObject *args, PyObject *kwds) {
+	int	     err_num, status;
+	PyObject *   ret_value_py;
+	ydb_buffer_t ret;
+
+	UNUSED(self);
+
+	/* parse and validate */
+	static char *kwlist[] = {"err_num", NULL};
+	/* Parsed values are borrowed references, do not Py_DECREF them. */
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "i", kwlist, &err_num))
+		return NULL;
+
+	YDB_MALLOC_BUFFER(&ret, YDBPY_MAX_ERRORMSG);
+	status = ydb_message(err_num, &ret);
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+		assert(YDB_ERR_INVSTRLEN != status);
+		return NULL;
+	}
+	ret.buf_addr[ret.len_used] = '\0';
+	/* Create Python object to return */
+	ret_value_py = Py_BuildValue("s#", ret.buf_addr, ret.len_used); // New Reference
+
+	return ret_value_py;
+}
+
+static PyObject *release(PyObject *self) {
+	int	     status;
+	PyObject *   ret_value_py;
+	ydb_buffer_t ret, varname;
+	char	     release[YDBPY_MAX_ERRORMSG];
+
+	UNUSED(self);
+
+	ret.buf_addr = release;
+	ret.len_alloc = YDBPY_MAX_ERRORMSG;
+	ret.len_used = 0;
+	YDB_STRING_TO_BUFFER("$ZYRELEASE", &varname);
+	status = ydb_get_s(&varname, 0, NULL, &ret);
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+		assert(YDB_ERR_INVSTRLEN != status);
+		return NULL;
+	}
+	ret.buf_addr[ret.len_used] = '\0';
+	/* Create Python object to return */
+	ret_value_py = Py_BuildValue("s#", ret.buf_addr, ret.len_used); // New Reference
+
+	return ret_value_py;
+}
 
 /* Wrapper for ydb_data_s */
 static PyObject *data(PyObject *self, PyObject *args, PyObject *kwds) {
@@ -731,11 +1366,13 @@ static PyObject *delete_excel(PyObject *self, PyObject *args, PyObject *kwds) {
 	namecount = 0;
 	if (Py_None != varnames_py)
 		namecount = PySequence_Length(varnames_py);
-	varnames_ydb = calloc(namecount, sizeof(ydb_buffer_t));
+	varnames_ydb = malloc(namecount * sizeof(ydb_buffer_t));
 	if (0 < namecount) {
 		success = convert_py_sequence_to_ydb_buffer_array(varnames_py, namecount, varnames_ydb);
-		if (!success)
+		if (!success) {
+			FREE_BUFFER_ARRAY(varnames_ydb, namecount);
 			return NULL;
+		}
 	}
 
 	status = ydb_delete_excl_s(namecount, varnames_ydb);
@@ -853,7 +1490,7 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "incr() for varname", return_NULL);
 	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
 	POPULATE_NEW_BUFFER(increment_py, increment_ydb, increment_ydb_len, "incr() for increment", return_NULL);
-	YDB_MALLOC_BUFFER(&ret_value_ydb, MAX_CONONICAL_NUMBER_STRING_MAX);
+	YDB_MALLOC_BUFFER(&ret_value_ydb, CANONICAL_NUMBER_TO_STRING_MAX);
 	if (!return_NULL) {
 		/* Call the wrapped function */
 		status = ydb_incr_s(&varname_ydb, subs_used, subsarray_ydb, &increment_ydb, &ret_value_ydb);
@@ -914,9 +1551,10 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	/* Setup for Call */
 	if (Py_None != keys_py) {
-		keys_ydb = (YDBKey *)calloc(len_keys, sizeof(YDBKey));
+		keys_ydb = malloc(len_keys * sizeof(YDBKey));
 		success = load_YDBKeys_from_key_sequence(keys_py, keys_ydb);
 		if (!success) {
+			free(keys_ydb);
 			return NULL;
 		}
 	}
@@ -1568,8 +2206,11 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 		varnames_ydb = (ydb_buffer_t *)calloc(namecount, sizeof(ydb_buffer_t));
 		if (0 < namecount) {
 			success = convert_py_sequence_to_ydb_buffer_array(varnames_py, namecount, varnames_ydb);
-			if (!success)
+			if (!success) {
+				FREE_BUFFER_ARRAY(varnames_ydb, namecount);
+				Py_DECREF(function_with_arguments);
 				return NULL;
+			}
 		}
 
 		/* Call the wrapped function */
@@ -1590,7 +2231,7 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 		}
 		/* free allocated memory */
 		Py_DECREF(function_with_arguments);
-		free(varnames_ydb);
+		FREE_BUFFER_ARRAY(varnames_ydb, namecount);
 	}
 
 	if (return_NULL) {
@@ -1688,7 +2329,14 @@ static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
  * The final struct is a sentinel value to indicate the end of the array (i.e. {NULL, NULL, 0, NULL})
  */
 static PyMethodDef methods[] = {
-    /* Simple and Simple Threaded API Functions */
+    /* Simple and Simple API Functions */
+    {"ci", (PyCFunction)ci, METH_VARARGS | METH_KEYWORDS,
+     "call an M routine defined in the call-in table specified by either the ydb_ci environment variable\n"
+     "or switch_ci_table() using the arguments passed, if any"},
+    {"cip", (PyCFunction)cip, METH_VARARGS | METH_KEYWORDS,
+     "call an M routine defined in the call-in table specified by the ydb_ci environment variable\n"
+     "or switch_ci_table() using the arguments passed, if any, while using cached call-in\n"
+     "information for performance"},
     {"data", (PyCFunction)data, METH_VARARGS | METH_KEYWORDS,
      "used to learn what type of data is at a node.\n "
      "0 : There is neither a value nor a subtree, "
@@ -1715,6 +2363,8 @@ static PyMethodDef methods[] = {
      "Without releasing any locks held by the process, "
      "attempt to acquire the requested lock incrementing it"
      " if already held."},
+    {"message", (PyCFunction)message, METH_VARARGS | METH_KEYWORDS,
+     "return the message string corresponding to the specified error code number\n"},
     {"node_next", (PyCFunction)node_next, METH_VARARGS | METH_KEYWORDS,
      "facilitate depth-first traversal of a local or global"
      " variable tree. returns string tuple of subscripts of"
@@ -1723,6 +2373,10 @@ static PyMethodDef methods[] = {
      "facilitate depth-first traversal of a local "
      "or global variable tree. returns string tuple"
      "of subscripts of previous node with value."},
+    {"open_ci_table", (PyCFunction)open_ci_table, METH_VARARGS | METH_KEYWORDS,
+     "open the specified call-in table file to allow calls to functions specified therein using ci() and cip()\n"},
+    {"release", (PyCFunction)release, METH_NOARGS,
+     "returns the release number of the active YottaDB installation. Equivalent to $ZYRELEASE in M.\n"},
     {"set", (PyCFunction)set, METH_VARARGS | METH_KEYWORDS, "sets the value of a node or raises exception"},
     {"str2zwr", (PyCFunction)str2zwr, METH_VARARGS | METH_KEYWORDS,
      "returns the zwrite formatted (Bytes Object) version of the"
@@ -1734,6 +2388,9 @@ static PyMethodDef methods[] = {
      "returns the name of the previous "
      "subscript at the same level as the "
      "one given"},
+    {"switch_ci_table", (PyCFunction)switch_ci_table, METH_VARARGS | METH_KEYWORDS,
+     "switch to the call-in table referenced by the integer held in the passed handle\n"
+     "and return the value of the previous handle"},
     {"tp", (PyCFunction)tp, METH_VARARGS | METH_KEYWORDS, "transaction"},
 
     {"zwr2str", (PyCFunction)zwr2str, METH_VARARGS | METH_KEYWORDS,

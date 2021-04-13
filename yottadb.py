@@ -11,7 +11,7 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
-from typing import Optional, List, Generator, Sequence, NamedTuple, AnyStr, Union, Callable
+from typing import Optional, List, Union, Generator, Sequence, NamedTuple, cast, Tuple, AnyStr, Any, Callable
 import enum
 from builtins import property
 
@@ -53,6 +53,87 @@ def set(varname: Union[AnyStr, KeyTuple], subsarray: Sequence[AnyStr] = (), valu
         subsarray = varname.subsarray
         varname = varname.varname
     _yottadb.set(varname, subsarray, value)
+
+
+def ci(routine: AnyStr, args: Sequence[Any] = (), has_retval: bool = False) -> Any:
+    """
+    Call an M routine specified in a YottaDB call-in table using the specified arguments, if any.
+    If the routine has a return value, this must be indicated using the has_retval parameter by
+    setting it to True if the routine has a return value, and False otherwise.
+
+    Note that the call-in table used to derive the routine interface may be specified by either the
+    ydb_ci environment variable, or via the switch_ci_table() function included in the YDBPython
+    module.
+
+    :param routine: The name of the M routine to be called.
+    :param args: The arguments to pass to that routine.
+    :param has_retval: Flag indicating whether the routine has a return value.
+    :returns: The return value of the routine, or else None.
+    """
+    return _yottadb.ci(routine, args, has_retval)
+
+
+def message(errnum: int) -> str:
+    """
+    Lookup the error message string for the given error code.
+
+    :param errnum: A valid YottaDB error code number.
+    :returns: A string containing the error message for the given error code.
+    """
+    return _yottadb.message(errnum)
+
+
+def cip(routine: AnyStr, args: Sequence[Any] = (), has_retval: bool = False) -> Any:
+    """
+    Call an M routine specified in a YottaDB call-in table using the specified arguments, if any,
+    reusing the internal YottaDB call-in handle on subsequent calls to the same routine
+    as a performance optimization.
+
+    If the routine has a return value, this must be indicated using the has_retval parameter by
+    setting it to True if the routine has a return value, and False otherwise.
+
+    Note that the call-in table used to derive the routine interface may be specified by either the
+    ydb_ci environment variable, or via the switch_ci_table() function included in the YDBPython
+    module.
+
+    :param routine: The name of the M routine to be called.
+    :param args: The arguments to pass to that routine.
+    :param has_retval: Flag indicating whether the routine has a return value.
+    :returns: The return value of the routine, or else None.
+    """
+    return _yottadb.cip(routine, args, has_retval)
+
+
+def release() -> str:
+    """
+    Lookup the current YottaDB release number.
+
+    :returns: A string containing the current YottaDB release number.
+    """
+    return _yottadb.release()
+
+
+def open_ci_table(filename: AnyStr) -> int:
+    """
+    Open the YottaDB call-in table at the specified location. Once opened,
+    the call-in table may be activated by passing the returned call-in table
+    handle to switch_ci_table().
+
+    :param filename: The name of the YottaDB call-in table to open.
+    :returns: An integer representing the call-in table handle opened by YottaDB.
+    """
+    return _yottadb.open_ci_table(filename)
+
+
+def switch_ci_table(handle: int) -> int:
+    """
+    Switch the active YottaDB call-in table to that represented by the passed handle,
+    as obtained through a previous call to open_ci_table().
+
+    :param handle: An integer value representing a call-in table handle.
+    :returns: An integer value representing a the previously active call-in table handle
+    """
+    return _yottadb.switch_ci_table(handle)
 
 
 def data(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> int:

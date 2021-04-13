@@ -9,4 +9,5 @@ dist/
 tests/__pycache__/
 yottadb.egg-info/
 mumps.dat
+tests/m_routines/*.o
 *.out

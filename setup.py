@@ -165,7 +165,7 @@ setup(
             sources=["_yottadb.c"],
             include_dirs=[YDB_DIST],
             library_dirs=[YDB_DIST],
-            undef_macros=["NDEBUG"],
+            # undef_macros=["NDEBUG"],  # Uncomment to enable asserts if a Debug build is desired
             extra_link_args=["-l", "yottadb", "-l", "ffi"],
             extra_compile_args=["--std=c99", "-Wall", "-Wextra", "-pedantic"],
         )

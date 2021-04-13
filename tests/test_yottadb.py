@@ -16,10 +16,129 @@ import multiprocessing
 import datetime
 import time
 import os
+import re
 from typing import NamedTuple, Callable, Tuple
 
 import yottadb
-from conftest import lock_value, str2zwr_tests
+from conftest import lock_value, str2zwr_tests, set_ci_environment, reset_ci_environment
+
+
+def test_ci_table():
+    cur_dir = os.getcwd()
+    previous = set_ci_environment(cur_dir, "")
+    cur_handle = yottadb.open_ci_table(cur_dir + "/tests/calltab.ci")
+    yottadb.switch_ci_table(cur_handle)
+
+    # Ensure no errors from basic/expected usage
+    assert "3241" == yottadb.ci("HelloWorld2", ["1", "24", "3"], has_retval=True)
+    # Test updating of IO parameter (second parameter) with a shorter value,
+    # i.e. set arg_list[1] = arg_list[0]
+    arg_list = ["1", "24", "3"]
+    assert "3241" == yottadb.ci("HelloWorld2", arg_list, has_retval=True)
+    assert arg_list[1] == "1"
+    # Test None returned from routine with no return value,
+    # also test update of output only parameter
+    outarg = ""
+    outargs = [outarg]
+    assert yottadb.ci("NoRet", outargs) is None
+    assert outargs[0] == "testeroni"
+    # Test routine with no parameters
+    assert "entry called" == yottadb.ci("HelloWorld1", has_retval=True)
+    # Test routine with output parameter succeeds where the length of
+    # the passed argument is equal to the length needed to store the result
+    assert "1234567890" == yottadb.ci("StringExtend", [9876543210], has_retval=True)
+    # Test routine with output parameter succeeds where the length of
+    # the passed argument is greater than the length needed to store the result
+    assert "1234567890" == yottadb.ci("StringExtend", [98765432101234], has_retval=True)
+    # Test routine with output parameter succeeds when passed the empty string
+    assert "1234567890" == yottadb.ci("StringExtend", [""], has_retval=True)
+
+    old_handle = cur_handle
+    cur_handle = yottadb.open_ci_table(cur_dir + "/tests/testcalltab.ci")
+    last_handle = yottadb.switch_ci_table(cur_handle)
+    assert last_handle == old_handle
+    assert "entry was called" == yottadb.ci("HelloWorld99", has_retval=True)
+
+    # Reset call-in table for other tests
+    cur_handle = yottadb.open_ci_table(cur_dir + "/tests/calltab.ci")
+    yottadb.switch_ci_table(cur_handle)
+
+    reset_ci_environment(previous)
+
+
+# Test ci() call using ydb_ci environment variable to specify call-in table
+# location. This is the default usage.
+def test_ci_default():
+    cur_dir = os.getcwd()
+    previous = set_ci_environment(cur_dir, cur_dir + "/tests/calltab.ci")
+
+    # Ensure no errors from basic/expected usage
+    assert "-1" == yottadb.ci("Passthrough", [-1], has_retval=True)
+    assert "3241" == yottadb.ci("HelloWorld2", [1, 24, 3], has_retval=True)
+    assert "3241" == yottadb.ci("HelloWorld2", ["1", "24", "3"], has_retval=True)
+    # Test updating of IO parameter (second parameter) with a shorter value,
+    # i.e. set arg_list[1] = arg_list[0]
+    arg_list = ["1", "24", "3"]
+    assert "3241" == yottadb.ci("HelloWorld2", arg_list, has_retval=True)
+    assert arg_list[1] == "1"
+    # Test None returned from routine with no return value,
+    # also test update of output only parameter
+    outarg = ""
+    outargs = [outarg]
+    assert yottadb.ci("NoRet", outargs) is None
+    assert outargs[0] == "testeroni"
+    # Test routine with no parameters
+    assert "entry called" == yottadb.ci("HelloWorld1", has_retval=True)
+
+    reset_ci_environment(previous)
+
+
+def test_cip():
+    cur_dir = os.getcwd()
+    previous = set_ci_environment(cur_dir, cur_dir + "/tests/calltab.ci")
+
+    # Ensure no errors from basic/expected usage
+    assert "-1" == yottadb.cip("Passthrough", [-1], has_retval=True)
+    assert "3241" == yottadb.cip("HelloWorld2", [1, 24, 3], has_retval=True)
+    assert "3241" == yottadb.cip("HelloWorld2", ["1", "24", "3"], has_retval=True)
+    # Test updating of IO parameter (second parameter) with a shorter value,
+    # i.e. set arg_list[1] = arg_list[0]
+    arg_list = ["1", "24", "3"]
+    assert "3241" == yottadb.cip("HelloWorld2", arg_list, has_retval=True)
+    assert arg_list[1] == "1"
+    # Test None returned from routine with no return value,
+    # also test update of output only parameter
+    outarg = ""
+    outargs = [outarg]
+    assert yottadb.cip("NoRet", outargs) is None
+    assert outargs[0] == "testeroni"
+    outargs[0] = "new value"
+    assert yottadb.cip("NoRet", outargs) is None
+    assert outargs[0] == "testeroni"
+    # Test routine with no parameters
+    assert "entry called" == yottadb.cip("HelloWorld1", has_retval=True)
+    # Test routine with output parameter succeeds where the length of
+    # the passed argument is equal to the length needed to store the result
+    assert "1234567890" == yottadb.cip("StringExtend", [9876543210], has_retval=True)
+    # Test routine with output parameter succeeds where the length of
+    # the passed argument is greater than the length needed to store the result
+    assert "1234567890" == yottadb.cip("StringExtend", [98765432101234], has_retval=True)
+    # Test routine with output parameter succeeds when passed the empty string
+    assert "1234567890" == yottadb.ci("StringExtend", [""], has_retval=True)
+
+    reset_ci_environment(previous)
+
+
+def test_message():
+    assert yottadb.message(yottadb.YDB_ERR_INVSTRLEN) == "%YDB-E-INVSTRLEN, Invalid string length !UL: max !UL"
+    with pytest.raises(yottadb.YDBError):
+        yottadb.message(0)  # Raises unknown error number error
+
+
+def test_release():
+    release = yottadb.release()
+    assert re.match("YottaDB.*", release) is not None
+    print(f"Release: {release}\n")
 
 
 def test_key_object(simple_data):

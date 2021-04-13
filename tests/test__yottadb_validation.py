@@ -12,30 +12,38 @@
 #                                                               #
 #################################################################
 """
-    This file is for tests of the validation of input from Python. Most tests are named by the function
-    being called and the parameter that is having its data validation tested.
+    This file is for tests of the validation of input from Python. Most tests
+    are named by the function being called and the parameter that is having
+    its data validation tested.
 
-    Some background: originally the plan was to have all validation be done by the underlying YottaDB C API,
-    however a bug arose in the transition from using 'int' to 'Py_size_t' that meant that length as well as type
-    must be validated (see documentation for `test_unsigned_int_length_bytes_overflow()` below for additional
-    detail). Since we were needing to test the length anyway the decision was to make that length equal to
-    YottaDB's limitations. This also has the benefit of making these types of input errors raise the normal
-    'TypeError' and 'ValueError' exceptions as is expected in Python.
+    Some background: originally the plan was to have all validation be done by
+    the underlying YottaDB C API, however a bug arose in the transition from
+    using 'int' to 'Py_size_t' that meant that length as well as type must be
+    validated (see documentation for
+    `test_unsigned_int_length_bytes_overflow()` below for additional detail).
+    Since we were needing to test the length anyway the decision was to make
+    that length equal to YottaDB's limitations. This also has the benefit of
+    making these types of input errors raise the normal 'TypeError' and
+    'ValueError' exceptions as is expected in Python.
 
-    Note: Many functions have "varname" and "subsarray" parameters which have the same rules for valid input.
-    Each of these functions are passed to "varname_invalid" and "subsarray_invalid" for testing.
+    Note: Many functions have "varname" and "subsarray" parameters which have
+    the same rules for valid input. Each of these functions are passed to
+    "varname_invalid" and "subsarray_invalid" for testing.
 """
-import pytest  # type: ignore # ignore due to pytest not having type annotations
+import pytest
 import _yottadb
 import yottadb
 import psutil
+import os
+
+from conftest import set_ci_environment, reset_ci_environment
 
 
 def varname_invalid(function):
     """
     Tests whether the function passed correctly validates variable names by
     verifying behavior under the following conditions:
-        1) varname is of incorrect type (i.e. not str or bytes): Raise a TypeError
+        1) varname is of incorrect type (not str or bytes): Raise a TypeError
         2) length of varname > _yottadb.YDB_MAX_IDENT: Raise ValueError
         3) length of varname <= _yottadb.YDB_MAX_IDENT: No error
 
@@ -52,7 +60,7 @@ def varname_invalid(function):
     # Case 3: length of varname == _yottadb.YDB_MAX_IDENT: No Error
     try:
         function(varname="b" * (_yottadb.YDB_MAX_IDENT))
-    except _yottadb.YDBError:  # Testing C-extention's validation, not YottaDB's
+    except _yottadb.YDBError:  # Testing C-extention's validation, not YDB's
         pass
 
 
@@ -71,7 +79,7 @@ def subsarray_invalid(function):
         5) Length of str object == _yottadb.YDB_MAX_STR: No Error
         6) Length of str object > _yottadb.YDB_MAX_STR: Raise ValueError
 
-    :param function: Any function that takes "varname"  and "subsarray" as a parameters.
+    :param function: A function that takes "varname" and "subsarray" parameters.
     """
     # Case 1: subsarray is not a valid sequence: raise TypeError
     with pytest.raises(TypeError):
@@ -266,7 +274,7 @@ def test_lock_varname_wrong_type():
 def test_lock_varname_max_ident():
     # Case 8: The first element of a key (varname) may be up to _yottadb.YDB_MAX_IDENT in length without raising an exception
     _yottadb.lock((("a" * (_yottadb.YDB_MAX_IDENT),),))
-    with pytest.raises(ValueError):
+    with pytest.raises(_yottadb.YDBVARNAME2LONGError):
         _yottadb.lock((("a" * (_yottadb.YDB_MAX_IDENT + 1),),))
 
 
@@ -524,6 +532,69 @@ def test_zwr2str_input():
     # Case 3: Raises a ValueError if input is longer than _yottadb.YDB_MAX_STR
     with pytest.raises(ValueError):
         _yottadb.zwr2str("b" * (_yottadb.YDB_MAX_STR + 1))
+
+
+def test_ci_input():
+    """
+    This function tests the validation of the ci call-in function's input
+    parameters. Specifically, it tests that _yottadb.ci():
+        1) Raises a TypeError if no routine name is provided
+        2) Raises a TypeError if the routine name is not str or bytes
+        3) Raises a TypeError if the arguments passed don't match the routine parameters
+    """
+    cur_dir = os.getcwd()
+    previous = set_ci_environment(cur_dir, cur_dir + "/tests/calltab.ci")
+
+    # Confirm YDB error when output value is longer than input string
+    with pytest.raises(_yottadb.YDBINVSTRLENError):
+        _yottadb.ci("StringExtend", [123], has_retval=True)
+
+    # Raise TypeError when argument list is immutable,
+    # but routine includes output arguments
+    with pytest.raises(TypeError):
+        _yottadb.ci("HelloWorld2", (1, 2, 3), has_retval=True)
+    with pytest.raises(TypeError):
+        _yottadb.ci("NoRet", (1,))
+
+    # Raise TypeError when arguments not passed as a Sequence
+    with pytest.raises(TypeError):
+        _yottadb.ci()
+    with pytest.raises(TypeError):
+        _yottadb.ci(1)
+    with pytest.raises(TypeError):
+        _yottadb.ci("HelloWorld2", "123", has_retval=True)
+    with pytest.raises(TypeError):
+        _yottadb.ci("HelloWorld2", b"123", has_retval=True)
+    with pytest.raises(TypeError):
+        _yottadb.ci("HelloWorld2", 1, has_retval=True)
+    with pytest.raises(TypeError):
+        _yottadb.ci("HelloWorld2", 1, 2, has_retval=True)
+
+    # Raise ValueError when arguments don't match the call-in table
+    with pytest.raises(ValueError):
+        _yottadb.ci("HelloWorld1", (1, 2, 3), has_retval=True)
+    with pytest.raises(ValueError):
+        _yottadb.ci("HelloWorld2")
+    with pytest.raises(ValueError):
+        _yottadb.ci("HelloWorld2", ("1",))
+    with pytest.raises(ValueError):
+        _yottadb.ci("HelloWorld2", ("1", "2"))
+    with pytest.raises(ValueError):
+        _yottadb.ci("HelloWorld2", ("1", "2", 3, 4))
+    with pytest.raises(ValueError):
+        _yottadb.ci("HelloWorld2", has_retval=True)
+    with pytest.raises(ValueError):
+        _yottadb.ci("HelloWorld2", ("1",), has_retval=True)
+    with pytest.raises(ValueError):
+        _yottadb.ci("HelloWorld2", ("1", "2"), has_retval=True)
+    with pytest.raises(ValueError):
+        _yottadb.ci("HelloWorld2", ("1", "2", 3, 4), has_retval=True)
+
+    # Raise ValueError when an invalid call-in table filename is specified
+    with pytest.raises(ValueError):
+        _yottadb.open_ci_table("")
+
+    reset_ci_environment(previous)
 
 
 # This test requires a lot of memory and will fail if there is not enough memory on the system that running
