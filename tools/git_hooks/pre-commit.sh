@@ -22,13 +22,6 @@ exit_value=0
 
 git stash -q --keep-index
 
-if ! [ -e copyright.py ] ; then
-  if ! wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/copyright.py ; then
-    echo "failed to download required script."
-    exit_value=1
-  fi
-fi
-
 echo "Checking that files to be committed have a YottaDB copyright ..."
 if [[ $exit_value -eq 0 ]] ; then
   for file in $committed_files ; do
@@ -46,7 +39,7 @@ if [[ exit_value -eq 0 ]] ; then
     # Deleted files don't need a copyright notice, hence -e check
     if [ -e $file ] && bash ./tools/ci/needs_copyright.sh $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
         echo "    Updating copyright date in $file"
-        cat "$file" | python3 copyright.py > "temp-$file"
+        python3 tools/ci/copyright.py "$file" > "temp-$file"
         mv "temp-$file" "$file"
         file_modified=true
     fi
