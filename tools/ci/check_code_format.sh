@@ -23,7 +23,7 @@ for file in $files_to_check ; do
       exit_code=1
     fi
   elif [[ "$file" == *".py" ]] || [[ "$file" == *".pyi" ]]; then
-    if ! black -q --check "$file"; then
+    if ! black -l 132 -q --check "$file"; then
       echo "    $file needs formatting with \"black\"."
 
       exit_code=1

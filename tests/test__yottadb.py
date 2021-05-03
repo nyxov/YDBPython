@@ -15,7 +15,6 @@ import pytest  # type: ignore # ignore due to pytest not having type annotations
 
 import subprocess
 import os
-import sys
 import shlex
 import datetime
 import time
@@ -655,7 +654,6 @@ def bank():
     account2 = "acc#5678"
     account1_balance = 1234
     account2_balance = 5678
-    transfer_amount = 10
     _yottadb.set(varname="^account", subsarray=(account1, "balance"), value=str(account1_balance))
     _yottadb.set(varname="^account", subsarray=(account2, "balance"), value=str(account2_balance))
 
@@ -703,7 +701,7 @@ def test_tp_bank_transfer_rollback(bank):
     _yottadb.set(varname="account", subsarray=(account1, "balance"), value=str(account1_balance))
     _yottadb.set(varname="account", subsarray=(account2, "balance"), value=str(account2_balance))
     with pytest.raises(_yottadb.YDBTPRollback):
-        result = _yottadb.tp(transfer_transaction, args=(account1, account2, transfer_amount), kwargs={})
+        _yottadb.tp(transfer_transaction, args=(account1, account2, transfer_amount), kwargs={})
 
     assert int(_yottadb.get(varname="account", subsarray=(account1, "balance"))) == account1_balance
     assert int(_yottadb.get(varname="account", subsarray=(account2, "balance"))) == account2_balance
@@ -853,9 +851,9 @@ def test_delete_excel():
     _yottadb.set(varname="testdeleteexcel2", subsarray=("sub1",), value="2")
     _yottadb.set(varname="testdeleteexcelexception", subsarray=("sub1",), value="3")
     _yottadb.delete_excel(varnames=("testdeleteexcelexception",))
-    with pytest.raises(_yottadb.YDBLVUNDEFError) as e:
+    with pytest.raises(_yottadb.YDBLVUNDEFError):
         _yottadb.get("testdeleteexcel1")
-    with pytest.raises(_yottadb.YDBLVUNDEFError) as e:
+    with pytest.raises(_yottadb.YDBLVUNDEFError):
         _yottadb.get("testdeleteexcel2", ("sub1",))
     assert _yottadb.get("testdeleteexcelexception", ("sub1",)) == b"3"
 
@@ -989,18 +987,26 @@ def test_incr_errors(key, initial, increment, error_type):
 
 
 str2zwr_tests = [
-    (b"X\0ABC", b'"X"_$C(0)_"ABC"'),
-    (bytes("你好世界", encoding="utf-8"), b'"\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8"_$C(150)_"\xe7"_$C(149,140)'),
+    (b"X\0ABC", b'"X"_$C(0)_"ABC"', b'"X"_$C(0)_"ABC"'),
+    (
+        bytes("你好世界", encoding="utf-8"),
+        b'"\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8"_$C(150)_"\xe7"_$C(149,140)',
+        b'"\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c"',
+    ),
 ]
-str2zwr_test_ids = [f"{input} -> {output}" for input, output in str2zwr_tests]
-zwr2str_test_ids = [f"{input} -> {output}" for output, input in str2zwr_tests]
 
 
-@pytest.mark.parametrize("input, output", str2zwr_tests, ids=str2zwr_test_ids)
-def test_str2zwr(input, output):
-    assert _yottadb.str2zwr(input) == output
+@pytest.mark.parametrize("input, output1, output2", str2zwr_tests)
+def test_str2zwr(input, output1, output2):
+    if os.environ["ydb_chset"] == "UTF-8":
+        assert _yottadb.str2zwr(input) == output2
+    else:
+        assert _yottadb.str2zwr(input) == output1
 
 
-@pytest.mark.parametrize("output, input", str2zwr_tests, ids=zwr2str_test_ids)
-def test_zwr2str(input, output):
-    assert _yottadb.zwr2str(input) == output
+@pytest.mark.parametrize("output1, output2, input", str2zwr_tests)
+def test_zwr2str(input, output1, output2):
+    if os.environ["ydb_chset"] == "UTF-8":
+        assert _yottadb.zwr2str(input) == output1
+    else:
+        assert _yottadb.zwr2str(input) == output2

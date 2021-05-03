@@ -18,7 +18,7 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 
     Note: Ubuntu Server 20.04 will require YottaDB 1.29 or later.
 
-2. Get the code: `git clone https://gitlab.com/gossrock/YDBPython.git`
+2. Get the code: `git clone https://gitlab.com/YottaDB/Lang/YDBPython.git`
 3. Install code:
     1. Install prerequisites: python3-dev and libffi-dev package: `sudo apt install python3-dev libffi-dev`
 

@@ -240,7 +240,7 @@ def test_lock_too_many_keys():
 def test_lock_first_key_wrong_type():
     # Case 4: Raises a type Error if the first element of a key is not a str object
     with pytest.raises(TypeError):
-        _yottadb.lock(("not list or tuple",))
+        _yottadb.lock(1)
 
 
 def test_lock_empty_key():
@@ -285,7 +285,11 @@ def test_lock_too_many_subs():
     # Case 11: Raises a ValueError if a subsarray is longer than _yottadb.YDB_MAX_SUBS
     with pytest.raises(ValueError):
         subsarray = ["test" + str(x) for x in range(0, _yottadb.YDB_MAX_SUBS + 1)]
-        _yottadb.lock((("test", subsarray),))
+        keys = (
+            "test",
+            subsarray,
+        )
+        _yottadb.lock(keys)
 
 
 def test_lock_subscript_wrong_type():

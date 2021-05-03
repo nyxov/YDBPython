@@ -22,10 +22,12 @@
 #include "_yottadb.h"
 #include "_yottadbexceptions.h"
 
-#define DECREF_AND_RETURN(PY_OBJECT, RET) \
-	{                                 \
-		Py_DECREF(PY_OBJECT);     \
-		return RET;               \
+#define DECREF_AND_RETURN(PY_OBJECT, RET)     \
+	{                                     \
+		if (NULL != PY_OBJECT) {      \
+			Py_DECREF(PY_OBJECT); \
+		}                             \
+		return RET;                   \
 	}
 
 /* Local Utility Functions */
@@ -387,8 +389,10 @@ static int is_valid_key_sequence(PyObject *keys_sequence, int max_len, char *err
 			subsarray = Py_None;
 		}
 
-		if (!key_seq || !(PyTuple_Check(key) || PyList_Check(key))) {
-			/* validate item/key type [list or tuple] */
+		if (!key_seq || ((2 == i) && !(PyTuple_Check(key) || PyList_Check(key)))) {
+			/* Validate item/key type [list or tuple]. Only relevant for second
+			 * item, i.e. subsarray, not varname
+			 */
 			raise_ValidationError(YDBPython_TypeError, YDBPY_ERR_KEYS_INVALID,
 					      YDBPY_ERR_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE, i);
 			error_encountered = TRUE;
