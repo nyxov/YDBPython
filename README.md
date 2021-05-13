@@ -28,6 +28,10 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 
     4. Run setup.py to install:
 
+		0. Setup environment:
+			1. Set the `$ydb_dist` environment variable, e.g. `export ydb_dist=*path_to_my_ydb_installation*`
+			2. Inform the linker of the location of YDB libraries: `export LD_LIBRARY_PATH=$ydb_dist`
+
         1. Option 1: install in venv
             1. Install the python3-venv package: `sudo apt install python3-venv`
             2. Create venv: `python3 -m venv .venv`
