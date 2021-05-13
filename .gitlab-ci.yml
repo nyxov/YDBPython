@@ -71,4 +71,4 @@ code-format-check:
     - apt install -y clang-format-10 python3-pip
     - python3 -m pip install black
   script:
-    bash ./tools/ci/check_code_format.sh
+    LC_ALL=C.UTF-8 LANG=C.UTF-8 bash ./tools/ci/check_code_format.sh
