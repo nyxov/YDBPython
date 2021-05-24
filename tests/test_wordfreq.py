@@ -23,7 +23,7 @@ MAX_VARNAME_LEN = 8
 MAX_WORDS_SUBS = 1
 MAX_INDEX_SUBS = 2
 MAX_WORD_LEN = 128  # Size increased from the C version which uses 64 here
-TP_TOKEN = yottadb.NOTTP
+TP_TOKEN = yottadb.YDB_NOTTP
 
 
 def test_wordfreq():

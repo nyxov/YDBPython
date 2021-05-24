@@ -16,22 +16,7 @@ import enum
 from builtins import property
 
 import _yottadb
-
-from _yottadb import YDBError
-from _yottadb import YDBTimeoutError
-
-from _yottadb import YDB_NOTTP as NOTTP
-
-from _yottadb import YDB_DEL_NODE as DEL_NODE
-from _yottadb import YDB_DEL_TREE as DEL_TREE
-
-from _yottadb import YDB_DATA_UNDEF as DATA_UNDEF
-from _yottadb import YDB_DATA_VALUE_NODESC as DATA_VALUE_NODESC
-from _yottadb import YDB_DATA_NOVALUE_DESC as DATA_NOVALUE_DESC
-from _yottadb import YDB_DATA_VALUE_DESC as DATA_VALUE_DESC
-
-from _yottadb import YDB_OK, YDBTPRollback, YDBTPRestart
-from _yottadb import YDBNODEENDError
+from _yottadb import *
 
 
 class SearchSpace(enum.Enum):
@@ -75,11 +60,11 @@ def data(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> int:
 
 
 def delete_node(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
-    _yottadb.delete(varname, subsarray, DEL_NODE)
+    _yottadb.delete(varname, subsarray, YDB_DEL_NODE)
 
 
 def delete_tree(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
-    _yottadb.delete(varname, subsarray, DEL_TREE)
+    _yottadb.delete(varname, subsarray, YDB_DEL_TREE)
 
 
 def incr(varname: AnyStr, subsarray: Sequence[bytes] = (), increment: Union[int, float, str, bytes] = "1") -> bytes:
@@ -324,14 +309,14 @@ class Key:
 
     @property
     def has_value(self):
-        if self.data == DATA_VALUE_NODESC or self.data == DATA_VALUE_DESC:
+        if self.data == YDB_DATA_VALUE_NODESC or self.data == YDB_DATA_VALUE_DESC:
             return True
         else:
             return False
 
     @property
     def has_tree(self):
-        if self.data == DATA_NOVALUE_DESC or self.data == DATA_VALUE_DESC:
+        if self.data == YDB_DATA_NOVALUE_DESC or self.data == YDB_DATA_VALUE_DESC:
             return True
         else:
             return False

@@ -22,6 +22,7 @@
 
 #include "_yottadb.h"
 #include "_yottadbexceptions.h"
+#include "_yottadbconstants.h"
 
 #define DECREF_AND_RETURN(PY_OBJECT, RET)     \
 	{                                     \
@@ -1772,42 +1773,7 @@ PyMODINIT_FUNC PyInit__yottadb(void) {
 	PyObject *module_dictionary = PyModule_GetDict(module);
 
 	/* Expose constants defined in libyottadb.h */
-	PyDict_SetItemString(module_dictionary, "YDB_DEL_TREE", Py_BuildValue("i", YDB_DEL_TREE));
-	PyDict_SetItemString(module_dictionary, "YDB_DEL_NODE", Py_BuildValue("i", YDB_DEL_NODE));
-
-	PyDict_SetItemString(module_dictionary, "YDB_SEVERITY_WARNING", Py_BuildValue("i", YDB_SEVERITY_WARNING));
-	PyDict_SetItemString(module_dictionary, "YDB_SEVERITY_SUCCESS", Py_BuildValue("i", YDB_SEVERITY_SUCCESS));
-	PyDict_SetItemString(module_dictionary, "YDB_SEVERITY_ERROR", Py_BuildValue("i", YDB_SEVERITY_ERROR));
-	PyDict_SetItemString(module_dictionary, "YDB_SEVERITY_INFORMATIONAL", Py_BuildValue("i", YDB_SEVERITY_INFORMATIONAL));
-	PyDict_SetItemString(module_dictionary, "YDB_SEVERITY_FATAL", Py_BuildValue("i", YDB_SEVERITY_FATAL));
-
-	PyDict_SetItemString(module_dictionary, "YDB_DATA_UNDEF", Py_BuildValue("i", YDB_DATA_UNDEF));
-	PyDict_SetItemString(module_dictionary, "YDB_DATA_VALUE_NODESC", Py_BuildValue("i", YDB_DATA_VALUE_NODESC));
-	PyDict_SetItemString(module_dictionary, "YDB_DATA_NOVALUE_DESC", Py_BuildValue("i", YDB_DATA_NOVALUE_DESC));
-	PyDict_SetItemString(module_dictionary, "YDB_DATA_VALUE_DESC", Py_BuildValue("i", YDB_DATA_VALUE_DESC));
-	PyDict_SetItemString(module_dictionary, "YDB_DATA_ERROR", Py_BuildValue("i", YDB_DATA_ERROR));
-
-	PyDict_SetItemString(module_dictionary, "YDB_RELEASE", Py_BuildValue("i", YDB_RELEASE));
-
-	PyDict_SetItemString(module_dictionary, "YDB_MAX_IDENT", Py_BuildValue("i", YDB_MAX_IDENT));
-	PyDict_SetItemString(module_dictionary, "YDB_MAX_NAMES", Py_BuildValue("i", YDB_MAX_NAMES));
-	PyDict_SetItemString(module_dictionary, "YDB_MAX_STR", Py_BuildValue("i", YDB_MAX_STR));
-	PyDict_SetItemString(module_dictionary, "YDB_MAX_SUBS", Py_BuildValue("i", YDB_MAX_SUBS));
-	PyDict_SetItemString(module_dictionary, "YDB_MAX_TIME_NSEC", Py_BuildValue("L", YDB_MAX_TIME_NSEC));
-	PyDict_SetItemString(module_dictionary, "YDB_MAX_YDBERR", Py_BuildValue("i", YDB_MAX_YDBERR));
-	PyDict_SetItemString(module_dictionary, "YDB_MAX_ERRORMSG", Py_BuildValue("i", YDB_MAX_ERRORMSG));
-
-	PyDict_SetItemString(module_dictionary, "YDB_MIN_YDBERR", Py_BuildValue("i", YDB_MIN_YDBERR));
-
-	PyDict_SetItemString(module_dictionary, "YDB_OK", Py_BuildValue("i", YDB_OK));
-
-	PyDict_SetItemString(module_dictionary, "YDB_INT_MAX", Py_BuildValue("i", YDB_INT_MAX));
-	PyDict_SetItemString(module_dictionary, "YDB_TP_RESTART", Py_BuildValue("i", YDB_TP_RESTART));
-	PyDict_SetItemString(module_dictionary, "YDB_TP_ROLLBACK", Py_BuildValue("i", YDB_TP_ROLLBACK));
-	PyDict_SetItemString(module_dictionary, "YDB_NOTOK", Py_BuildValue("i", YDB_NOTOK));
-	PyDict_SetItemString(module_dictionary, "YDB_LOCK_TIMEOUT", Py_BuildValue("i", YDB_LOCK_TIMEOUT));
-
-	PyDict_SetItemString(module_dictionary, "YDB_NOTTP", Py_BuildValue("i", YDB_NOTTP));
+	ADD_YDBCONSTANTS(module_dictionary)
 
 	/* expose useful constants from libydberrors.h or libydberrors2.h */
 	PyDict_SetItemString(module_dictionary, "YDB_ERR_TPTIMEOUT", Py_BuildValue("i", YDB_ERR_TPTIMEOUT));

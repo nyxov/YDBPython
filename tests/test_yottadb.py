@@ -214,13 +214,13 @@ def test_Key_delete_tree():
 
 
 def test_Key_data(simple_data):
-    assert yottadb.Key("nodata").data == yottadb.DATA_UNDEF
-    assert yottadb.Key("^test1").data == yottadb.DATA_VALUE_NODESC
-    assert yottadb.Key("^test2").data == yottadb.DATA_NOVALUE_DESC
-    assert yottadb.Key("^test2")["sub1"].data == yottadb.DATA_VALUE_NODESC
-    assert yottadb.Key("^test3").data == yottadb.DATA_VALUE_DESC
-    assert yottadb.Key("^test3")["sub1"].data == yottadb.DATA_VALUE_DESC
-    assert yottadb.Key("^test3")["sub1"]["sub2"].data == yottadb.DATA_VALUE_NODESC
+    assert yottadb.Key("nodata").data == yottadb.YDB_DATA_UNDEF
+    assert yottadb.Key("^test1").data == yottadb.YDB_DATA_VALUE_NODESC
+    assert yottadb.Key("^test2").data == yottadb.YDB_DATA_NOVALUE_DESC
+    assert yottadb.Key("^test2")["sub1"].data == yottadb.YDB_DATA_VALUE_NODESC
+    assert yottadb.Key("^test3").data == yottadb.YDB_DATA_VALUE_DESC
+    assert yottadb.Key("^test3")["sub1"].data == yottadb.YDB_DATA_VALUE_DESC
+    assert yottadb.Key("^test3")["sub1"]["sub2"].data == yottadb.YDB_DATA_VALUE_NODESC
 
 
 def test_Key_has_value(simple_data):
@@ -257,8 +257,8 @@ def test_transaction_smoke_test1() -> None:
     value1 = b"v1"
     key2 = test_base_key["key2"]
     value2 = b"v2"
-    assert key1.data == yottadb.DATA_UNDEF
-    assert key2.data == yottadb.DATA_UNDEF
+    assert key1.data == yottadb.YDB_DATA_UNDEF
+    assert key2.data == yottadb.YDB_DATA_UNDEF
 
     simple_transaction(key1, value1, key2, value2)
 
@@ -281,8 +281,8 @@ def test_transaction_smoke_test2() -> None:
     value1 = "v1"
     key2 = test_base_key["key2"]
     value2 = "v2"
-    assert key1.data == yottadb.DATA_UNDEF
-    assert key2.data == yottadb.DATA_UNDEF
+    assert key1.data == yottadb.YDB_DATA_UNDEF
+    assert key2.data == yottadb.YDB_DATA_UNDEF
 
     try:
         simple_rollback_transaction(key1, value1, key2, value2)
@@ -290,14 +290,14 @@ def test_transaction_smoke_test2() -> None:
         print(str(e))
         assert str(e) == "rolling back transaction."
 
-    assert key1.data == yottadb.DATA_UNDEF
-    assert key2.data == yottadb.DATA_UNDEF
+    assert key1.data == yottadb.YDB_DATA_UNDEF
+    assert key2.data == yottadb.YDB_DATA_UNDEF
     test_base_key.delete_tree()
 
 
 @yottadb.transaction
 def simple_restart_transaction(key1: yottadb.Key, key2: yottadb.Key, value: str, restart_tracker: yottadb.Key) -> None:
-    if restart_tracker.data == yottadb.DATA_UNDEF:
+    if restart_tracker.data == yottadb.YDB_DATA_UNDEF:
         key1.value = value
         restart_tracker.value = "1"
         raise yottadb.YDBTPRestart("restating transaction")
@@ -316,9 +316,9 @@ def test_transaction_smoke_test3() -> None:
     value = b"val"
     restart_tracker = test_base_local_key["restart tracker"]
 
-    assert key1.data == yottadb.DATA_UNDEF
-    assert key2.data == yottadb.DATA_UNDEF
-    assert restart_tracker.data == yottadb.DATA_UNDEF
+    assert key1.data == yottadb.YDB_DATA_UNDEF
+    assert key2.data == yottadb.YDB_DATA_UNDEF
+    assert restart_tracker.data == yottadb.YDB_DATA_UNDEF
 
     simple_restart_transaction(key1, key2, value, restart_tracker)
 
@@ -541,3 +541,56 @@ def test_module_zwr2str(input, output1, output2):
         assert yottadb.zwr2str(input) == output1
     else:
         assert yottadb.zwr2str(input) == output2
+
+
+def test_import():
+    assert yottadb.YDBACKError == yottadb.YDBACKError
+    assert yottadb.YDBCCEBADFNError == yottadb.YDBCCEBADFNError
+    assert yottadb.YDBCOLLTYPVERSIONError == yottadb.YDBCOLLTYPVERSIONError
+    assert yottadb.YDBJNLPOOLRECOVERYError == yottadb.YDBJNLPOOLRECOVERYError
+    assert yottadb.YDBTRIGUPBADLABELError == yottadb.YDBTRIGUPBADLABELError
+
+    assert yottadb.YDB_DEL_TREE == 1
+    assert yottadb.YDB_DEL_NODE == 2
+
+    assert yottadb.YDB_SEVERITY_WARNING == 0
+    assert yottadb.YDB_SEVERITY_SUCCESS == 1
+    assert yottadb.YDB_SEVERITY_ERROR == 2
+    assert yottadb.YDB_SEVERITY_INFORMATIONAL == 3
+    assert yottadb.YDB_SEVERITY_FATAL == 4
+
+    assert yottadb.YDB_DATA_UNDEF == 0
+    assert yottadb.YDB_DATA_VALUE_NODESC == 1
+    assert yottadb.YDB_DATA_NOVALUE_DESC == 10
+    assert yottadb.YDB_DATA_VALUE_DESC == 11
+    assert yottadb.YDB_DATA_ERROR == 0x7FFFFF00
+
+    assert yottadb.YDB_MAIN_LANG_C == 0
+    assert yottadb.YDB_MAIN_LANG_GO == 1
+
+    assert yottadb.YDB_RELEASE == 131
+
+    assert yottadb.YDB_MAX_IDENT == 31
+    assert yottadb.YDB_MAX_NAMES == 35
+    assert yottadb.YDB_MAX_STR == (1 * 1024 * 1024)
+    assert yottadb.YDB_MAX_SUBS == 31
+    assert yottadb.YDB_MAX_PARMS == 32
+    assert yottadb.YDB_MAX_TIME_NSEC == 2147483647000000
+    assert yottadb.YDB_MAX_YDBERR == (1 << 30)
+    assert yottadb.YDB_MAX_ERRORMSG == 1024
+    assert yottadb.YDB_MIN_YDBERR == (1 << 27)
+
+    assert yottadb.YDB_OK == 0
+
+    assert yottadb.YDB_INT_MAX == 0x7FFFFFFF
+    assert yottadb.YDB_TP_RESTART == (yottadb.YDB_INT_MAX - 1)
+    assert yottadb.YDB_TP_ROLLBACK == (yottadb.YDB_INT_MAX - 2)
+    assert yottadb.YDB_NOTOK == (yottadb.YDB_INT_MAX - 3)
+    assert yottadb.YDB_LOCK_TIMEOUT == (yottadb.YDB_INT_MAX - 4)
+    assert yottadb.YDB_DEFER_HANDLER == (yottadb.YDB_INT_MAX - 5)
+
+    assert yottadb.DEFAULT_DATA_SIZE == 32
+    assert yottadb.DEFAULT_SUBSCR_CNT == 2
+    assert yottadb.DEFAULT_SUBSCR_SIZE == 16
+
+    assert yottadb.YDB_NOTTP == 0

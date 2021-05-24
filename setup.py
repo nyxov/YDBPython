@@ -15,6 +15,7 @@ from setuptools import setup, Extension, find_packages
 import os
 import pathlib
 import csv
+import re
 from typing import Dict
 
 YDB_DIST = os.environ.get("ydb_dist")
@@ -114,7 +115,38 @@ def create_exceptions_from_error_codes():
         header_file.write(header_file_text)
 
 
+def create_constants_from_header_file():
+    YDB_Dir = pathlib.Path(YDB_DIST)
+    constants_header = pathlib.Path(".") / "_yottadbconstants.h"
+    constant_data = []
+    file_path = YDB_Dir / "libyottadb.h"
+    with file_path.open() as file:
+        for line in file.readlines():
+            if re.match("#define\\sYDB_\\w*\\s[\\w\\(\\)<]*\\s.*", line) or re.match(
+                "#define\\sDEFAULT_\\w*\\s[\\w\\(\\)]*\\s.*", line
+            ):
+                parts = list(filter(lambda string: string != "", line.replace("\n", "").split("\t")))
+                constant_data.append(parts[1])
+            elif re.match("\tYDB_\\w* = [\\w]*.*", line):
+                parts = line.split()
+                constant_data.append(parts[0])
+
+    header_file_text = ""
+    header_file_text += "\n"
+    # create macro to add constants to module
+    header_file_text += "#define ADD_YDBCONSTANTS(MODULE_DICTIONARY) { \\\n"
+    add_constant_template = '    PyDict_SetItemString(MODULE_DICTIONARY, "{c_name}", Py_BuildValue("K", {c_name})); \\\n'
+    for constant_info in constant_data:
+        header_file_text += add_constant_template.replace("{c_name}", constant_info).replace("{c_name}", constant_info)
+    header_file_text += "}\n"
+    header_file_text += "\n"
+
+    with constants_header.open("w") as header_file:
+        header_file.write(header_file_text)
+
+
 create_exceptions_from_error_codes()
+create_constants_from_header_file()
 
 setup(
     name="yottadb",
