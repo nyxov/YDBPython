@@ -13,16 +13,14 @@
 #################################################################
 import pytest  # type: ignore # ignore due to pytest not having type annotations
 
-import subprocess
+import multiprocessing
 import os
-import shlex
 import datetime
 import time
 from decimal import Decimal
 from typing import NamedTuple, Sequence, Tuple, Optional, Callable
 
-from conftest import execute
-from lock import key_tuple_to_str
+from conftest import lock_value, str2zwr_tests
 
 import _yottadb
 import yottadb
@@ -248,71 +246,81 @@ def test_lock_incr_varname_and_subscript():
     _yottadb.lock_decr(b"test2", (b"sub1",))
 
 
-@pytest.mark.skip(reason="inconsistent failures due to timing issues in different environments")
 def test_lock_incr_timeout_error_varname_only():
     # Timeout error, varname only
-    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test1"))
-    time.sleep(1)
+    key = KeyTuple("^test1")
+    process = multiprocessing.Process(target=lock_value, args=(key,))
+    process.start()
+    time.sleep(0.5)
     with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr("^test1")
-    time.sleep(1)
+    process.join()
     # Using bytes arguments
-    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test1"))
-    time.sleep(1)
+    process = multiprocessing.Process(target=lock_value, args=(key,))
+    process.start()
+    time.sleep(0.5)
     with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr(b"^test1")
-    time.sleep(1)
+    process.join()
 
 
-@pytest.mark.skip(reason="inconsistent failures due to timing issues in different environments")
 def test_lock_incr_timeout_error_varname_and_subscript():
     # Timeout error, varname and subscript
-    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test2 sub1"))
-    time.sleep(1)
+    key = KeyTuple("^test2", ("sub1",))
+    process = multiprocessing.Process(target=lock_value, args=(key,))
+    process.start()
+    time.sleep(0.5)
     with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr("^test2", ("sub1",))
-    time.sleep(1)
+    process.join()
     # Using bytes arguments
-    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test2 sub1"))
-    time.sleep(1)
+    process = multiprocessing.Process(target=lock_value, args=(key,))
+    process.start()
+    time.sleep(0.5)
     with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr(b"^test2", (b"sub1",))
-    time.sleep(1)
+    process.join()
 
-    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test2"))
-    time.sleep(1)
+    key2 = KeyTuple("^test2", ("sub1",))
+    process = multiprocessing.Process(target=lock_value, args=(key2,))
+    process.start()
+    time.sleep(0.5)
     with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr("^test2", ("sub1",))
-    time.sleep(1)
+    process.join()
     # Using bytes arguments
-    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test2"))
-    time.sleep(1)
+    process = multiprocessing.Process(target=lock_value, args=(key2,))
+    process.start()
+    time.sleep(0.5)
     with pytest.raises(_yottadb.YDBTimeoutError):
         _yottadb.lock_incr(b"^test2", (b"sub1",))
-    time.sleep(1)
+    process.join()
 
 
 def test_lock_incr_no_timeout():
     # No timeout
-    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test2 sub1"))
-    time.sleep(1)
+    key = KeyTuple("^test2", ("sub1",))
+    process = multiprocessing.Process(target=lock_value, args=(key,))
+    process.start()
+    time.sleep(0.5)
     t1 = datetime.datetime.now()
     _yottadb.lock_incr("test2")
     t2 = datetime.datetime.now()
     time_elapse = t2.timestamp() - t1.timestamp()
     assert time_elapse < 0.01
-    _yottadb.lock_decr("test2")
-    time.sleep(1.1)
+    _yottadb.lock_decr("^test2", ("sub1",))
+    time.sleep(0.5)
+    process.join()
     # Using bytes arguments
-    subprocess.Popen(shlex.split("python3 tests/lock.py -t 2 ^test2 sub1"))
-    time.sleep(1)
+    process = multiprocessing.Process(target=lock_value, args=(key,))
+    time.sleep(0.5)
     t1 = datetime.datetime.now()
     _yottadb.lock_incr(b"test2")
     t2 = datetime.datetime.now()
     time_elapse = t2.timestamp() - t1.timestamp()
     assert time_elapse < 0.01
-    _yottadb.lock_decr(b"test2")
-    time.sleep(1.1)
+    _yottadb.lock_decr(b"^test2", (b"sub1",))
+    time.sleep(0.5)
 
 
 # The following functions are Python function wrappers
@@ -821,28 +829,42 @@ def test_node_previous_long_subscripts():
     assert _yottadb.node_previous("testlong", ("a" * 1025, "a" * 1026, "a")) == ("a" * 1025, "a" * 1026)
 
 
-@pytest.mark.skip(reason="inconsistent failures due to timing issues in different environments")
 def test_lock_blocking_other(simple_data):
     t1 = KeyTuple("^test1")
     t2 = KeyTuple("^test2", ("sub1",))
     t3 = KeyTuple("^test3", ("sub1", "sub2"))
     keys_to_lock = (t1, t2, t3)
     _yottadb.lock(keys=keys_to_lock, timeout_nsec=0)
-    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t1)}") == "Lock Failed"
-    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t2)}") == "Lock Failed"
-    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Failed"
+    # Attempt to increment/decrement locks
+    processes = []
+    for key in keys_to_lock:
+        process = multiprocessing.Process(target=lock_value, args=(key,))
+        process.start()
+        processes.append(process)
+    for process in processes:
+        process.join()
+        assert process.exitcode == 1
+    # Release all locks
     _yottadb.lock()
-    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t1)}") == "Lock Success"
-    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t2)}") == "Lock Success"
-    assert execute(f"python3 tests/lock.py -T 0 -t 0 {key_tuple_to_str(t3)}") == "Lock Success"
+    # Attempt to increment/decrement locks
+    processes = []
+    for key in keys_to_lock:
+        process = multiprocessing.Process(target=lock_value, args=(key,))
+        process.start()
+        processes.append(process)
+    for process in processes:
+        process.join()
+        assert process.exitcode == 0
 
 
-@pytest.mark.skip(reason="inconsistent failures due to timing issues in different environments")
 def test_lock_being_blocked():
-    subprocess.Popen(shlex.split("python3 tests/lock.py ^test1"))
+    key = KeyTuple("^test1")
+    process = multiprocessing.Process(target=lock_value, args=(key,))
+    process.start()
     time.sleep(1)
     with pytest.raises(_yottadb.YDBTimeoutError):
-        _yottadb.lock([KeyTuple("^test1")])
+        _yottadb.lock([key])
+    process.join()
 
 
 def test_delete_excel():
@@ -983,16 +1005,6 @@ def test_incr_errors(key, initial, increment, error_type):
         _yottadb.incr(*key, increment=number_to_str(increment))
         assert _yottadb.get(*key) == initial
     _yottadb.delete(*key, _yottadb.YDB_DEL_TREE)
-
-
-str2zwr_tests = [
-    (b"X\0ABC", b'"X"_$C(0)_"ABC"', b'"X"_$C(0)_"ABC"'),
-    (
-        bytes("你好世界", encoding="utf-8"),
-        b'"\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8"_$C(150)_"\xe7"_$C(149,140)',
-        b'"\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c"',
-    ),
-]
 
 
 @pytest.mark.parametrize("input, output1, output2", str2zwr_tests)

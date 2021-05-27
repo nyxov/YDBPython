@@ -12,9 +12,14 @@
 #                                                               #
 #################################################################
 import pytest  # type: ignore # ignore due to pytest not having type annotations
+import multiprocessing
+import datetime
+import time
+import os
 from typing import NamedTuple, Callable, Tuple
 
 import yottadb
+from conftest import lock_value, str2zwr_tests
 
 
 def test_key_object(simple_data):
@@ -423,3 +428,116 @@ def test_transaction_return_YDB_OK_to_depth(depth):
 
     sub1 = f"test_transaction_return_YDB_OK_to_depth{depth}"
     yottadb.Key("^tptests")[sub1].delete_tree()
+
+
+# Confirm lock() works with Key objects without raising any errors.
+# Due to timing issues, it's not possible to reliably test the behavior
+# of lock() calls beyond simply failure detection. Accordingly,
+# this test will pass so long as there are no exceptions.
+def test_lock_Keys(simple_data):
+    t1 = yottadb.Key("^test1")
+    t2 = yottadb.Key("^test2")["sub1"]
+    t3 = yottadb.Key("^test3")["sub1"]["sub2"]
+    keys_to_lock = (t1, t2, t3)
+    # Attempt to get locks for keys t1,t2 and t3
+    yottadb.lock(keys=keys_to_lock, timeout_nsec=0)
+    # Attempt to increment/decrement locks
+    processes = []
+    for key in keys_to_lock:
+        process = multiprocessing.Process(target=lock_value, args=(key,))
+        process.start()
+        processes.append(process)
+    for process in processes:
+        process.join()
+        assert process.exitcode == 1
+    # Release all locks
+    yottadb.lock()
+    # Attempt to increment/decrement locks
+    processes = []
+    for key in keys_to_lock:
+        process = multiprocessing.Process(target=lock_value, args=(key,))
+        process.start()
+        processes.append(process)
+    for process in processes:
+        process.join()
+        assert process.exitcode == 0
+
+
+# Lock a Key using the class lock() method instead of the module method
+def test_lock_Key(simple_data):
+    key = yottadb.Key("^test4")["sub1"]["sub2"]
+    # Attempt to get the lock
+    key.lock()
+    # Attempt to increment/decrement the lock
+    process = multiprocessing.Process(target=lock_value, args=(key,))
+    process.start()
+    process.join()
+    assert process.exitcode == 1
+    # Release all locks
+    yottadb.lock()
+    # Attempt to increment/decrement the lock
+    process = multiprocessing.Process(target=lock_value, args=(key,))
+    process.start()
+    process.join()
+    assert process.exitcode == 0
+
+
+def test_lock_incr_Key():
+    key = yottadb.Key("test1")["sub1"]["sub2"]
+    t1 = datetime.datetime.now()
+    key.lock_incr()
+    t2 = datetime.datetime.now()
+    time_elapse = t2.timestamp() - t1.timestamp()
+    assert time_elapse < 0.01
+    key.lock_decr()
+
+
+def test_lock_incr_Key_timeout_error():
+    # Timeout error, varname and subscript
+    key = yottadb.Key("^test2")["sub1"]
+    process = multiprocessing.Process(target=lock_value, args=(key,))
+    process.start()
+    time.sleep(0.5)
+    with pytest.raises(yottadb.YDBTimeoutError):
+        key.lock_incr()
+    process.join()
+
+    key2 = yottadb.Key("^test2")["sub1"]
+    process = multiprocessing.Process(target=lock_value, args=(key2,))
+    process.start()
+    time.sleep(0.5)
+    with pytest.raises(yottadb.YDBTimeoutError):
+        key2.lock_incr()
+    process.join()
+
+
+def test_lock_incr_Key_no_timeout():
+    # No timeout
+    key = yottadb.Key("^test2")["sub1"]
+    process = multiprocessing.Process(target=lock_value, args=(key,))
+    process.start()
+    time.sleep(0.5)
+    t1 = datetime.datetime.now()
+    yottadb.Key("test2").lock_incr()
+    t2 = datetime.datetime.now()
+    time_elapse = t2.timestamp() - t1.timestamp()
+    assert time_elapse < 0.01
+    key.lock_decr()
+    time.sleep(0.5)
+    process.join()
+
+
+@pytest.mark.parametrize("input, output1, output2", str2zwr_tests)
+def test_module_str2zwr(input, output1, output2):
+    if os.environ["ydb_chset"] == "UTF-8":
+        assert yottadb.str2zwr(input) == output2
+    else:
+        assert yottadb.str2zwr(input) == output1
+
+
+@pytest.mark.parametrize("output1, output2, input", str2zwr_tests)
+def test_module_zwr2str(input, output1, output2):
+    if os.environ["ydb_chset"] == "UTF-8":
+        assert yottadb.zwr2str(input) == output1
+    else:
+        assert yottadb.zwr2str(input) == output2

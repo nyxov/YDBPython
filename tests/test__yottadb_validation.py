@@ -27,6 +27,7 @@
 """
 import pytest  # type: ignore # ignore due to pytest not having type annotations
 import _yottadb
+import yottadb
 import psutil
 
 
@@ -240,7 +241,7 @@ def test_lock_too_many_keys():
 def test_lock_first_key_wrong_type():
     # Case 4: Raises a type Error if the first element of a key is not a str object
     with pytest.raises(TypeError):
-        _yottadb.lock(1)
+        _yottadb.lock([1])
 
 
 def test_lock_empty_key():
@@ -285,8 +286,8 @@ def test_lock_too_many_subs():
     # Case 11: Raises a ValueError if a subsarray is longer than _yottadb.YDB_MAX_SUBS
     with pytest.raises(ValueError):
         subsarray = ["test" + str(x) for x in range(0, _yottadb.YDB_MAX_SUBS + 1)]
-        keys = ("test", subsarray)
-        _yottadb.lock(keys)
+        key = ("test", subsarray)
+        _yottadb.lock([key])
 
 
 def test_lock_subscript_wrong_type():
@@ -299,7 +300,7 @@ def test_lock_max_subscript_length():
     # Case 13: Accepts an item in a subsarray of length _yottadb.YDB_MAX_STR without raising an exception
     try:
         _yottadb.lock((("test", ["a" * (_yottadb.YDB_MAX_STR)]),))
-    except _yottadb.YDBError as e:  # Testing C-extention's validation, not YottaDB's
+    except _yottadb.YDBError:  # Testing C-extention's validation, not YottaDB's
         pass
 
 
@@ -569,3 +570,21 @@ def test_unsigned_int_length_bytes_overflow():
 
     with pytest.raises(ValueError):
         _yottadb.zwr2str(BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH)
+
+
+# Confirm validation exceptions produce the correct error message
+def test_validation_exception_message(simple_data):
+    t1 = yottadb.Key("^test1")
+    t2 = yottadb.Key("^test2")["sub1"]
+    t3 = yottadb.Key("^test3")["sub1"]["b" * (_yottadb.YDB_MAX_STR + 1)]
+    keys_to_lock = (t1, t2, t3)
+    with pytest.raises(ValueError):
+        yottadb.lock(keys_to_lock)
+
+    try:
+        yottadb.lock(keys_to_lock)
+    except ValueError as e:
+        assert (
+            str(e)
+            == "'keys' argument invalid: item 2 in key sequence has invalid subsarray: invalid bytes length 1048577: max 1048576"
+        )

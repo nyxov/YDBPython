@@ -15,7 +15,10 @@ import os
 import shutil
 import subprocess
 import shlex
+import time
+import sys
 import pytest  # type: ignore # ignore due to pytest not having type annotations
+from typing import Union
 
 import yottadb
 from yottadb import KeyTuple
@@ -47,6 +50,48 @@ SIMPLE_DATA = (
     (KeyTuple("^Test5"), "test5value"),
     (KeyTuple("^test6", ("sub6", "subsub6")), "test6value"),
 )
+
+
+str2zwr_tests = [
+    (b"X\0ABC", b'"X"_$C(0)_"ABC"', b'"X"_$C(0)_"ABC"'),
+    (
+        bytes("你好世界", encoding="utf-8"),
+        b'"\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8"_$C(150)_"\xe7"_$C(149,140)',
+        b'"\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c"',
+    ),
+]
+
+
+# Lock a value in the database
+def lock_value(key: Union[yottadb.Key, KeyTuple], interval: int = 2, timeout: int = 1):
+    if isinstance(key, yottadb.Key):
+        varname = key.varname
+        subsarray = key.subsarray
+    else:
+        varname = key[0]
+        subsarray = key[1]
+    if len(key.subsarray) == 0:
+        subsarray = None
+
+    has_lock = False
+    try:
+        yottadb.lock_incr(varname, subsarray, timeout_nsec=(timeout * 1_000_000_000))
+        print("Lock Success")
+        has_lock = True
+    except yottadb.YDBTimeoutError:
+        print("Lock Failed")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Lock Error: {repr(e)}")
+        sys.exit(2)
+
+    if has_lock:
+        time.sleep(interval)
+        yottadb.lock_decr(varname, subsarray)
+        if timeout != 0 or interval != 0:
+            print("Lock Released")
+
+    sys.exit(0)
 
 
 def execute(command: str, stdin: str = "") -> str:

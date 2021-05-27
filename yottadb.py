@@ -93,8 +93,24 @@ def subscript_next(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> AnyStr:
     return _yottadb.subscript_next(varname, subsarray)
 
 
-def subscript_previous(varname: bytes, subsarray: Sequence[bytes] = ()) -> bytes:
+def subscript_previous(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> bytes:
     return _yottadb.subscript_previous(varname, subsarray)
+
+
+def lock_incr(varname: AnyStr, subsarray: Sequence[AnyStr] = (), timeout_nsec: int = 0) -> bytes:
+    return _yottadb.lock_incr(varname, subsarray, timeout_nsec)
+
+
+def lock_decr(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> bytes:
+    return _yottadb.lock_decr(varname, subsarray)
+
+
+def str2zwr(string: AnyStr) -> bytes:
+    return _yottadb.str2zwr(string)
+
+
+def zwr2str(string: AnyStr) -> bytes:
+    return _yottadb.zwr2str(string)
 
 
 def tp(callback: object, args: tuple = None, transid: str = "BATCH", varnames: Sequence[AnyStr] = None, **kwargs):
@@ -254,6 +270,15 @@ class Key:
             varname = self.varname
         return subscript_previous(varname, subsarray)
 
+    def lock(self, timeout_nsec: int = 0) -> None:
+        return lock((self,), timeout_nsec)
+
+    def lock_incr(self, timeout_nsec: int = 0) -> bytes:
+        return lock_incr(self.varname, self.subsarray, timeout_nsec)
+
+    def lock_decr(self) -> bytes:
+        return lock_decr(self.varname, self.subsarray)
+
     def tp(self, callback: Callable, args: tuple = None, transid: str = "BATCH", varnames: Sequence[AnyStr] = None, **kwargs):
         return tp(callback, args, kwargs, transid, varnames)
 
@@ -332,17 +357,17 @@ class Key:
             yield self[sub]
 
     """
-    def lock_decr(self): ...
-    def lock_incr(self): ...
     def node_next(self): ...
     def node_previous(self): ...
-
     def delete_excel(self): ...
-    def lock(self): ...
-
-    def str2zwr(self): ...
-    def zwr2str(self): ...
     """
+
+
+# Defined after Key class to allow access to that class
+def lock(keys: Sequence[tuple] = None, timeout_nsec: int = 0) -> None:
+    if keys is not None:
+        keys = [(key.varname, key.subsarray) if isinstance(key, Key) else key for key in keys]
+    return _yottadb.lock(keys=keys, timeout_nsec=timeout_nsec)
 
 
 def transaction(function):

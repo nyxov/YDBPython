@@ -68,7 +68,7 @@ static void raise_ValidationError(YDBPythonErrorType err_type, char *format_pref
 	int	copied;
 
 	va_start(args, err_format);
-	copied = snprintf(err_message, YDBPY_MAX_ERRORMSG, err_format, args);
+	copied = vsnprintf(err_message, YDBPY_MAX_ERRORMSG, err_format, args);
 	assert(YDBPY_MAX_ERRORMSG > copied);
 	UNUSED(copied);
 	va_end(args);
@@ -90,10 +90,10 @@ static void raise_ValidationError(YDBPythonErrorType err_type, char *format_pref
 
 	switch (err_type) {
 	case YDBPython_TypeError:
-		PyErr_SetString(PyExc_TypeError, err_message);
+		PyErr_SetString(PyExc_TypeError, prefixed_err_message);
 		break;
 	case YDBPython_ValueError:
-		PyErr_SetString(PyExc_ValueError, err_message);
+		PyErr_SetString(PyExc_ValueError, prefixed_err_message);
 		break;
 	default:
 		// Only TypeError and ValueError are possible, so we should never get here.
@@ -190,7 +190,6 @@ static bool is_valid_sequence(PyObject *object, YDBPythonSequenceType sequence_t
 			raise_ValidationError(YDBPython_TypeError, err_prefix, YDBPY_ERR_ITEM_NOT_BYTES_LIKE, i);
 			DECREF_AND_RETURN(sequence, FALSE);
 		}
-		// item_len = PySequence_Fast_GET_SIZE(item);
 		/* Validate item length */
 		if (max_item_len < item_len) {
 			raise_ValidationError(YDBPython_ValueError, err_prefix, YDBPY_ERR_BYTES_TOO_LONG, item_len, max_item_len);
@@ -390,7 +389,11 @@ static int is_valid_key_sequence(PyObject *keys_sequence, int max_len) {
 	error_encountered = FALSE;
 	for (i = 0; i < len_keys; i++) {
 		key = PySequence_Fast_GET_ITEM(seq, i); // Borrowed Reference
-		key_seq = PySequence_Fast(key, "");	// New Reference
+		if (!(PyTuple_Check(key) || PyList_Check(key))) {
+			raise_ValidationError(YDBPython_TypeError, YDBPY_ERR_KEYS_INVALID, YDBPY_ERR_NOT_LIST_OR_TUPLE);
+			DECREF_AND_RETURN(seq, FALSE);
+		}
+		key_seq = PySequence_Fast(key, ""); // New Reference
 		len_key_seq = PySequence_Fast_GET_SIZE(key_seq);
 
 		if (1 <= len_key_seq) {
@@ -458,7 +461,7 @@ static int is_valid_key_sequence(PyObject *keys_sequence, int max_len) {
 						  YDBPY_ERR_KEY_IN_SEQUENCE_SUBSARRAY_INVALID);
 				assert(copied < YDBPY_MAX_ERRORMSG);
 				UNUSED(copied);
-				copied = snprintf(err_prefix, YDBPY_MAX_ERRORMSG, tmp_prefix, i, "%%s");
+				copied = snprintf(err_prefix, YDBPY_MAX_ERRORMSG, tmp_prefix, i, "%s");
 				assert(copied < YDBPY_MAX_ERRORMSG);
 				UNUSED(copied);
 

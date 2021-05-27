@@ -47,7 +47,7 @@ typedef enum YDBPythonSequenceType {
 } YDBPythonSequenceType;
 
 // TypeError messages
-#define YDBPY_ERR_NOT_LIST_OR_TUPLE		    "value must be list or tuple."
+#define YDBPY_ERR_NOT_LIST_OR_TUPLE		    "key must be list or tuple."
 #define YDBPY_ERR_VARNAME_NOT_BYTES_LIKE	    "varname argument is not a bytes-like object (bytes or str)"
 #define YDBPY_ERR_ITEM_NOT_BYTES_LIKE		    "item %ld is not a bytes-like object (bytes or str)"
 #define YDBPY_ERR_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE "item %ld is not a list or tuple."
@@ -57,10 +57,10 @@ typedef enum YDBPythonSequenceType {
 #define YDBPY_ERR_VARNAME_TOO_LONG		   "invalid varname length %ld: max %d"
 #define YDBPY_ERR_SEQUENCE_TOO_LONG		   "invalid sequence length %ld: max %d"
 #define YDBPY_ERR_BYTES_TOO_LONG		   "invalid bytes length %ld: max %d"
-#define YDBPY_ERR_KEY_IN_SEQUENCE_INCORRECT_LENGTH "item %ld must be length 1 or 2."
+#define YDBPY_ERR_KEY_IN_SEQUENCE_INCORRECT_LENGTH "item %lu must be length 1 or 2."
 #define YDBPY_ERR_KEY_IN_SEQUENCE_VARNAME_TOO_LONG "item %ld in key sequence has invalid varname length %ld: max %d."
 
-#define YDBPY_ERR_KEY_IN_SEQUENCE_SUBSARRAY_INVALID "item %ld in key sequence has invalid subsarray: "
+#define YDBPY_ERR_KEY_IN_SEQUENCE_SUBSARRAY_INVALID "item %ld in key sequence has invalid subsarray: %s"
 
 #define YDBPY_ERR_VARNAME_INVALID   "'varnames' argument invalid: %s"
 #define YDBPY_ERR_SUBSARRAY_INVALID "'subsarray' argument invalid: %s"
