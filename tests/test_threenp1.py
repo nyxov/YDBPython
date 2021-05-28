@@ -65,18 +65,7 @@ def db_init(gvnlist: GVNList):
 
 # Implements M entryref digitsinit^threeen1f
 def init_digits():
-    digitstrings = [
-        "zero",
-        "eins",
-        "deux",
-        "tres",
-        "quattro",
-        "пять",
-        "ستة",
-        "सात",
-        "捌",
-        "ஒன்பது",
-    ]
+    digitstrings = ["zero", "eins", "deux", "tres", "quattro", "пять", "ستة", "सात", "捌", "ஒன்பது"]
 
     digitstring = yottadb.Key("ds")
     digitint = yottadb.Key("di")
@@ -117,7 +106,7 @@ def do_block(start: int):
         if gvnlist.limits[str(i)].data == 0:
             break
 
-        result = gvnlist.limits[str(i)][str(1)].incr()
+        result = int(gvnlist.limits[str(i)][str(1)].incr())
         if result != 1:
             continue
 
@@ -130,12 +119,7 @@ def do_block(start: int):
         do_step(first, last, gvstats)
 
         try:
-            yottadb.tp(
-                gvstats_incr,
-                reads=gvstats["reads"],
-                updates=gvstats["updates"],
-                highest=gvstats["highest"],
-            )
+            yottadb.tp(gvstats_incr, reads=gvstats["reads"], updates=gvstats["updates"], highest=gvstats["highest"])
         except yottadb.YDBTPRestart:
             return
 

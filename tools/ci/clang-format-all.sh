@@ -17,7 +17,7 @@ else
 fi
 
 find . -name '*.c' -o -name '*.h' | xargs "$CLANG_FORMAT" -i
-find . -regex '.*\.pyi?' | grep -v venv | xargs black -l 132
+find . -regex '.*\.pyi?' | grep -v venv | grep -v "copyright.py" | xargs black -l 132
 if ! [ $(git diff --stat | wc -l) = 0 ]; then
   echo " -> Formatting differences found!"
   git diff

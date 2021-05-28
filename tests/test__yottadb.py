@@ -372,10 +372,7 @@ def process_transaction(nested_transaction_data: Tuple[TransactionData], start_t
         try:
             _yottadb.tp(
                 process_transaction,
-                kwargs={
-                    "nested_transaction_data": sub_data,
-                    "start_time": datetime.datetime.now(),
-                },
+                kwargs={"nested_transaction_data": sub_data, "start_time": datetime.datetime.now()},
                 varnames=current_data.varnames,
             )
         except _yottadb.YDBTPRestart:
@@ -401,18 +398,11 @@ def process_transaction(nested_transaction_data: Tuple[TransactionData], start_t
 def test_tp_return_YDB_OK():
     key = KeyTuple(varname="^tptests", subsarray=("test_tp_return_YDB_OK",))
     value = b"return YDB_OK"
-    transaction_data = TransactionData(
-        action=set_key,
-        action_arguments=(key, value),
-        return_value=_yottadb.YDB_OK,
-    )
+    transaction_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=_yottadb.YDB_OK)
     _yottadb.delete(*key)
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_UNDEF
 
-    _yottadb.tp(
-        process_transaction,
-        kwargs={"nested_transaction_data": (transaction_data,)},
-    )
+    _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
 
     assert _yottadb.get(*key) == value
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
@@ -554,10 +544,7 @@ def test_tp_return_YDB_TP_RESTART_reset_all():
 
     _yottadb.tp(
         process_transaction,
-        kwargs={
-            "nested_transaction_data": (transaction_data,),
-            "start_time": datetime.datetime.now(),
-        },
+        kwargs={"nested_transaction_data": (transaction_data,), "start_time": datetime.datetime.now()},
         varnames=("*",),
     )
 
@@ -570,11 +557,7 @@ def test_tp_return_YDB_TP_RESTART_reset_all():
 def test_tp_return_YDB_ERR_TPTIMEOUT():
     key = KeyTuple(varname="^tptests", subsarray=("test_tp_return_YDB_ERR_TPTIMEOUT",))
     value = b"return YDB_ERR_TPTIMEOUT"
-    transaction_data = TransactionData(
-        action=set_key,
-        action_arguments=(key, value),
-        return_value=_yottadb.YDB_ERR_TPTIMEOUT,
-    )
+    transaction_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=_yottadb.YDB_ERR_TPTIMEOUT)
     _yottadb.delete(*key)
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_UNDEF
 
@@ -974,7 +957,7 @@ def test_incr(key, initial, increment, result):
     _yottadb.set(*key, value=initial)
     returned_value = _yottadb.incr(*key, increment=number_to_str(increment))
 
-    assert returned_value == result
+    assert returned_value == bytes(result, encoding="utf8")
     assert _yottadb.get(*key) == bytes(result, encoding="ascii")
     _yottadb.delete(*key, _yottadb.YDB_DEL_TREE)
 

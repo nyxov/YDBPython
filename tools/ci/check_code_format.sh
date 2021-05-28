@@ -14,7 +14,7 @@
 #################################################################
 exit_code=0
 
-files_to_check=$(find . '(' -path ./.git -o -path ./.eggs -o -path ./.venv ')' -type d -prune -false -o -name '*.c' -o '(' -name '*.h' -a ! -path ./_yottadbexceptions.h ')' -o  -name '*.py' -o -name '*.pyi')
+files_to_check=$(find . '(' -path ./.git -o -path ./.eggs -o -path ./.venv -o -path ./tools/ci ')' -type d -prune -false -o -name '*.c' -o '(' -name '*.h' -a ! -path ./_yottadbexceptions.h ')' -o  -name '*.py' -o -name '*.pyi')
 echo "Checking code format ..."
 for file in $files_to_check ; do
   if [[ "$file" == *".c" ]] || [[ "$file" == *".h" ]]; then

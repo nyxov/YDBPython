@@ -73,18 +73,19 @@ def test_key_object(simple_data):
 
     # Key incrementation
     key = yottadb.Key("localincr")
-    assert key.incr() == 1
-    assert key.incr(-1) == 0
-    assert key.incr("2") == 2
+    assert key.incr() == b"1"
+    assert key.incr(-1) == b"0"
+    assert key.incr("2") == b"2"
+    assert key.incr("testeroni") == b"2"  # Not a canonical number, leaves value unchanged
     with pytest.raises(TypeError):
-        key.incr(None)  # Must be int, str, or bytes
+        key.incr(None)  # Must be int, str, float, or bytes
     # Using bytes argument for Key (carrying over previous node value)
     key = yottadb.Key(b"localincr")
-    assert key.incr() == 3
-    assert key.incr(-1) == 2
-    assert key.incr(b"2") == 4
+    assert key.incr() == b"3"
+    assert key.incr(-1) == b"2"
+    assert key.incr(b"2") == b"4"
     with pytest.raises(TypeError):
-        key.incr([])  # Must be int, str, or bytes
+        key.incr([])  # Must be int, str, float, or bytes
 
     # Key comparison via __eq__ (Key/value comparisons tested in various other
     # test cases below)
@@ -95,6 +96,27 @@ def test_key_object(simple_data):
     assert key == key_copy
     # Different varname/subscripts should not be equal
     assert key != key2
+
+    # Incrementation/decrementation using += and -= syntax (__iadd__ and __isub__ methods)
+    key = yottadb.Key("iadd")
+    key += 1
+    assert int(key.value) == 1
+    key -= 1
+    assert int(key.value) == 0
+    key += "2"
+    assert int(key.value) == 2
+    key -= "3"
+    assert int(key.value) == -1
+    key += 0.5
+    assert float(key.value) == -0.5
+    key -= -1.5
+    assert int(key.value) == 1
+    key += 0.5
+    assert float(key.value) == 1.5
+    key += "testeroni"  # Not a canonical number, leaves value unchanged
+    assert float(key.value) == 1.5
+    with pytest.raises(TypeError):
+        key += ("tuple",)  # Must be int, str, float, or bytes
 
 
 def test_Key_construction_error():

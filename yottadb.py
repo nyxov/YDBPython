@@ -82,11 +82,11 @@ def delete_tree(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
     _yottadb.delete(varname, subsarray, DEL_TREE)
 
 
-def incr(varname: AnyStr, subsarray: Sequence[bytes] = (), increment: Union[int, str] = "1") -> int:
-    if isinstance(increment, int):
-        # Implicitly convert integers to string for passage to API
+def incr(varname: AnyStr, subsarray: Sequence[bytes] = (), increment: Union[int, float, str, bytes] = "1") -> bytes:
+    if isinstance(increment, int) or isinstance(increment, float):
+        # Implicitly convert integers and floats to string for passage to API
         increment = str(increment)
-    return int(_yottadb.incr(varname, subsarray, increment))
+    return _yottadb.incr(varname, subsarray, increment)
 
 
 def subscript_next(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> AnyStr:
@@ -97,13 +97,7 @@ def subscript_previous(varname: bytes, subsarray: Sequence[bytes] = ()) -> bytes
     return _yottadb.subscript_previous(varname, subsarray)
 
 
-def tp(
-    callback: object,
-    args: tuple = None,
-    transid: str = "BATCH",
-    varnames: Sequence[AnyStr] = None,
-    **kwargs,
-):
+def tp(callback: object, args: tuple = None, transid: str = "BATCH", varnames: Sequence[AnyStr] = None, **kwargs):
     return _yottadb.tp(callback, args, kwargs, transid, varnames)
 
 
@@ -179,6 +173,17 @@ class Key:
     def __getitem__(self, item):
         return Key(name=item, parent=self)
 
+    def __iadd__(self, num: Union[int, float, str, bytes]) -> Optional["Key"]:
+        self.incr(num)
+        return self
+
+    def __isub__(self, num: Union[int, float, str, bytes]) -> Optional["Key"]:
+        if isinstance(num, float):
+            self.incr(-float(num))
+        else:
+            self.incr(-int(num))
+        return self
+
     def __eq__(self, other) -> bool:
         if isinstance(other, Key):
             return self.varname == other.varname and self.subsarray == other.subsarray
@@ -229,8 +234,15 @@ class Key:
     def delete_tree(self) -> None:
         delete_tree(self.varname, self.subsarray)
 
-    def incr(self, increment: Union[int, str] = "1") -> int:
-        return int(incr(self.varname, self.subsarray, increment))
+    def incr(self, increment: Union[int, float, str, bytes] = "1") -> bytes:
+        if (
+            not isinstance(increment, int)
+            and not isinstance(increment, str)
+            and not isinstance(increment, bytes)
+            and not isinstance(increment, float)
+        ):
+            raise TypeError("unsupported operand type(s) for +=: must be 'int', 'float', 'str', or 'bytes'")
+        return incr(self.varname, self.subsarray, increment)
 
     def subscript_next(self, varname: AnyStr = None, subsarray: Sequence[AnyStr] = ()) -> AnyStr:
         if varname is None:
@@ -242,14 +254,7 @@ class Key:
             varname = self.varname
         return subscript_previous(varname, subsarray)
 
-    def tp(
-        self,
-        callback: Callable,
-        args: tuple = None,
-        transid: str = "BATCH",
-        varnames: Sequence[AnyStr] = None,
-        **kwargs,
-    ):
+    def tp(self, callback: Callable, args: tuple = None, transid: str = "BATCH", varnames: Sequence[AnyStr] = None, **kwargs):
         return tp(callback, args, kwargs, transid, varnames)
 
     @property

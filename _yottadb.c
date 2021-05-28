@@ -862,7 +862,7 @@ static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
 		/* Create Python object to return */
 		if (!return_NULL) {
 			/* New Reference */
-			ret_value_py = Py_BuildValue("s#", ret_value_ydb.buf_addr, (Py_ssize_t)ret_value_ydb.len_used);
+			ret_value_py = Py_BuildValue("y#", ret_value_ydb.buf_addr, (Py_ssize_t)ret_value_ydb.len_used);
 		}
 	}
 	/* free allocated memory */
