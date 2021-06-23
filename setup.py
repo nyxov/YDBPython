@@ -71,10 +71,10 @@ def create_exceptions_from_error_codes():
                     exception_info["python_name"] = "YDBTPRestart"
                     exception_info["exception_type"] = "YDBTPRestart"
                 elif "YDB_TP_ROLLBACK" == parts[1]:
-                    exception_info["python_name"] = f"YDBTPRollback"
+                    exception_info["python_name"] = "YDBTPRollback"
                     exception_info["exception_type"] = "YDBTPRollback"
                 elif "YDB_LOCK_TIMEOUT" == parts[1]:
-                    exception_info["python_name"] = f"YDBTimeoutError"
+                    exception_info["python_name"] = "YDBTimeoutError"
                     exception_info["exception_type"] = "YDBTimeoutError"
                 else:
                     continue
@@ -119,25 +119,33 @@ def create_constants_from_header_file():
     YDB_Dir = pathlib.Path(YDB_DIST)
     constants_header = pathlib.Path(".") / "_yottadbconstants.h"
     constant_data = []
-    file_path = YDB_Dir / "libyottadb.h"
-    with file_path.open() as file:
-        for line in file.readlines():
-            if re.match("#define\\sYDB_\\w*\\s[\\w\\(\\)<]*\\s.*", line) or re.match(
-                "#define\\sDEFAULT_\\w*\\s[\\w\\(\\)]*\\s.*", line
-            ):
-                parts = list(filter(lambda string: string != "", line.replace("\n", "").split("\t")))
-                constant_data.append(parts[1])
-            elif re.match("\tYDB_\\w* = [\\w]*.*", line):
-                parts = line.split()
-                constant_data.append(parts[0])
+    file_paths = [YDB_Dir / "libyottadb.h", YDB_Dir / "libydberrors.h", YDB_Dir / "libydberrors2.h"]
+    for file_path in file_paths:
+        with file_path.open() as file:
+            for line in file.readlines():
+                if re.match("#define\\sYDB_\\w*\\s[\\w\\(\\)<]*\\s.*", line) or re.match(
+                    "#define\\sDEFAULT_\\w*\\s[\\w\\(\\)]*\\s.*", line
+                ):
+                    parts = list(filter(lambda string: string != "", line.replace("\n", "").split("\t")))
+                    constant_data.append({"name": parts[1], "type": "K"})
+                elif re.match("\tYDB_\\w* = [\\w]*.*", line):
+                    parts = line.split()
+                    constant_data.append({"name": parts[0], "type": "K"})
+                elif re.match("#define YDB_ERR\\w* -\\d*.*", line):
+                    parts = line.split()
+                    constant_data.append({"name": parts[1], "type": "i"})
 
     header_file_text = ""
     header_file_text += "\n"
     # create macro to add constants to module
     header_file_text += "#define ADD_YDBCONSTANTS(MODULE_DICTIONARY) { \\\n"
-    add_constant_template = '    PyDict_SetItemString(MODULE_DICTIONARY, "{c_name}", Py_BuildValue("K", {c_name})); \\\n'
+    add_constant_template = '    PyDict_SetItemString(MODULE_DICTIONARY, "{c_name}", Py_BuildValue("{int_type}", {c_name})); \\\n'
     for constant_info in constant_data:
-        header_file_text += add_constant_template.replace("{c_name}", constant_info).replace("{c_name}", constant_info)
+        header_file_text += (
+            add_constant_template.replace("{c_name}", constant_info["name"])
+            .replace("{c_name}", constant_info["name"])
+            .replace("{int_type}", constant_info["type"])
+        )
     header_file_text += "}\n"
     header_file_text += "\n"
 

@@ -594,3 +594,13 @@ def test_import():
     assert yottadb.DEFAULT_SUBSCR_SIZE == 16
 
     assert yottadb.YDB_NOTTP == 0
+
+    # Selection of constants from libydberrors.h
+    assert yottadb.YDB_ERR_INVSTRLEN == -150375522
+    assert yottadb.YDB_ERR_VERSION == -150374082
+    assert yottadb.YDB_ERR_FILENOTFND == -150374338
+
+    # Selection of constants from libydberrors2.h
+    assert yottadb.YDB_ERR_FATALERROR2 == -151027828
+    assert yottadb.YDB_ERR_TIME2LONG == -151027834
+    assert yottadb.YDB_ERR_VARNAME2LONG == -151027842
