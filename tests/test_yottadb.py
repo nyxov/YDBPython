@@ -687,7 +687,7 @@ def test_import():
     assert yottadb.YDB_MAIN_LANG_C == 0
     assert yottadb.YDB_MAIN_LANG_GO == 1
 
-    assert yottadb.YDB_RELEASE == 131
+    assert yottadb.YDB_RELEASE == 133
 
     assert yottadb.YDB_MAX_IDENT == 31
     assert yottadb.YDB_MAX_NAMES == 35
