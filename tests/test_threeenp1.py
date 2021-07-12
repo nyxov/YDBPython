@@ -10,11 +10,13 @@
 #                                                               #
 #################################################################
 import os
+import pytest
 import datetime
 import multiprocessing
 
 import yottadb
 from yottadb import YDB_OK
+from conftest import setup_db, teardown_db
 
 
 MAX_PROCESSES = 32
@@ -208,6 +210,7 @@ def do_step(first: int, last: int, gvstats: dict):
 # These arguments are needed to check the exit codes of the do_block processes,
 # when test_threeenp1 is invoked by test_fatal_signal.
 def test_threeenp1(fatal_signal_flag=False, exit_code=0):
+    db = setup_db()
     # Initialize global variables and store in an object for
     # easy argument passing
     gvnlist = GVNList()
@@ -225,11 +228,11 @@ def test_threeenp1(fatal_signal_flag=False, exit_code=0):
     # captured by pytest by default, and simplify test configuration.
     start = 1  # Starting integer for the problem
     if 4 < streams:
-        end = 3000000  # Ending/upper bound integer for the problem
-        expected = 559
+        end = 30000  # Ending/upper bound integer for the problem
+        expected = 307
     else:
-        end = 250000  # Ending/upper bound integer for the problem
-        expected = 442
+        end = 2500  # Ending/upper bound integer for the problem
+        expected = 208
     block_size = 100  # Size of blocks of integer
     with open("3nparms.out", "w") as output_file:
         output_file.write(f"upperbound={end} expected={expected}\n")
@@ -290,3 +293,12 @@ def test_threeenp1(fatal_signal_flag=False, exit_code=0):
             output_file.write(f"{update_rate} {read_rate}\n")
 
     assert expected == int(gvnlist.result.value)
+    # Cleanup database for other tests
+    gvnlist.limits.delete_tree()
+    gvnlist.count.delete_tree()
+    gvnlist.reads.delete_tree()
+    gvnlist.updates.delete_tree()
+    gvnlist.highest.delete_tree()
+    gvnlist.result.delete_tree()
+    gvnlist.step.delete_tree()
+    teardown_db(db)

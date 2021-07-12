@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #################################################################
 #								#
 # Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	#
@@ -10,6 +10,11 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
+
+set -e # Fail script if any command fails
+set -u # Enable detection of uninitialized variables
+set -o pipefail	# this way $? is set to zero only if ALL commands in a pipeline succeed. Else only last command determines $?
+
 if [ -x "$(which "$1")" ]; then
 	CLANG_FORMAT="$1"
 else
@@ -23,4 +28,3 @@ if ! [ $(git diff --stat | wc -l) = 0 ]; then
   git diff
   exit 1
 fi
-

@@ -11,12 +11,51 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
-from typing import Optional, List, Union, Generator, Sequence, NamedTuple, cast, Tuple, AnyStr, Any, Callable
+from typing import Optional, List, Union, Generator, Sequence, AnyStr, Any, Callable, NewType, Tuple
 import enum
+import copy
+import struct
 from builtins import property
 
 import _yottadb
 from _yottadb import *
+
+
+Key = NewType("Key", object)
+
+# Get the maximum number of arguments accepted by ci()/cip()
+# based on whether the CPU architecture is 32-bit or 64-bit
+arch_bits = 8 * struct.calcsize("P")
+max_ci_args = 34 if 64 == arch_bits else 33
+
+
+# Get the YottaDB numeric error code for the given
+# YDBError by extracting it from the exception message.
+def get_error_code(YDBError):
+    error_code = int(YDBError.args[0].split(",")[0])  # Extract error code from between parentheses in error message
+    if 0 < error_code:
+        error_code *= -1  # Multiply by -1 for conformity with negative YDB error codes
+    return error_code
+
+
+# Note that the following setattr() call is done due to how the PyErr_SetObject()
+# Python C API function works. That is, this function calls the constructor of a
+# specified Exception type, in this case YDBError, and sets Python's
+# internal error indicator causing the exception mechanism to fire and
+# raise an exception visible at the Python level. Since both of these things
+# are done by this single function, there is no opportunity for the calling
+# C code to modify the created YDBError object instance and append the YDB
+# error code.
+#
+# Moreover, it is not straightforward (and perhaps not possible) to define
+# a custom constructor for custom exceptions defined in C code, e.g. YDBError.
+# Such might allow for an error code integer to be set on the YDBError object
+# when it is created by PyErr_SetObject() without the need for returning control
+# to the calling C code to update the object.
+#
+# Attach error code lookup function to the YDBError class
+# as a method for convenience.
+setattr(YDBError, "code", get_error_code)
 
 
 class SearchSpace(enum.Enum):
@@ -25,34 +64,22 @@ class SearchSpace(enum.Enum):
     BOTH = enum.auto()
 
 
-class KeyTuple(NamedTuple):
-    varname: AnyStr
-    subsarray: Sequence[AnyStr] = ()
-
-    def __str__(self) -> str:
-        return_value = str(self.varname)
-        if len(self.subsarray) > 0:
-            return_value += f'("{self.subsarray[0]}"'
-            for sub in self.subsarray[1:]:
-                return_value += f',"{sub}"'
-            return_value += ")"
-        return return_value
-
-
 def get(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Optional[bytes]:
+    if "$" == varname[0] and () != subsarray:
+        raise ValueError(f"YottaDB Intrinsic Special Variable (ISV) cannot be subscripted: {varname}")
     try:
         return _yottadb.get(varname, subsarray)
-    except (_yottadb.YDBLVUNDEFError, _yottadb.YDBGVUNDEFError):
-        return None
+    except YDBError as e:
+        ecode = e.code()
+        if _yottadb.YDB_ERR_LVUNDEF == ecode or _yottadb.YDB_ERR_GVUNDEF == ecode:
+            return None
+        else:
+            raise e
 
 
-def set(varname: Union[AnyStr, KeyTuple], subsarray: Sequence[AnyStr] = (), value: AnyStr = "") -> None:
-    # Derive call-in arguments from KeyTuple if passed,
-    # otherwise use arguments as is
-    if isinstance(varname, KeyTuple):
-        subsarray = varname.subsarray
-        varname = varname.varname
+def set(varname: AnyStr, subsarray: Sequence[AnyStr] = (), value: AnyStr = "") -> None:
     _yottadb.set(varname, subsarray, value)
+    return None
 
 
 def ci(routine: AnyStr, args: Sequence[Any] = (), has_retval: bool = False) -> Any:
@@ -70,6 +97,11 @@ def ci(routine: AnyStr, args: Sequence[Any] = (), has_retval: bool = False) -> A
     :param has_retval: Flag indicating whether the routine has a return value.
     :returns: The return value of the routine, or else None.
     """
+    num_args = len(args)
+    if num_args > max_ci_args:
+        raise ValueError(
+            f"ci(): number of arguments ({num_args}) exceeds max for a {arch_bits}-bit system architecture ({max_ci_args})"
+        )
     return _yottadb.ci(routine, args, has_retval)
 
 
@@ -101,16 +133,21 @@ def cip(routine: AnyStr, args: Sequence[Any] = (), has_retval: bool = False) -> 
     :param has_retval: Flag indicating whether the routine has a return value.
     :returns: The return value of the routine, or else None.
     """
+    num_args = len(args)
+    if num_args > max_ci_args:
+        raise ValueError(
+            f"cip(): number of arguments ({num_args}) exceeds max for a {arch_bits}-bit system architecture ({max_ci_args})"
+        )
     return _yottadb.cip(routine, args, has_retval)
 
 
 def release() -> str:
     """
-    Lookup the current YottaDB release number.
+    Lookup the current YDBPython and YottaDB release numbers.
 
-    :returns: A string containing the current YottaDB release number.
+    :returns: A string containing the current YDBPython and YottaDB release numbers.
     """
-    return _yottadb.release()
+    return "pywr " + "v0.10.0 " + _yottadb.release()
 
 
 def open_ci_table(filename: AnyStr) -> int:
@@ -133,7 +170,11 @@ def switch_ci_table(handle: int) -> int:
     :param handle: An integer value representing a call-in table handle.
     :returns: An integer value representing a the previously active call-in table handle
     """
-    return _yottadb.switch_ci_table(handle)
+    result = _yottadb.switch_ci_table(handle)
+    if result == 0:
+        return None
+
+    return result
 
 
 def data(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> int:
@@ -148,14 +189,24 @@ def delete_tree(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
     _yottadb.delete(varname, subsarray, YDB_DEL_TREE)
 
 
-def incr(varname: AnyStr, subsarray: Sequence[bytes] = (), increment: Union[int, float, str, bytes] = "1") -> bytes:
-    if isinstance(increment, int) or isinstance(increment, float):
-        # Implicitly convert integers and floats to string for passage to API
-        increment = str(increment)
+def incr(varname: AnyStr, subsarray: Sequence[AnyStr] = (), increment: Union[int, float, str, bytes] = "1") -> bytes:
+    if (
+        not isinstance(increment, int)
+        and not isinstance(increment, str)
+        and not isinstance(increment, bytes)
+        and not isinstance(increment, float)
+    ):
+        raise TypeError("unsupported operand type(s) for +=: must be 'int', 'float', 'str', or 'bytes'")
+    # Implicitly convert integers and floats to string for passage to API
+    if isinstance(increment, bytes):
+        # bytes objects cast to str prepend `b'` and append `'`, yielding an invalid numeric
+        # so cast to float first to guarantee a valid numeric value
+        increment = float(increment)
+    increment = str(increment)
     return _yottadb.incr(varname, subsarray, increment)
 
 
-def subscript_next(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> AnyStr:
+def subscript_next(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> bytes:
     return _yottadb.subscript_next(varname, subsarray)
 
 
@@ -163,11 +214,19 @@ def subscript_previous(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> byt
     return _yottadb.subscript_previous(varname, subsarray)
 
 
-def lock_incr(varname: AnyStr, subsarray: Sequence[AnyStr] = (), timeout_nsec: int = 0) -> bytes:
+def node_next(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Tuple[bytes, ...]:
+    return _yottadb.node_next(varname, subsarray)
+
+
+def node_previous(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Tuple[bytes, ...]:
+    return _yottadb.node_previous(varname, subsarray)
+
+
+def lock_incr(varname: AnyStr, subsarray: Sequence[AnyStr] = (), timeout_nsec: int = 0) -> None:
     return _yottadb.lock_incr(varname, subsarray, timeout_nsec)
 
 
-def lock_decr(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> bytes:
+def lock_decr(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
     return _yottadb.lock_decr(varname, subsarray)
 
 
@@ -179,12 +238,12 @@ def zwr2str(string: AnyStr) -> bytes:
     return _yottadb.zwr2str(string)
 
 
-def tp(callback: object, args: tuple = None, transid: str = "BATCH", varnames: Sequence[AnyStr] = None, **kwargs):
+def tp(callback: object, args: tuple = None, transid: str = "", varnames: Sequence[AnyStr] = None, **kwargs) -> int:
     return _yottadb.tp(callback, args, kwargs, transid, varnames)
 
 
 class SubscriptsIter:
-    def __init__(self, varname: bytes, subsarray: Sequence[bytes] = ()):
+    def __init__(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()):
         self.index = 0
         self.varname = varname
         self.subsarray = list(subsarray)
@@ -199,7 +258,7 @@ class SubscriptsIter:
             else:
                 sub_next = subscript_next(self.varname)
             self.subsarray[-1] = sub_next
-        except _yottadb.YDBNODEENDError:
+        except YDBNodeEnd:
             raise StopIteration
         self.index += 1
         return (sub_next, self.index)
@@ -216,38 +275,57 @@ class SubscriptsIter:
                     return (sub_next, 1)
                 index += 1
                 result.append((sub_next, index))
-            except _yottadb.YDBNODEENDError:
+            except YDBNodeEnd:
                 break
         return result
 
 
-def subscripts(varname: bytes, subsarray: Sequence[bytes] = ()) -> SubscriptsIter:
+def subscripts(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> SubscriptsIter:
     return SubscriptsIter(varname, subsarray)
 
 
 class Key:
     name: AnyStr
-    parent: Optional["Key"]
+    parent: Key
+    next_subsarray: List
 
-    def __init__(self, name: AnyStr, parent: Optional["Key"] = None) -> None:
+    def __init__(self, name: AnyStr, parent: Key = None) -> None:
         if isinstance(name, str) or isinstance(name, bytes):
             self.name = name
         else:
             raise TypeError("'name' must be an instance of str or bytes")
 
-        if parent is not None and not isinstance(parent, Key):
-            raise TypeError("'parent' must be of type Key")
+        if parent is not None:
+            if not isinstance(parent, Key):
+                raise TypeError("'parent' must be of type Key")
+            if "$" == parent.varname[0]:
+                raise ValueError(f"YottaDB Intrinsic Special Variable (ISV) cannot be subscripted: {parent.varname}")
         self.parent = parent
+        if _yottadb.YDB_MAX_SUBS < len(self.subsarray):
+            raise ValueError(f"Cannot create Key with {len(self.subsarray)} subscripts (max: {_yottadb.YDB_MAX_SUBS})")
+
+        # Initialize subsarray for use with Key.subscript_next()/Key.subscript_previous() methods
+        if [] == self.subsarray:
+            self.next_subsarray = [""]
+        else:
+            # Shallow copy the subscript array so that it is not mutated by Key.subscript_next()/Key.subscript_previous()
+            self.next_subsarray = copy.copy(self.subsarray)
+            self.next_subsarray.pop()
+            self.next_subsarray.append("")
+
+    def __repr__(self) -> str:
+        result = f'{self.__class__.__name__}("{self.varname}")'
+        for subscript in self.subsarray:
+            result += f'["{subscript}"]'
+        return result
 
     def __str__(self) -> str:
-        subscripts = ",".join([sub for sub in self.subsarray])
+        # Convert to ZWRITE format to allow decoding of binary blobs into `str` objects
+        subscripts = ",".join([str2zwr(sub).decode("ascii") for sub in self.subsarray])
         if subscripts == "":
             return self.varname
         else:
             return f"{self.varname}({subscripts})"
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}:{self}"
 
     def __setitem__(self, item, value):
         Key(name=item, parent=self).value = value
@@ -255,11 +333,11 @@ class Key:
     def __getitem__(self, item):
         return Key(name=item, parent=self)
 
-    def __iadd__(self, num: Union[int, float, str, bytes]) -> Optional["Key"]:
+    def __iadd__(self, num: Union[int, float, str, bytes]) -> Key:
         self.incr(num)
         return self
 
-    def __isub__(self, num: Union[int, float, str, bytes]) -> Optional["Key"]:
+    def __isub__(self, num: Union[int, float, str, bytes]) -> Key:
         if isinstance(num, float):
             self.incr(-float(num))
         else:
@@ -283,7 +361,7 @@ class Key:
                 sub_next = subscript_next(self.varname, subscript_subsarray)
                 subscript_subsarray[-1] = sub_next
                 yield Key(sub_next, self)
-            except YDBNODEENDError:
+            except YDBNodeEnd:
                 return
 
     def __reversed__(self) -> Generator:
@@ -297,7 +375,7 @@ class Key:
                 sub_next = subscript_previous(self.varname, subscript_subsarray)
                 subscript_subsarray[-1] = sub_next
                 yield Key(sub_next, self)
-            except YDBNODEENDError:
+            except YDBNodeEnd:
                 return
 
     def get(self) -> Optional[bytes]:
@@ -317,39 +395,42 @@ class Key:
         delete_tree(self.varname, self.subsarray)
 
     def incr(self, increment: Union[int, float, str, bytes] = "1") -> bytes:
-        if (
-            not isinstance(increment, int)
-            and not isinstance(increment, str)
-            and not isinstance(increment, bytes)
-            and not isinstance(increment, float)
-        ):
-            raise TypeError("unsupported operand type(s) for +=: must be 'int', 'float', 'str', or 'bytes'")
+        # incr() will enforce increment type
         return incr(self.varname, self.subsarray, increment)
 
-    def subscript_next(self, varname: AnyStr = None, subsarray: Sequence[AnyStr] = ()) -> AnyStr:
-        if varname is None:
-            varname = self.varname
-        return subscript_next(varname, subsarray)
+    def subscript_next(self, reset: bool = False) -> AnyStr:
+        if reset:
+            self.next_subsarray.pop()
+            self.next_subsarray.append("")
 
-    def subscript_previous(self, varname: AnyStr = None, subsarray: Sequence[bytes] = ()) -> bytes:
-        if varname is None:
-            varname = self.varname
-        return subscript_previous(varname, subsarray)
+        next_sub = subscript_next(self.varname, self.next_subsarray)
+        self.next_subsarray.pop()
+        self.next_subsarray.append(next_sub)
+
+        return next_sub
+
+    def subscript_previous(self, reset: bool = False) -> bytes:
+        if reset:
+            self.next_subsarray.pop()
+            self.next_subsarray.append("")
+
+        prev_sub = subscript_previous(self.varname, self.next_subsarray)
+        self.next_subsarray.pop()
+        self.next_subsarray.append(prev_sub)
+
+        return prev_sub
 
     def lock(self, timeout_nsec: int = 0) -> None:
         return lock((self,), timeout_nsec)
 
-    def lock_incr(self, timeout_nsec: int = 0) -> bytes:
+    def lock_incr(self, timeout_nsec: int = 0) -> None:
         return lock_incr(self.varname, self.subsarray, timeout_nsec)
 
-    def lock_decr(self) -> bytes:
+    def lock_decr(self) -> None:
         return lock_decr(self.varname, self.subsarray)
 
-    def tp(self, callback: Callable, args: tuple = None, transid: str = "BATCH", varnames: Sequence[AnyStr] = None, **kwargs):
-        return tp(callback, args, kwargs, transid, varnames)
-
     @property
-    def varname_key(self) -> "Key":
+    def varname_key(self) -> Key:
         if self.parent is None:
             return self
         ancestor = self.parent
@@ -380,7 +461,7 @@ class Key:
         return ret_list  # Returns List of str or bytes
 
     @property
-    def value(self) -> Optional[AnyStr]:
+    def value(self) -> Optional[bytes]:
         return get(self.varname, self.subsarray)
 
     @value.setter
@@ -414,17 +495,10 @@ class Key:
                 sub_next = subscript_next(self.varname, subscript_subsarray)
                 subscript_subsarray[-1] = sub_next
                 yield sub_next
-            except YDBNODEENDError:
+            except YDBNodeEnd:
                 return
 
-    @property
-    def subscript_keys(self) -> Generator:
-        for sub in self.subscripts:
-            yield self[sub]
-
     """
-    def node_next(self): ...
-    def node_previous(self): ...
     def delete_excel(self): ...
     """
 
@@ -436,8 +510,8 @@ def lock(keys: Sequence[tuple] = None, timeout_nsec: int = 0) -> None:
     return _yottadb.lock(keys=keys, timeout_nsec=timeout_nsec)
 
 
-def transaction(function):
-    def wrapper(*args, **kwargs):
+def transaction(function) -> Callable[..., object]:
+    def wrapper(*args, **kwargs) -> int:
         def wrapped_transaction(*args, **kwargs):
             ret_val = YDB_OK
             try:

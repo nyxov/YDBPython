@@ -15,7 +15,7 @@ import sys
 from typing import NamedTuple, Callable, Tuple
 
 import yottadb
-from yottadb import YDBError, YDBNODEENDError
+from yottadb import YDBError
 
 
 # Constants for loading varnames and other things with
@@ -26,7 +26,7 @@ MAX_WORD_LEN = 128  # Size increased from the C version which uses 64 here
 TP_TOKEN = yottadb.YDB_NOTTP
 
 
-def test_wordfreq():
+def test_wordfreq(new_db):
     # Initialize all array variable names we are planning to use. Randomly use locals vs globals to store word frequencies.
     # If using globals, delete any previous contents
     if os.getpid() % 2:
@@ -55,8 +55,11 @@ def test_wordfreq():
         for count, discard in yottadb.subscripts(index_var, (word, b"")):
             print("{}\t{}".format(word, count))
 
+    yottadb.delete_tree(words_var)
+    yottadb.delete_tree(index_var)
 
-def test_wordfreq_key():
+
+def test_wordfreq_key(new_db):
     yottadb.Key("^words").delete_tree()
     yottadb.Key("^index").delete_tree()
     try:
@@ -79,3 +82,6 @@ def test_wordfreq_key():
                     print("{}\t{}".format(key1.name, key2.name))
     except IOError:
         print("Failed to open file")
+
+    yottadb.Key("^words").delete_tree()
+    yottadb.Key("^index").delete_tree()

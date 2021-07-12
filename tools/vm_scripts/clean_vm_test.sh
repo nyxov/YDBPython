@@ -13,6 +13,10 @@
 #                                                               #
 #################################################################
 
+set -e # Fail script if any command fails
+set -u # Enable detection of uninitialized variables
+set -o pipefail	# this way $? is set to zero only if ALL commands in a pipeline succeed. Else only last command determines $?
+
 # Notes
   # * tested under CentOS 7 and 8 and Ubuntu 18.04 and 20.04
   # * Ubuntu 18.04 and 20.04: install ssh

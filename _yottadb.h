@@ -12,6 +12,9 @@
  *                                                              *
  ****************************************************************/
 
+#include <libyottadb.h>
+#include <Python.h>
+
 #define YDBPY_DEFAULT_VALUE_LEN	       32
 #define YDBPY_DEFAULT_SUBSCRIPT_LEN    16
 #define YDBPY_DEFAULT_SUBSCRIPT_COUNT  2
@@ -119,6 +122,7 @@ typedef struct {
 			PyErr_Format(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in %s", (FUNCTIONNAME)); \
 			(RETURN_NULL) = true;                                                                  \
 		}                                                                                              \
+		(YDBVARNAME).buf_addr[VARNAMELEN] = '\0';                                                      \
 	}
 
 #define POPULATE_SUBS_USED_AND_SUBSARRAY(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB, RETURN_NULL)                      \
@@ -158,34 +162,6 @@ typedef struct {
 		}                                                  \
 	}
 
-/* Safely downcasts SRC_LEN (Py_ssize_t) and stores in DEST_LEN (unsigned int).
- *
- * First checks that the value of SRC_LEN is within bounds of the YDB limit signaled
- * by IS_VARNAME, i.e. YDB_MAX_IDENT for variable names (IS_VARNAME) or YDB_MAX_STR
- * for string values (!IS_VARNAME). If this check succeeds, Py_SAFE_DOWNCAST is invoked.
- * Otherwise, a Python ValueError is raised.
- */
-#define INVOKE_PY_SAFE_DOWNCAST(DEST_LEN, SRC_LEN, IS_VARNAME)                                        \
-	{                                                                                             \
-		Py_ssize_t max_len, src_len;                                                          \
-		char *	   err_msg;                                                                   \
-                                                                                                      \
-		src_len = (SRC_LEN);                                                                  \
-		if (IS_VARNAME) {                                                                     \
-			max_len = YDB_MAX_IDENT;                                                      \
-			err_msg = YDBPY_ERR_VARNAME_TOO_LONG;                                         \
-		} else {                                                                              \
-			max_len = YDB_MAX_STR;                                                        \
-			err_msg = YDBPY_ERR_BYTES_TOO_LONG;                                           \
-		}                                                                                     \
-		if (max_len < src_len) {                                                              \
-			raise_ValidationError(YDBPython_ValueError, NULL, err_msg, src_len, max_len); \
-			return NULL;                                                                  \
-		} else {                                                                              \
-			DEST_LEN = Py_SAFE_DOWNCAST(src_len, Py_ssize_t, unsigned int);               \
-		}                                                                                     \
-	}
-
 #define RETURN_IF_INVALID_SEQUENCE(SEQUENCE, SEQUENCE_TYPE)              \
 	{                                                                \
 		if (!is_valid_sequence(SEQUENCE, SEQUENCE_TYPE, NULL)) { \
@@ -201,6 +177,12 @@ typedef struct {
 		YDB_MALLOC_BUFFER(&BUFFER, correct_length); \
 	}
 
+#define RAISE_SPECIFIC_ERROR(ERROR_TYPE, MESSAGE)     \
+	{                                             \
+		assert(NULL != MESSAGE);              \
+		PyErr_SetObject(ERROR_TYPE, MESSAGE); \
+	}
+
 /* PYTHON EXCEPTION DECLARATIONS */
 
 /* YottaDBError represents an error return status from any of the libyottadb
@@ -213,12 +195,18 @@ static PyObject *YDBException;
 static PyObject *YDBError;
 
 static PyObject *YDBTPException;
-static PyObject *YDBTPRollback;
 static PyObject *YDBTPRestart;
+static PyObject *YDBTPRollback;
+static PyObject *YDBNotOk;
+static PyObject *YDBDeferHandler;
+static PyObject *YDBNodeEnd;
 
-/* YottaDBLockTimeout is a simple exception to indicate that a lock failed due
+/* YDBLockTimeoutError is a simple exception to indicate that a lock failed due
  * to timeout. */
-static PyObject *YDBTimeoutError;
+static PyObject *YDBLockTimeoutError;
+/* YDBTPTimeoutError is a simple exception to indicate that a transaction callback
+ * function failed due to timeout. */
+static PyObject *YDBTPTimeoutError;
 
 /* YDBPythonError is to be raised when there is a possibility for an error to
    occur but that we believe that it should never happen. */

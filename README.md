@@ -32,7 +32,6 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 
 		0. Setup environment:
 			1. Set the `$ydb_dist` environment variable, e.g. `export ydb_dist=*path_to_my_ydb_installation*`
-			2. Inform the linker of the location of YDB libraries: `export LD_LIBRARY_PATH=$ydb_dist`
 
         1. Option 1: install in venv
             1. Install the python3-venv package: `sudo apt install python3-venv`
@@ -49,14 +48,14 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
             2. Install package globally: `sudo -E python3 setup.py install`
 
     5. Run tests:
-        1. Install `pytest` and `psutil`
+        1. Install `pytest`, `pytest-order`, and `psutil`
             1. If `pip` for `python3` is not installed do so: `sudo apt install python3-pip`
-            2. Use `pip` to install `pytest` and `psutil`
+            2. Use `pip` to install `pytest`, `pytest-order`, `psutil`
                 1. Option 1: install into venv
                     1. Activate `venv` if it is not already: `source .venv/bin/activate`
-                    2. Install: `pip install pytest psutil`
-                2. Option 2: install for user: `pip3 install --user pytest`
-                3. Option 3: install globally (not suggested): `sudo pip3 install pytest`
+                    2. Install: `pip install pytest pytest-order psutil`
+                2. Option 2: install for user: `pip3 install --user pytest pytest-order psutil`
+                3. Option 3: install globally (not suggested): `sudo pip3 install pytest pytest-order psutil`
 
     5. TODO: add to pypi
 
@@ -67,62 +66,59 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 ```python
 import yottadb
 
-# create a Context object that controls access to the database (you should only use one)
-db = yottadb.Context()
+# Create Key objects for conveniently accessing and manipulating database nodes
+key1 = yottadb.Key('^hello')  # Create a key referencing the global variable '^hello'
 
-key1 = db[b'^hello'] # create a key that has the global variable '^hello'
-
-print(f"{key1}: {key1.value}") # display current value of '^hello'
-key1.value = b'Hello world!' # set '^hello' to 'Hello world!'
+print(f"{key1}: {key1.value}")  # Display current value of '^hello'
+key1.value = b'Hello world!'  # Set '^hello' to 'Hello world!'
 print(f"{key1}: {key1.value}")
 
-key2 = db[b'^hello'][b'cowboy'] # add a subscript 'cowboy' to the global variable '^hello'
-key2.value = b'Howdy partner!' # set '^hello('cowboy') to 'Howdy partner!'
+key2 = yottadb.Key('^hello')['cowboy']  # Add a 'cowboy' subscript to the global variable '^hello', creating a new key
+key2.value = 'Howdy partner!'  # Set '^hello('cowboy') to 'Howdy partner!'
 print(f"{key2}: {key2.value}")
 
-key3 = db[b'^hello'][b'chinese'] # add a second subscript to '^hello'
-key3.value = bytes('你好世界!', encoding="utf-8") # the value can be set to anything that can be encoded to bytes
-print(key3, str(key3.value, encoding="utf-8")) # at this time you will need to handle the encoding and decoding
+key3 = yottadb.Key('^hello')['chinese']  # Add a second subscript to '^hello', creating a third key
+key3.value = bytes('你好世界!', encoding="utf-8")  # The value can be set to anything that can be encoded to `bytes`
+print(key3, str(key3.value, encoding="utf-8"))  # Returned values are `bytes` objects, and so may need to be encoded
 
-
-for subscript in key1.subscripts: # you can loop through all the subscripts of a key
+for subscript in key1.subscripts:  # Loop through all the subscripts of a key
     sub_key = key1[subscript]
     print(f"{sub_key}: {sub_key.value}")
 
-key1.delete_node() # delete the value of '^hello' but not any of its subscripts
+key1.delete_node()  # Delete the value of '^hello', but not any of its child nodes
 
-print(f"{key1}: {key1.value}") # should show nothing
-for subscript in key1.subscripts: # the values of the subscripts should still be in the database
+print(f"{key1}: {key1.value}")  # No value is printed
+for subscript in key1.subscripts:  # The values of the child nodes are still in the database
     sub_key = key1[subscript]
     print(f"{sub_key}: {sub_key.value}")
 
-
-key1.value = b'Hello world!'
-print(f"{key1}: {key1.value}")
-key1.delete_tree() # delete both the value at the '^hello' node and all of it's subscripts
-print(f"{key1}: {key1.value}") # show nothing in the value
-for subscript in key1.subscripts: # displays no subscripts
+key1.value = 'Hello world!'   # Reset the value of '^hello'
+print(f"{key1}: {key1.value}")  # Prints the value
+key1.delete_tree() # Delete both the value at the '^hello' node and all of it's children
+print(f"{key1}: {key1.value}")  # Prints no value
+for subscript in key1.subscripts:  # Loop terminates immediately and displays no subscripts
     sub_key = key1[subscript]
     print(sub_key, sub_key.value)
 
-#transactions are also available
+# Database transactions are also available
 @yottadb.transaction
-def simple_transaction(value, context): # the final argument of a transaction is the current context
-    context[b'test1'].value = value
-    context[b'test2'].value = value
-    some_condition_a = False
-    some_condition_b = False
-    if some_condition_a:
-        # When yottadb.YDBTPRollback is raised YottaDB will rollback the transaction
+def simple_transaction(value):
+	# Set values directly with the set() function
+    yottadb.set('test1', value=value)  # Set the local variable 'test1' to the given value
+    yottadb.set('test2', value=value)  # Set the local variable 'test2' to the given value
+    condition_a = False
+    condition_b = False
+    if condition_a:
+        # When a yottadb.YDBTPRollback exception is raised YottaDB will rollback the transaction
         # and then propagate the exception to the calling code.
         raise yottadb.YDBTPRollback("reason for the rollback")
-    elif some_condition_b:
-        # When yottadb.YDBTPRestart is raised YottaDB will call the transaction again.
+    elif condition_b:
+        # When a yottadb.YDBTPRestart exception is raised YottaDB will call the transaction again.
         # Warning: This code is intentionally simplistic. An infinite loop will occur
         #           if yottadb.YDBTPRestart is continually raised
         raise yottadb.YDBTPRestart()
     else:
-        return yottadb.YDB_OK # indicates success, transaction will be committed
+        return yottadb.YDB_OK  # Success, transaction will be committed
 
 
 simple_transaction(b'test', db)
@@ -136,7 +132,7 @@ print(f"{db[b'test2']}: {db[b'test2'].value}")
 
 No, YDBPython does not support multithreading. This is due to the limitations of the Python Global Interpreter Lock for CPU-intensive multithreading. For background, see the following resources:
 + Python documentation: [Thread State and the Global Interpreter Lock](https://docs.python.org/3/c-api/init.html#thread-state-and-the-global-interpreter-lock)
-+ [Python’s GIL — A Hurdle to Multithreaded Program](https://medium.com/python-features/pythons-gil-a-hurdle-to-multithreaded-program-d04ad9c1a63)
++ [Python's GIL - A Hurdle to Multithreaded Program](https://medium.com/python-features/pythons-gil-a-hurdle-to-multithreaded-program-d04ad9c1a63)
 + [Grok the GIL: How to write fast and thread-safe Python](https://opensource.com/article/17/4/grok-gil)
 + YDBPython GitLab discussion: [Issue #7](https://gitlab.com/YottaDB/Lang/YDBPython/-/issues/7)
 

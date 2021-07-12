@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #################################################################
 #								#
 # Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	#
@@ -14,7 +14,10 @@
 #
 # Takes no arguments and outputs the name of the executable.
 # If a recent enough version was not found, outputs nothing.
-set -eu
+
+set -e # Fail script if any command fails
+set -u # Enable detection of uninitialized variables
+set -o pipefail	# this way $? is set to zero only if ALL commands in a pipeline succeed. Else only last command determines $?
 
 tool="$1"
 version="$2"

@@ -20,11 +20,11 @@ import time
 from decimal import Decimal
 from typing import NamedTuple, Sequence, Tuple, Optional, Callable
 
-from conftest import lock_value, str2zwr_tests
+from conftest import lock_value, str2zwr_tests, setup_db, teardown_db
 
 import _yottadb
 import yottadb
-from yottadb import KeyTuple
+from yottadb import YDBError, YDBTPTimeoutError
 
 YDB_INSTALL_DIR = os.environ["ydb_dist"]
 TEST_DATA_DIRECTORY = "/tmp/test_yottadb/"
@@ -52,19 +52,18 @@ def test_get(simple_data):
     assert _yottadb.get(varname=b"^test3", subsarray=[b"sub1", b"sub2"]) == b"test3value3"
 
     # Error handling
-    with pytest.raises(_yottadb.YDBGVUNDEFError):
-        _yottadb.get("^testerror")
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
-        _yottadb.get("testerror")
-    with pytest.raises(_yottadb.YDBGVUNDEFError):
-        _yottadb.get("^testerror", ["sub1"])
-    # Using bytes arguments
-    with pytest.raises(_yottadb.YDBGVUNDEFError):
-        _yottadb.get(b"^testerror")
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
-        _yottadb.get(b"testerror")
-    with pytest.raises(_yottadb.YDBGVUNDEFError):
-        _yottadb.get(b"^testerror", [b"sub1"])
+    gvns = (("^testerror", []), ("^testerror", ["sub1"]), (b"^testerror", []), (b"^testerror", [b"sub1"]))
+    for gvn in gvns:
+        try:
+            _yottadb.get(gvn[0], gvn[1])
+        except YDBError as e:
+            assert _yottadb.YDB_ERR_GVUNDEF == e.code()
+    lvns = (("testerror", []), ("testerror", ["sub1"]), (b"testerror", []), (b"testerror", [b"sub1"]))
+    for lvn in lvns:
+        try:
+            _yottadb.get(lvn[0], lvn[1])
+        except YDBError as e:
+            assert _yottadb.YDB_ERR_LVUNDEF == e.code()
 
     # Handling of large values
     _yottadb.set(varname="testlong", value=("a" * _yottadb.YDB_MAX_STR))
@@ -111,26 +110,34 @@ def test_delete():
     _yottadb.set(varname="test8", value="test8value")
     assert _yottadb.get("test8") == b"test8value"
     _yottadb.delete("test8")
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get("test8")
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
     # Using bytes arguments
     _yottadb.set(varname=b"test8", value=b"test8value")
     assert _yottadb.get(b"test8") == b"test8value"
     _yottadb.delete(b"test8")
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get(b"test8")
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
 
     _yottadb.set(varname="test10", subsarray=("sub1",), value="test10value")
     assert _yottadb.get("test10", ("sub1",)) == b"test10value"
     _yottadb.delete("test10", ("sub1",))
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get("test10", ("sub1",))
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
     # Using bytes arguments
     _yottadb.set(varname=b"test10", subsarray=(b"sub1",), value=b"test10value")
     assert _yottadb.get(b"test10", (b"sub1",)) == b"test10value"
     _yottadb.delete(b"test10", (b"sub1",))
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get(b"test10", (b"sub1",))
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
 
     # Delete tree
     _yottadb.set(varname="test12", value="test12 node value")
@@ -138,45 +145,61 @@ def test_delete():
     assert _yottadb.get("test12") == b"test12 node value"
     assert _yottadb.get("test12", ("sub1",)) == b"test12 subnode value"
     _yottadb.delete("test12", (), _yottadb.YDB_DEL_TREE)
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get("test12")
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
+    try:
         _yottadb.get("test12", ("sub1",))
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
     # Using bytes arguments
     _yottadb.set(varname=b"test12", value=b"test12 node value")
     _yottadb.set(varname=b"test12", subsarray=(b"sub1",), value=b"test12 subnode value")
     assert _yottadb.get(b"test12") == b"test12 node value"
     assert _yottadb.get(b"test12", (b"sub1",)) == b"test12 subnode value"
     _yottadb.delete(b"test12", (), _yottadb.YDB_DEL_TREE)
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get(b"test12")
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
+    try:
         _yottadb.get(b"test12", (b"sub1",))
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
 
     # Keyword arguments
     _yottadb.set(varname="test9", value="test9value")
     assert _yottadb.get("test9") == b"test9value"
     _yottadb.delete(varname="test9", delete_type=_yottadb.YDB_DEL_NODE)
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get("test9")
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
     # Using bytes arguments
     _yottadb.set(varname=b"test9", value=b"test9value")
     assert _yottadb.get(b"test9") == b"test9value"
     _yottadb.delete(varname=b"test9", delete_type=_yottadb.YDB_DEL_NODE)
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get(b"test9")
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
 
     _yottadb.set(varname="test11", subsarray=("sub1",), value="test11value")
     assert _yottadb.get("test11", ("sub1",)) == b"test11value"
     _yottadb.delete(varname="test11", subsarray=("sub1",), delete_type=_yottadb.YDB_DEL_NODE)
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get("test11", ("sub1",))
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
     # Using bytes arguments
     _yottadb.set(varname=b"test11", subsarray=(b"sub1",), value="test11value")
     assert _yottadb.get(b"test11", (b"sub1",)) == b"test11value"
     _yottadb.delete(varname=b"test11", subsarray=(b"sub1",), delete_type=_yottadb.YDB_DEL_NODE)
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get(b"test11", (b"sub1",))
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
 
     # Delete tree
     _yottadb.set(varname="test13", value="test13 node value")
@@ -184,20 +207,28 @@ def test_delete():
     assert _yottadb.get("test13") == b"test13 node value"
     assert _yottadb.get("test13", ("sub1",)) == b"test13 subnode value"
     _yottadb.delete(varname="test13", delete_type=_yottadb.YDB_DEL_TREE)
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get("test13")
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
+    try:
         _yottadb.get("test13", ("sub1",))
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
     # Using bytes arguments
     _yottadb.set(varname=b"test13", value=b"test13 node value")
     _yottadb.set(varname=b"test13", subsarray=(b"sub1",), value="test13 subnode value")
     assert _yottadb.get(b"test13") == b"test13 node value"
     assert _yottadb.get(b"test13", (b"sub1",)) == b"test13 subnode value"
     _yottadb.delete(varname=b"test13", delete_type=_yottadb.YDB_DEL_TREE)
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get(b"test13")
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
+    try:
         _yottadb.get(b"test13", (b"sub1",))
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
 
 
 def test_data(simple_data):
@@ -212,7 +243,7 @@ def test_data(simple_data):
     assert _yottadb.data(b"^test3", (b"sub1", b"sub2")) == _yottadb.YDB_DATA_VALUE_NODESC
 
 
-def test_lock_incr_varname_only():
+def test_lock_incr_varname_only(new_db):
     # Varname only
     t1 = datetime.datetime.now()
     _yottadb.lock_incr("test1")
@@ -229,7 +260,7 @@ def test_lock_incr_varname_only():
     _yottadb.lock_decr(b"test1")
 
 
-def test_lock_incr_varname_and_subscript():
+def test_lock_incr_varname_and_subscript(new_db):
     # Varname and subscript
     t1 = datetime.datetime.now()
     _yottadb.lock_incr("test2", ("sub1",))
@@ -246,81 +277,81 @@ def test_lock_incr_varname_and_subscript():
     _yottadb.lock_decr(b"test2", (b"sub1",))
 
 
-def test_lock_incr_timeout_error_varname_only():
+def test_lock_incr_timeout_error_varname_only(new_db):
     # Timeout error, varname only
-    key = KeyTuple("^test1")
+    key = ("^test1", ())
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.5)
-    with pytest.raises(_yottadb.YDBTimeoutError):
+    time.sleep(0.2)
+    with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr("^test1")
     process.join()
     # Using bytes arguments
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.5)
-    with pytest.raises(_yottadb.YDBTimeoutError):
+    time.sleep(0.2)
+    with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr(b"^test1")
     process.join()
 
 
-def test_lock_incr_timeout_error_varname_and_subscript():
+def test_lock_incr_timeout_error_varname_and_subscript(new_db):
     # Timeout error, varname and subscript
-    key = KeyTuple("^test2", ("sub1",))
+    key = ("^test2", ("sub1",))
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.5)
-    with pytest.raises(_yottadb.YDBTimeoutError):
+    time.sleep(0.2)
+    with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr("^test2", ("sub1",))
     process.join()
     # Using bytes arguments
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.5)
-    with pytest.raises(_yottadb.YDBTimeoutError):
+    time.sleep(0.2)
+    with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr(b"^test2", (b"sub1",))
     process.join()
 
-    key2 = KeyTuple("^test2", ("sub1",))
+    key2 = ("^test2", ("sub1",))
     process = multiprocessing.Process(target=lock_value, args=(key2,))
     process.start()
-    time.sleep(0.5)
-    with pytest.raises(_yottadb.YDBTimeoutError):
+    time.sleep(0.2)
+    with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr("^test2", ("sub1",))
     process.join()
     # Using bytes arguments
     process = multiprocessing.Process(target=lock_value, args=(key2,))
     process.start()
-    time.sleep(0.5)
-    with pytest.raises(_yottadb.YDBTimeoutError):
+    time.sleep(0.2)
+    with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr(b"^test2", (b"sub1",))
     process.join()
 
 
-def test_lock_incr_no_timeout():
+def test_lock_incr_no_timeout(new_db):
     # No timeout
-    key = KeyTuple("^test2", ("sub1",))
+    key = ("^test2", ("sub1",))
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.5)
+    time.sleep(0.2)
     t1 = datetime.datetime.now()
     _yottadb.lock_incr("test2")
     t2 = datetime.datetime.now()
     time_elapse = t2.timestamp() - t1.timestamp()
     assert time_elapse < 0.01
     _yottadb.lock_decr("^test2", ("sub1",))
-    time.sleep(0.5)
+    time.sleep(0.2)
     process.join()
     # Using bytes arguments
     process = multiprocessing.Process(target=lock_value, args=(key,))
-    time.sleep(0.5)
+    time.sleep(0.2)
     t1 = datetime.datetime.now()
     _yottadb.lock_incr(b"test2")
     t2 = datetime.datetime.now()
     time_elapse = t2.timestamp() - t1.timestamp()
     assert time_elapse < 0.01
     _yottadb.lock_decr(b"^test2", (b"sub1",))
-    time.sleep(0.5)
+    time.sleep(0.2)
 
 
 # The following functions are Python function wrappers
@@ -331,23 +362,23 @@ def no_action() -> None:
     pass
 
 
-def set_key(key: KeyTuple, value: str) -> None:
-    _yottadb.set(*key, value=value)
+def set_key(key: tuple, value: str) -> None:
+    _yottadb.set(key[0], key[1], value=value)
 
 
-def incr_key(key: KeyTuple, increment: str) -> None:
-    _yottadb.incr(*key, increment=increment)
+def incr_key(key: tuple, increment: str) -> None:
+    _yottadb.incr(key[0], key[1], increment=increment)
 
 
-def conditional_set_key(key1: KeyTuple, key2: KeyTuple, value: str, traker_key: KeyTuple) -> None:
-    if _yottadb.data(*traker_key) == _yottadb.YDB_DATA_UNDEF:
-        _yottadb.set(*key1, value=value)
+def conditional_set_key(key1: tuple, key2: tuple, value: str, traker_key: tuple) -> None:
+    if _yottadb.data(traker_key[0], traker_key[1]) == _yottadb.YDB_DATA_UNDEF:
+        _yottadb.set(key1[0], key1[1], value=value)
     else:
-        _yottadb.set(*key2, value=value)
+        _yottadb.set(key2[0], key2[1], value=value)
 
 
-def raise_YDBError(undefined_key: KeyTuple) -> None:
-    _yottadb.get(*undefined_key)
+def raise_YDBError(undefined_key: tuple) -> None:
+    _yottadb.get(undefined_key[0], undefined_key[1])
 
 
 def raise_standard_python_exception() -> None:
@@ -360,7 +391,7 @@ class TransactionData(NamedTuple):
     action: Callable = no_action
     action_arguments: Tuple = ()
     varnames: Optional[Sequence[str]] = None
-    restart_key: KeyTuple = KeyTuple("tptests", ("process_transation", "default"))
+    restart_key: tuple = ("tptests", ("process_transation", "default"))
     return_value: int = _yottadb.YDB_OK
     restart_timeout: float = -1
     restart_timeout_return_value: int = _yottadb.YDB_OK
@@ -403,8 +434,8 @@ def process_transaction(nested_transaction_data: Tuple[TransactionData], start_t
 # Transaction/TP tests
 
 
-def test_tp_return_YDB_OK():
-    key = KeyTuple(varname="^tptests", subsarray=("test_tp_return_YDB_OK",))
+def test_tp_return_YDB_OK(new_db):
+    key = ("^tptests", ("test_tp_return_YDB_OK",))
     value = b"return YDB_OK"
     transaction_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=_yottadb.YDB_OK)
     _yottadb.delete(*key)
@@ -416,11 +447,11 @@ def test_tp_return_YDB_OK():
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def test_tp_nested_return_YDB_OK():
-    key1 = KeyTuple(varname="^tptests", subsarray=("test_tp_nested_return_YDB_OK", "outer"))
+def test_tp_nested_return_YDB_OK(new_db):
+    key1 = ("^tptests", ("test_tp_nested_return_YDB_OK", "outer"))
     value1 = b"return_YDB_OK"
     outer_transaction = TransactionData(action=set_key, action_arguments=(key1, value1), return_value=_yottadb.YDB_OK)
-    key2 = KeyTuple(varname="^tptests", subsarray=("test_tp_nested_return_YDB_OK", "nested"))
+    key2 = ("^tptests", ("test_tp_nested_return_YDB_OK", "nested"))
     value2 = b"nested return_YDB_OK"
     inner_transaction = TransactionData(action=set_key, action_arguments=(key2, value2), return_value=_yottadb.YDB_OK)
 
@@ -431,8 +462,8 @@ def test_tp_nested_return_YDB_OK():
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def test_tp_return_YDB_ROLLBACK():
-    key = KeyTuple(varname="^tptests", subsarray=("test_tp_return_YDB_ROLLBACK",))
+def test_tp_return_YDB_ROLLBACK(new_db):
+    key = ("^tptests", ("test_tp_return_YDB_ROLLBACK",))
     value = "return YDB_ROLLBACK"
     transation_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=_yottadb.YDB_TP_ROLLBACK)
     _yottadb.delete(*key)
@@ -445,11 +476,11 @@ def test_tp_return_YDB_ROLLBACK():
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def test_nested_return_YDB_ROLLBACK():
-    key1 = KeyTuple(varname="^tptests", subsarray=("test_nested_return_YDB_ROLLBACK", "outer"))
+def test_nested_return_YDB_ROLLBACK(new_db):
+    key1 = ("^tptests", ("test_nested_return_YDB_ROLLBACK", "outer"))
     value1 = "return YDB_ROLLBACK"
     outer_transaction = TransactionData(action=set_key, action_arguments=(key1, value1), return_value=_yottadb.YDB_TP_ROLLBACK)
-    key2 = KeyTuple(varname="^tptests", subsarray=("test_nested_return_YDB_ROLLBACK", "nested"))
+    key2 = ("^tptests", ("test_nested_return_YDB_ROLLBACK", "nested"))
     value2 = "nested return YDB_ROLLBACK"
     inner_transaction = TransactionData(action=set_key, action_arguments=(key2, value2), return_value=_yottadb.YDB_TP_ROLLBACK)
     _yottadb.delete(*key1)
@@ -465,13 +496,13 @@ def test_nested_return_YDB_ROLLBACK():
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def test_tp_return_YDB_TP_RESTART():
-    key1 = KeyTuple(varname="^tptests", subsarray=("test_tp_return_YDB_TP_RESTART", "key1"))
+def test_tp_return_YDB_TP_RESTART(new_db):
+    key1 = ("^tptests", ("test_tp_return_YDB_TP_RESTART", "key1"))
     _yottadb.delete(*key1)
-    key2 = KeyTuple(varname="^tptests", subsarray=("test_tp_return_YDB_TP_RESTART", "key2"))
+    key2 = ("^tptests", ("test_tp_return_YDB_TP_RESTART", "key2"))
     _yottadb.delete(*key2)
     value = b"restart once"
-    tracker = KeyTuple(varname="tptests", subsarray=("test_tp_return_YDB_RESET", "reset count"))
+    tracker = ("tptests", ("test_tp_return_YDB_RESET", "reset count"))
     transaction_data = TransactionData(
         action=conditional_set_key,
         action_arguments=(key1, key2, value, tracker),
@@ -481,21 +512,23 @@ def test_tp_return_YDB_TP_RESTART():
 
     _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
 
-    with pytest.raises(_yottadb.YDBGVUNDEFError):
+    try:
         _yottadb.get(*key1)
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_GVUNDEF == e.code()
     assert _yottadb.get(*key2) == value
     assert int(_yottadb.get(*tracker)) == 1
 
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def test_nested_tp_return_YDB_TP_RESTART():
-    key1_1 = KeyTuple(varname="^tptests", subsarray=("test_nested_tp_return_YDB_TP_RESTART", "outer", "key1"))
+def test_nested_tp_return_YDB_TP_RESTART(new_db):
+    key1_1 = ("^tptests", ("test_nested_tp_return_YDB_TP_RESTART", "outer", "key1"))
     _yottadb.delete(*key1_1)
-    key1_2 = KeyTuple(varname="^tptests", subsarray=("test_nested_tp_return_YDB_TP_RESTART", "outer", "key2"))
+    key1_2 = ("^tptests", ("test_nested_tp_return_YDB_TP_RESTART", "outer", "key2"))
     _yottadb.delete(*key1_2)
     value1 = b"outer restart once"
-    tracker1 = KeyTuple(varname="tptests", subsarray=("test_nested_tp_return_YDB_TP_RESTART", "outer reset count"))
+    tracker1 = ("tptests", ("test_nested_tp_return_YDB_TP_RESTART", "outer reset count"))
     outer_transaction = TransactionData(
         action=conditional_set_key,
         action_arguments=(key1_1, key1_2, value1, tracker1),
@@ -503,12 +536,12 @@ def test_nested_tp_return_YDB_TP_RESTART():
         return_value=_yottadb.YDB_TP_RESTART,
     )
 
-    key2_1 = KeyTuple(varname="^tptests", subsarray=("test_nested_tp_return_YDB_TP_RESTART", "inner", "key1"))
+    key2_1 = ("^tptests", ("test_nested_tp_return_YDB_TP_RESTART", "inner", "key1"))
     _yottadb.delete(*key2_1)
-    key2_2 = KeyTuple(varname="^tptests", subsarray=("test_nested_tp_return_YDB_TP_RESTART", "inner", "key2"))
+    key2_2 = ("^tptests", ("test_nested_tp_return_YDB_TP_RESTART", "inner", "key2"))
     _yottadb.delete(*key2_2)
     value2 = b"inner restart once"
-    tracker2 = KeyTuple(varname="tptests", subsarray=("test_nested_tp_return_YDB_TP_RESTART", "inner reset count"))
+    tracker2 = ("tptests", ("test_nested_tp_return_YDB_TP_RESTART", "inner reset count"))
     inner_transaction = TransactionData(
         action=conditional_set_key,
         action_arguments=(key2_1, key2_2, value2, tracker2),
@@ -518,12 +551,16 @@ def test_nested_tp_return_YDB_TP_RESTART():
 
     _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
 
-    with pytest.raises(_yottadb.YDBGVUNDEFError):
+    try:
         _yottadb.get(*key1_1)
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_GVUNDEF == e.code()
     assert _yottadb.get(*key1_2) == value1
     assert int(_yottadb.get(*tracker1)) == 1
-    with pytest.raises(_yottadb.YDBGVUNDEFError):
+    try:
         _yottadb.get(*key2_1)
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_GVUNDEF == e.code()
     assert _yottadb.get(*key2_2) == value2
     assert int(_yottadb.get(*tracker2)) == 1
 
@@ -536,9 +573,9 @@ def test_nested_tp_return_YDB_TP_RESTART():
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def test_tp_return_YDB_TP_RESTART_reset_all():
-    key = KeyTuple(varname="^tptests", subsarray=("test_tp_return_YDB_TP_RESTART_reset_all", "resetvalue"))
-    tracker = KeyTuple(varname="tptests", subsarray=("test_tp_return_YDB_TP_RESTART_reset_all", "reset_count"))
+def test_tp_return_YDB_TP_RESTART_reset_all(new_db):
+    key = ("^tptests", ("test_tp_return_YDB_TP_RESTART_reset_all", "resetvalue"))
+    tracker = ("tptests", ("test_tp_return_YDB_TP_RESTART_reset_all", "reset_count"))
     _yottadb.delete(*key)
 
     transaction_data = TransactionData(
@@ -557,34 +594,36 @@ def test_tp_return_YDB_TP_RESTART_reset_all():
     )
 
     assert _yottadb.get(*key) == b"1"
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get(*tracker)
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def test_tp_return_YDB_ERR_TPTIMEOUT():
-    key = KeyTuple(varname="^tptests", subsarray=("test_tp_return_YDB_ERR_TPTIMEOUT",))
+def test_tp_return_YDB_ERR_TPTIMEOUT(new_db):
+    key = ("^tptests", ("test_tp_return_YDB_ERR_TPTIMEOUT",))
     value = b"return YDB_ERR_TPTIMEOUT"
     transaction_data = TransactionData(action=set_key, action_arguments=(key, value), return_value=_yottadb.YDB_ERR_TPTIMEOUT)
     _yottadb.delete(*key)
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_UNDEF
 
-    with pytest.raises(_yottadb.YDBTPTimeoutError):
+    with pytest.raises(YDBTPTimeoutError):
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
 
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_UNDEF
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def test_tp_nested_return_YDB_ERR_TPTIMEOUT():
-    key1 = KeyTuple(varname="^tptests", subsarray=("test_nested_return_YDB_ERR_TPTIMEOUT", "outer"))
+def test_tp_nested_return_YDB_ERR_TPTIMEOUT(new_db):
+    key1 = ("^tptests", ("test_nested_return_YDB_ERR_TPTIMEOUT", "outer"))
     value1 = "return YDB_ERR_TPTIMEOUT"
     outer_transaction = TransactionData(action=set_key, action_arguments=(key1, value1), return_value=_yottadb.YDB_ERR_TPTIMEOUT)
-    key2 = KeyTuple(varname="^tptests", subsarray=("test_nested_return_YDB_ERR_TPTIMEOUT", "nested"))
+    key2 = ("^tptests", ("test_nested_return_YDB_ERR_TPTIMEOUT", "nested"))
     value2 = "nested return YDB_ERR_TPTIMEOUT"
     inner_transaction = TransactionData(action=set_key, action_arguments=(key2, value2), return_value=_yottadb.YDB_ERR_TPTIMEOUT)
 
-    with pytest.raises(_yottadb.YDBTPTimeoutError):
+    with pytest.raises(YDBTPTimeoutError):
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
 
     assert _yottadb.data(*key1) == _yottadb.YDB_DATA_UNDEF
@@ -592,34 +631,38 @@ def test_tp_nested_return_YDB_ERR_TPTIMEOUT():
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def test_tp_raise_YDBError():
-    key = KeyTuple(varname="^tptests", subsarray=("test_tp_raise_YDBError",))
+def test_tp_raise_YDBError(new_db):
+    key = ("^tptests", ("test_tp_raise_YDBError",))
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_UNDEF
     transaction_data = TransactionData(action=raise_YDBError, action_arguments=(key,))
 
-    with pytest.raises(_yottadb.YDBGVUNDEFError):
+    try:
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_GVUNDEF == e.code()
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def test_tp_nested_raise_YDBError():
+def test_tp_nested_raise_YDBError(new_db):
     outer_transaction = TransactionData()
-    key = KeyTuple(varname="^tptests", subsarray=("test_nested_tp_raise_YDBError",))
+    key = ("^tptests", ("test_nested_tp_raise_YDBError",))
     inner_transaction = TransactionData(action=raise_YDBError, action_arguments=(key,))
     assert _yottadb.data(*key) == _yottadb.YDB_DATA_UNDEF
 
-    with pytest.raises(_yottadb.YDBGVUNDEFError):
+    try:
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (outer_transaction, inner_transaction)})
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_GVUNDEF == e.code()
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
 
 
-def test_tp_raise_standard_python_exception():
+def test_tp_raise_standard_python_exception(new_db):
     transaction_data = TransactionData(action=raise_standard_python_exception)
     with pytest.raises(ZeroDivisionError):
         _yottadb.tp(process_transaction, kwargs={"nested_transaction_data": (transaction_data,)})
 
 
-def test_tp_nested_raise_standard_python_exception():
+def test_tp_nested_raise_standard_python_exception(new_db):
     outer_transaction = TransactionData()
     inner_transaction = TransactionData(action=raise_standard_python_exception)
     with pytest.raises(ZeroDivisionError):
@@ -634,11 +677,13 @@ YDB_MAX_TP_DEPTH = 126
 
 @pytest.mark.parametrize("depth", range(1, YDB_MAX_TP_DEPTH + 1))
 def test_tp_return_YDB_OK_to_depth(depth):
-    def key_at_level(level: int) -> KeyTuple:
-        return KeyTuple(varname="^tptests", subsarray=(f"test_tp_return_YDB_to_depth{depth}", f"level{level}"))
+    def key_at_level(level: int) -> tuple:
+        return ("^tptests", (f"test_tp_return_YDB_to_depth{depth}", f"level{level}"))
 
     def value_at_level(level: int) -> bytes:
         return bytes(f"level{level} returns YDB_OK", encoding="utf-8")
+
+    db = setup_db()
 
     transaction_data = []
     for level in range(0, depth):
@@ -652,6 +697,8 @@ def test_tp_return_YDB_OK_to_depth(depth):
     for level in range(0, depth):
         _yottadb.delete(*key_at_level(level))
     _yottadb.delete("^tptests", delete_type=_yottadb.YDB_DEL_TREE)
+
+    teardown_db(db)
 
 
 # somewhat realistic tp tests
@@ -684,7 +731,7 @@ def transfer_transaction(from_account, to_account, amount):
         return _yottadb.YDB_OK
 
 
-def test_tp_bank_transfer_ok(bank):
+def test_tp_bank_transfer_ok(new_db, bank):
     account1 = bank[0]["account#"]
     account2 = bank[1]["account#"]
     account1_balance = bank[0]["account_balance"]
@@ -697,7 +744,7 @@ def test_tp_bank_transfer_ok(bank):
     assert int(_yottadb.get(varname="^account", subsarray=(account2, "balance"))) == account2_balance + transfer_amount
 
 
-def test_tp_bank_transfer_rollback(bank):
+def test_tp_bank_transfer_rollback(new_db, bank):
     account1 = bank[0]["account#"]
     account2 = bank[1]["account#"]
     account1_balance = bank[0]["account_balance"]
@@ -726,7 +773,7 @@ def callback_for_tp_simple_restart(start_time):
     return _yottadb.YDB_TP_RESTART
 
 
-def test_tp_reset_some():
+def test_tp_reset_some(new_db):
     yottadb.set("resetattempt", value="0")
     yottadb.set("resetvalue", value="0")
     start_time = datetime.datetime.now()
@@ -739,106 +786,114 @@ def test_tp_reset_some():
 
 
 def test_subscript_next_1(simple_data):
-    assert _yottadb.subscript_next(varname="^%") == "^Test5"
-    assert _yottadb.subscript_next(varname="^a") == "^test1"
-    assert _yottadb.subscript_next(varname="^test1") == "^test2"
-    assert _yottadb.subscript_next(varname="^test2") == "^test3"
-    assert _yottadb.subscript_next(varname="^test3") == "^test4"
-    with pytest.raises(_yottadb.YDBNODEENDError):
-        _yottadb.subscript_next(varname="^test6")
+    assert _yottadb.subscript_next(varname="^%") == b"^Test5"
+    assert _yottadb.subscript_next(varname="^a") == b"^test1"
+    assert _yottadb.subscript_next(varname="^test1") == b"^test2"
+    assert _yottadb.subscript_next(varname="^test2") == b"^test3"
+    assert _yottadb.subscript_next(varname="^test3") == b"^test4"
+    with pytest.raises(_yottadb.YDBNodeEnd):
+        _yottadb.subscript_next(varname="^test7")
 
-    assert _yottadb.subscript_next(varname="^test4", subsarray=("",)) == "sub1"
-    assert _yottadb.subscript_next(varname="^test4", subsarray=("sub1",)) == "sub2"
-    assert _yottadb.subscript_next(varname="^test4", subsarray=("sub2",)) == "sub3"
-    with pytest.raises(_yottadb.YDBNODEENDError):
+    assert _yottadb.subscript_next(varname="^test4", subsarray=("",)) == b"sub1"
+    assert _yottadb.subscript_next(varname="^test4", subsarray=("sub1",)) == b"sub2"
+    assert _yottadb.subscript_next(varname="^test4", subsarray=("sub2",)) == b"sub3"
+    with pytest.raises(_yottadb.YDBNodeEnd):
         _yottadb.subscript_next(varname="^test4", subsarray=("sub3",))
 
-    assert _yottadb.subscript_next(varname="^test4", subsarray=("sub1", "")) == "subsub1"
-    assert _yottadb.subscript_next(varname="^test4", subsarray=("sub1", "subsub1")) == "subsub2"
-    assert _yottadb.subscript_next(varname="^test4", subsarray=("sub1", "subsub2")) == "subsub3"
-    with pytest.raises(_yottadb.YDBNODEENDError):
+    assert _yottadb.subscript_next(varname="^test4", subsarray=("sub1", "")) == b"subsub1"
+    assert _yottadb.subscript_next(varname="^test4", subsarray=("sub1", "subsub1")) == b"subsub2"
+    assert _yottadb.subscript_next(varname="^test4", subsarray=("sub1", "subsub2")) == b"subsub3"
+    with pytest.raises(_yottadb.YDBNodeEnd):
         _yottadb.subscript_next(varname="^test4", subsarray=("sub3", "subsub3"))
+
+    # Test subscripts that include a non-UTF-8 character
+    assert _yottadb.subscript_next(varname="^test7", subsarray=("",)) == b"sub1\x80"
+    assert _yottadb.subscript_next(varname="^test7", subsarray=("sub1\x80",)) == b"sub2\x80"
+    assert _yottadb.subscript_next(varname="^test7", subsarray=("sub2\x80",)) == b"sub3\x80"
+    assert _yottadb.subscript_next(varname="^test7", subsarray=("sub3\x80",)) == b"sub4\x80"
+    with pytest.raises(_yottadb.YDBNodeEnd):
+        _yottadb.subscript_next(varname="^test7", subsarray=(b"sub4\x80",))
 
 
 def test_subscript_next_long():
     _yottadb.set(varname="testLongSubscript", subsarray=("a" * _yottadb.YDB_MAX_STR,), value="toolong")
-    assert _yottadb.subscript_next(varname="testLongSubscript", subsarray=("",)) == "a" * _yottadb.YDB_MAX_STR
+    assert _yottadb.subscript_next(varname="testLongSubscript", subsarray=("",)) == b"a" * _yottadb.YDB_MAX_STR
 
 
 def test_subscript_next_i18n():
     _yottadb.set(varname="testi18n", subsarray=("中文",), value="chinese")
-    assert _yottadb.subscript_next(varname="testi18n", subsarray=("",)) == "中文"
+    assert _yottadb.subscript_next(varname="testi18n", subsarray=("",)) == "中文".encode()
 
 
 def test_subscript_previous_1(simple_data):
-    assert _yottadb.subscript_previous(varname="^z") == "^test6"
-    assert _yottadb.subscript_previous(varname="^a") == "^Test5"
-    assert _yottadb.subscript_previous(varname="^test1") == "^Test5"
-    assert _yottadb.subscript_previous(varname="^test2") == "^test1"
-    assert _yottadb.subscript_previous(varname="^test3") == "^test2"
-    assert _yottadb.subscript_previous(varname="^test4") == "^test3"
-    with pytest.raises(_yottadb.YDBNODEENDError):
+    assert _yottadb.subscript_previous(varname="^z") == b"^test7"
+    assert _yottadb.subscript_previous(varname="^a") == b"^Test5"
+    assert _yottadb.subscript_previous(varname="^test1") == b"^Test5"
+    assert _yottadb.subscript_previous(varname="^test2") == b"^test1"
+    assert _yottadb.subscript_previous(varname="^test3") == b"^test2"
+    assert _yottadb.subscript_previous(varname="^test4") == b"^test3"
+    with pytest.raises(_yottadb.YDBNodeEnd):
         _yottadb.subscript_previous(varname="^Test5")
 
-    assert _yottadb.subscript_previous(varname="^test4", subsarray=("",)) == "sub3"
-    assert _yottadb.subscript_previous(varname="^test4", subsarray=("sub2",)) == "sub1"
-    assert _yottadb.subscript_previous(varname="^test4", subsarray=("sub3",)) == "sub2"
-    with pytest.raises(_yottadb.YDBNODEENDError):
+    assert _yottadb.subscript_previous(varname="^test4", subsarray=("",)) == b"sub3"
+    assert _yottadb.subscript_previous(varname="^test4", subsarray=("sub2",)) == b"sub1"
+    assert _yottadb.subscript_previous(varname="^test4", subsarray=("sub3",)) == b"sub2"
+    with pytest.raises(_yottadb.YDBNodeEnd):
         _yottadb.subscript_previous(varname="^test4", subsarray=("sub1",))
 
-    assert _yottadb.subscript_previous(varname="^test4", subsarray=("sub1", "")) == "subsub3"
-    assert _yottadb.subscript_previous(varname="^test4", subsarray=("sub1", "subsub2")) == "subsub1"
-    assert _yottadb.subscript_previous(varname="^test4", subsarray=("sub1", "subsub3")) == "subsub2"
-    with pytest.raises(_yottadb.YDBNODEENDError):
+    assert _yottadb.subscript_previous(varname="^test4", subsarray=("sub1", "")) == b"subsub3"
+    assert _yottadb.subscript_previous(varname="^test4", subsarray=("sub1", "subsub2")) == b"subsub1"
+    assert _yottadb.subscript_previous(varname="^test4", subsarray=("sub1", "subsub3")) == b"subsub2"
+    with pytest.raises(_yottadb.YDBNodeEnd):
         _yottadb.subscript_previous(varname="^test4", subsarray=("sub3", "subsub1"))
 
 
 def test_subscript_previous_long():
     _yottadb.set(varname="testLongSubscript", subsarray=("a" * _yottadb.YDB_MAX_STR,), value="toolong")
-    assert _yottadb.subscript_previous(varname="testLongSubscript", subsarray=("",)) == "a" * _yottadb.YDB_MAX_STR
+    assert _yottadb.subscript_previous(varname="testLongSubscript", subsarray=("",)) == b"a" * _yottadb.YDB_MAX_STR
 
 
 def test_node_next_1(simple_data):
-    assert _yottadb.node_next("^test3") == ("sub1",)
-    assert _yottadb.node_next("^test3", subsarray=("sub1",)) == ("sub1", "sub2")
-    with pytest.raises(_yottadb.YDBNODEENDError):
+    assert _yottadb.node_next("^test3") == (b"sub1",)
+    assert _yottadb.node_next("^test3", subsarray=("sub1",)) == (b"sub1", b"sub2")
+    with pytest.raises(_yottadb.YDBNodeEnd):
         _yottadb.node_next(varname="^test3", subsarray=("sub1", "sub2"))
-    assert _yottadb.node_next("^test6") == ("sub6", "subsub6")
+    assert _yottadb.node_next("^test6") == (b"sub6", b"subsub6")
 
 
 def test_node_next_many_subscipts():
     _yottadb.set(varname="testmanysubscripts", subsarray=("sub1", "sub2", "sub3", "sub4", "sub5", "sub6"), value="123")
-    assert _yottadb.node_next("testmanysubscripts") == ("sub1", "sub2", "sub3", "sub4", "sub5", "sub6")
+    assert _yottadb.node_next("testmanysubscripts") == (b"sub1", b"sub2", b"sub3", b"sub4", b"sub5", b"sub6")
 
 
 def test_node_next_long_subscripts():
     _yottadb.set(varname="testlong", subsarray=("a" * 1025, "a" * 1026), value="123")
-    assert _yottadb.node_next("testlong") == ("a" * 1025, "a" * 1026)
+    assert _yottadb.node_next("testlong") == (b"a" * 1025, b"a" * 1026)
 
 
 def test_node_previous_1(simple_data):
-    with pytest.raises(_yottadb.YDBNODEENDError):
+    with pytest.raises(_yottadb.YDBNodeEnd):
         _yottadb.node_previous("^test3")
     assert _yottadb.node_previous("^test3", ("sub1",)) == ()
-    assert _yottadb.node_previous("^test3", subsarray=("sub1", "sub2")) == ("sub1",)
+    assert _yottadb.node_previous("^test3", subsarray=("sub1", "sub2")) == (b"sub1",)
 
 
 def test_node_previous_long_subscripts():
     _yottadb.set(varname="testlong", subsarray=("a" * 1025, "a" * 1026), value="123")
     _yottadb.set(varname="testlong", subsarray=("a" * 1025, "a" * 1026, "a"), value="123")
-    assert _yottadb.node_previous("testlong", ("a" * 1025, "a" * 1026, "a")) == ("a" * 1025, "a" * 1026)
+    assert _yottadb.node_previous("testlong", ("a" * 1025, "a" * 1026, "a")) == (b"a" * 1025, b"a" * 1026)
 
 
 def test_lock_blocking_other(simple_data):
-    t1 = KeyTuple("^test1")
-    t2 = KeyTuple("^test2", ("sub1",))
-    t3 = KeyTuple("^test3", ("sub1", "sub2"))
+    t1 = ("^test1", ())
+    t2 = ("^test2", ("sub1",))
+    t3 = ("^test3", ("sub1", "sub2"))
     keys_to_lock = (t1, t2, t3)
     _yottadb.lock(keys=keys_to_lock, timeout_nsec=0)
     # Attempt to increment/decrement locks
     processes = []
     for key in keys_to_lock:
-        process = multiprocessing.Process(target=lock_value, args=(key,))
+        process = multiprocessing.Process(target=lock_value, args=(key, 0.1))
         process.start()
         processes.append(process)
     for process in processes:
@@ -849,7 +904,7 @@ def test_lock_blocking_other(simple_data):
     # Attempt to increment/decrement locks
     processes = []
     for key in keys_to_lock:
-        process = multiprocessing.Process(target=lock_value, args=(key,))
+        process = multiprocessing.Process(target=lock_value, args=(key, 0.1))
         process.start()
         processes.append(process)
     for process in processes:
@@ -857,12 +912,12 @@ def test_lock_blocking_other(simple_data):
         assert process.exitcode == 0
 
 
-def test_lock_being_blocked():
-    key = KeyTuple("^test1")
+def test_lock_being_blocked(new_db):
+    key = ("^test1", ())
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(1)
-    with pytest.raises(_yottadb.YDBTimeoutError):
+    time.sleep(0.2)
+    with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock([key])
     process.join()
 
@@ -872,10 +927,14 @@ def test_delete_excel():
     _yottadb.set(varname="testdeleteexcel2", subsarray=("sub1",), value="2")
     _yottadb.set(varname="testdeleteexcelexception", subsarray=("sub1",), value="3")
     _yottadb.delete_excel(varnames=("testdeleteexcelexception",))
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    try:
         _yottadb.get("testdeleteexcel1")
-    with pytest.raises(_yottadb.YDBLVUNDEFError):
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
+    try:
         _yottadb.get("testdeleteexcel2", ("sub1",))
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
     assert _yottadb.get("testdeleteexcelexception", ("sub1",)) == b"3"
 
 
@@ -955,13 +1014,13 @@ increment_test_ids = [
 ]
 
 increment_keys = [
-    KeyTuple("testincrparamaterized"),
-    KeyTuple("^testincrparamaterized"),
-    KeyTuple("^testincrparamaterized", ("sub1",)),
-    KeyTuple("testincrparamaterized", ("sub1",)),
+    ("testincrparametrized", ()),
+    ("^testincrparametrized", ()),
+    ("^testincrparametrized", ("sub1",)),
+    ("testincrparametrized", ("sub1",)),
 ]
 
-increment_key_test_ids = [f'"{key.varname}({key.subsarray})' for key in increment_keys]
+increment_key_test_ids = [f'"{key[0]}({key[1]})' for key in increment_keys]
 
 
 def number_to_str(number):
@@ -976,6 +1035,8 @@ def number_to_str(number):
 @pytest.mark.parametrize("initial, increment, result", increment_tests, ids=increment_test_ids)
 @pytest.mark.parametrize("key", increment_keys, ids=increment_key_test_ids)
 def test_incr(key, initial, increment, result):
+    db = setup_db()
+
     _yottadb.set(*key, value=initial)
     returned_value = _yottadb.incr(*key, increment=number_to_str(increment))
 
@@ -983,10 +1044,12 @@ def test_incr(key, initial, increment, result):
     assert _yottadb.get(*key) == bytes(result, encoding="ascii")
     _yottadb.delete(*key, _yottadb.YDB_DEL_TREE)
 
+    teardown_db(db)
+
 
 increment_error_test = [
-    ("0", "1E47", _yottadb.YDBNUMOFLOWError),
-    ("0", "-1E47", _yottadb.YDBNUMOFLOWError),
+    (b"0", "1E47", _yottadb.YDB_ERR_NUMOFLOW),
+    (b"0", "-1E47", _yottadb.YDB_ERR_NUMOFLOW),
     # ("0", "1E-47", _yottadb.YDBNUMOFLOWError),
 ]
 
@@ -999,17 +1062,22 @@ increment_test_ids = [
 @pytest.mark.parametrize("initial, increment, error_type", increment_error_test, ids=increment_test_ids)
 @pytest.mark.parametrize("key", increment_keys, ids=increment_key_test_ids)
 def test_incr_errors(key, initial, increment, error_type):
+    db = setup_db()
     _yottadb.set(*key, value=initial)
 
-    with pytest.raises(error_type):
+    try:
         _yottadb.incr(*key, increment=number_to_str(increment))
+    except _yottadb.YDBError as e:
+        assert error_type == e.code()
         assert _yottadb.get(*key) == initial
     _yottadb.delete(*key, _yottadb.YDB_DEL_TREE)
+
+    teardown_db(db)
 
 
 @pytest.mark.parametrize("input, output1, output2", str2zwr_tests)
 def test_str2zwr(input, output1, output2):
-    if os.environ["ydb_chset"] == "UTF-8":
+    if os.environ.get("ydb_chset") == "UTF-8":
         assert _yottadb.str2zwr(input) == output2
     else:
         assert _yottadb.str2zwr(input) == output1
@@ -1017,7 +1085,4 @@ def test_str2zwr(input, output1, output2):
 
 @pytest.mark.parametrize("output1, output2, input", str2zwr_tests)
 def test_zwr2str(input, output1, output2):
-    if os.environ["ydb_chset"] == "UTF-8":
-        assert _yottadb.zwr2str(input) == output1
-    else:
-        assert _yottadb.zwr2str(input) == output2
+    assert _yottadb.zwr2str(input) == output1

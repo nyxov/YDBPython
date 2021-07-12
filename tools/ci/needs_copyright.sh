@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #################################################################
 #                                                               #
@@ -15,7 +15,10 @@
 # Determines whether a file should need a copyright by its name
 # Returns 0 if it needs a copyright and 1 otherwise.
 # Returns 2 if an error occurs.
-set -eu
+
+set -e # Fail script if any command fails
+set -u # Enable detection of uninitialized variables
+set -o pipefail	# this way $? is set to zero only if ALL commands in a pipeline succeed. Else only last command determines $?
 
 if ! [ $# = 1 ]; then
 	echo "usage: $0 <filename>"

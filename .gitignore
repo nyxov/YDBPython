@@ -11,3 +11,11 @@ yottadb.egg-info/
 mumps.dat
 tests/m_routines/*.o
 *.out
+core[0-9]*
+YDB_FATAL_ERROR.ZSHOW_DMP*.txt
+.pytest_cache
+clang_tidy_warnings.txt
+filenames.txt
+no_note.txt
+sorted_warnings.txt
+warnings.txt

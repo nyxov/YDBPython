@@ -15,7 +15,7 @@ import time
 import random
 import signal
 from multiprocessing import Process
-from test_threenp1 import test_threeenp1
+from test_threeenp1 import test_threeenp1
 
 
 def test_fatal_signal():
@@ -29,16 +29,10 @@ def test_fatal_signal():
         exit_code = 241
 
     # Start test_threeenp1.py as a child process
-    p = Process(
-        target=test_threeenp1,
-        args=(
-            True,
-            exit_code,
-        ),
-    )
+    p = Process(target=test_threeenp1, args=(True, exit_code))
     p.start()
 
-    time.sleep(10)
+    time.sleep(1)
 
     # Get parent PID, parent process and all child processes
     parent_pid = os.getpid()

@@ -11,6 +11,10 @@
 #                                                               #
 #################################################################
 
+set -e # Fail script if any command fails
+set -u # Enable detection of uninitialized variables
+set -o pipefail	# this way $? is set to zero only if ALL commands in a pipeline succeed. Else only last command determines $?
+
 # Run Python tests using pytest with valgrind to check for memory issues
 
 # First (and only) argument specifies a regex pattern for test names to run. For example,

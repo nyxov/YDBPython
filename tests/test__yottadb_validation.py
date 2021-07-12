@@ -57,11 +57,22 @@ def varname_invalid(function):
     with pytest.raises(ValueError):
         function(varname="b" * (_yottadb.YDB_MAX_IDENT + 1))
 
-    # Case 3: length of varname == _yottadb.YDB_MAX_IDENT: No Error
+    # Case 3: length of varname == _yottadb.YDB_MAX_IDENT: No ValueError
     try:
+        if "get" == function.__name__:
+            # If testing _yottadb.get(), avoid an LVUNDEF by setting the node before
+            # the call, since this test is intended to confirm that the maximum
+            # variable name length is accepted.
+            _yottadb.set(varname="b" * (_yottadb.YDB_MAX_IDENT), value="val")
         function(varname="b" * (_yottadb.YDB_MAX_IDENT))
-    except _yottadb.YDBError:  # Testing C-extention's validation, not YDB's
+    except _yottadb.YDBNodeEnd:  # Testing C-extention's validation, not YDB's
         pass
+
+    # Case 4: A non-ASCII character is used in a variable name: Propagate error from YDB to caller via YDBError
+    with pytest.raises(_yottadb.YDBError):
+        function(varname="\x80")  # str case
+    with pytest.raises(_yottadb.YDBError):
+        function(varname=b"\x80")  # bytes case
 
 
 def subsarray_invalid(function):
@@ -87,8 +98,13 @@ def subsarray_invalid(function):
 
     # Case 2: subsarray length == _yottadb.YDB_MAX_SUBS: no error
     try:
+        if "get" == function.__name__:
+            # If testing _yottadb.get(), avoid an LVUNDEF by setting the node before
+            # the call, since this test is intended to confirm that the maximum
+            # variable name length is accepted.
+            _yottadb.set(varname="test", subsarray=("b",) * (_yottadb.YDB_MAX_SUBS), value="val")
         function(varname="test", subsarray=("b",) * (_yottadb.YDB_MAX_SUBS))
-    except _yottadb.YDBError:  # Testing C-extention's validation, not YottaDB's
+    except _yottadb.YDBNodeEnd:  # Testing C-extention's validation, not YottaDB's
         pass
 
     # Case 3: subsarray length > _yottadb.YDB_MAX_SUBS: raise ValueError
@@ -99,11 +115,23 @@ def subsarray_invalid(function):
     with pytest.raises(TypeError):
         function(varname="test", subsarray=(1,))
 
-    # Case 5: str length == _yottadb.YDB_MAX_STR: raise ValueError
+    # Case 5: str length == _yottadb.YDB_MAX_STR: no error
     try:
+        if "get" == function.__name__:
+            # If testing _yottadb.get(), avoid an LVUNDEF by setting the node before
+            # the call, since this test is intended to confirm that the maximum
+            # variable name length is accepted.
+            _yottadb.set(varname="test", subsarray=("b" * (_yottadb.YDB_MAX_STR),), value="val")
         function("test", ("b" * (_yottadb.YDB_MAX_STR),))
-    except _yottadb.YDBError:  # Testing C-extention's validation, not YottaDB's
+    except _yottadb.YDBNodeEnd:  # Node iterations will complete if no other error, so accept that case here
         pass
+    except _yottadb.YDBError as e:
+        if _yottadb.YDB_ERR_LOCKSUB2LONG == e.code():
+            # Subscripts for lock functions are shorter, and so will raise an error for subscripts with lengths > 255,
+            # so accept that case here.
+            pass
+        else:
+            raise e
 
     # Case 6: str length > _yottadb.YDB_MAX_STR: raise ValueError
     with pytest.raises(ValueError):
@@ -233,7 +261,7 @@ def test_lock_typeerror():
         _yottadb.lock("not list or tuple")
 
 
-def test_lock_max_keys_ok():
+def test_lock_max_keys_ok(new_db):
     # Case 2: Accepts a list of keys as long as _yottadb.YDB_LOCK_MAX_KEYS without raising a exception
     keys = [["test" + str(x)] for x in range(0, _yottadb.YDB_LOCK_MAX_KEYS)]
     _yottadb.lock(keys)
@@ -271,11 +299,13 @@ def test_lock_varname_wrong_type():
         _yottadb.lock(((1,),))
 
 
-def test_lock_varname_max_ident():
+def test_lock_varname_max_ident(new_db):
     # Case 8: The first element of a key (varname) may be up to _yottadb.YDB_MAX_IDENT in length without raising an exception
     _yottadb.lock((("a" * (_yottadb.YDB_MAX_IDENT),),))
-    with pytest.raises(_yottadb.YDBVARNAME2LONGError):
+    try:
         _yottadb.lock((("a" * (_yottadb.YDB_MAX_IDENT + 1),),))
+    except yottadb.YDBError as e:
+        assert _yottadb.YDB_ERR_VARNAME2LONG == e.code()
 
 
 def test_lock_subsarray_wrong_type():
@@ -284,7 +314,7 @@ def test_lock_subsarray_wrong_type():
         _yottadb.lock((("test", "not list or tuple"),))
 
 
-def test_lock_subsarray_max_subs():
+def test_lock_subsarray_max_subs(new_db):
     # Case 10: Accepts a subsarray list of str up to _yottadb.YDB_MAX_SUBS without raising an exception
     subsarray = ["test" + str(x) for x in range(0, _yottadb.YDB_MAX_SUBS)]
     _yottadb.lock((("test", subsarray),))
@@ -319,20 +349,20 @@ def test_lock_keys_case14():
 
 
 # lock_decr()
-def test_decr_varname():
+def test_decr_varname(new_db):
     varname_invalid(_yottadb.lock_decr)
 
 
-def test_decr_subsarray():
+def test_decr_subsarray(new_db):
     subsarray_invalid(_yottadb.lock_decr)
 
 
 # lock_incr()
-def test_lock_incr_varname():
+def test_lock_incr_varname(new_db):
     varname_invalid(_yottadb.lock_incr)
 
 
-def test_lock_incr_subsarray():
+def test_lock_incr_subsarray(new_db):
     subsarray_invalid(_yottadb.lock_incr)
 
 
@@ -449,7 +479,7 @@ def test_tp_callback_not_a_callable():
         _yottadb.tp(callback="not a callable")
 
 
-def test_tp_callback_return_wrong_type():
+def test_tp_callback_return_wrong_type(new_db):
     """
     Tests that tp() raises TypeError when a callback returns the wrong type.
     """
@@ -473,7 +503,7 @@ def test_tp_kwargs():
         _yottadb.tp(callback=simple_transaction, kwargs="not a dictionary of keyword arguments")
 
 
-def test_tp_varnames():
+def test_tp_varnames(new_db):
     """
     This function tests the validation of the tp function's varnames parameter.
     It tests that the tp function:
@@ -546,8 +576,10 @@ def test_ci_input():
     previous = set_ci_environment(cur_dir, cur_dir + "/tests/calltab.ci")
 
     # Confirm YDB error when output value is longer than input string
-    with pytest.raises(_yottadb.YDBINVSTRLENError):
+    try:
         _yottadb.ci("StringExtend", [123], has_retval=True)
+    except yottadb.YDBError as e:
+        assert _yottadb.YDB_ERR_INVSTRLEN == e.code()
 
     # Raise TypeError when argument list is immutable,
     # but routine includes output arguments
@@ -555,6 +587,19 @@ def test_ci_input():
         _yottadb.ci("HelloWorld2", (1, 2, 3), has_retval=True)
     with pytest.raises(TypeError):
         _yottadb.ci("NoRet", (1,))
+
+    # Raise YDB_ERR_INVSTRLEN when has_retval doesn't match the call-in table
+    # NOTE: This test is disabled as it may raise a garbage value and fail
+    # when using a Debug build of YottaDB due to imprecision in how YDBPython
+    # handles an incorrect setting for has_retval, that is, when this option
+    # does not reflect the call-in table entry for the given routine. This problem is
+    # tracked by YDBPython#24. This tests may be re-enabled and this comment removed
+    # when that issue is resolved.
+    try:
+        # yottadb.ci("HelloWorld2", ["1", "24", "3"], has_retval=False)
+        pass
+    except yottadb.YDBError as e:
+        assert _yottadb.YDB_ERR_INVSTRLEN == e.code()
 
     # Raise TypeError when arguments not passed as a Sequence
     with pytest.raises(TypeError):

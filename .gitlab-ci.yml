@@ -17,6 +17,7 @@ stages:
   - formating-checks
   - test
 
+
 .ubuntu:
   image: yottadb/yottadb-base:latest-master
   before_script:
@@ -36,8 +37,13 @@ stages:
 
 .test:
   script:
-    - python3 -m pip install --user pytest psutil
+    - python3 -m pip install --user pytest pytest-order psutil
     - python3 -m pytest tests/
+
+.debug:
+  script:
+    # Enable Debug build be uncommenting undef_macros compiler line in setup.py
+    - sed -i 's/# undef_macros/undef_macros/' setup.py
 
 test_ubuntu:
   stage: test
@@ -49,6 +55,13 @@ test_centos:
   stage: test
   extends:
     - .centos
+    - .test
+
+test_ubuntu_debug:
+  stage: test
+  extends:
+    - .ubuntu
+    - .debug
     - .test
 
 commit-verify:
@@ -64,11 +77,20 @@ commit-verify:
     - ./commit_verify.sh ./tools/ci/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBPython
 
 code-format-check:
-  image: ubuntu:18.04
   stage: formating-checks
-  before_script:
-    - apt update -qq && apt-get install -y -qq git wget gnupg
-    - apt install -y clang-format-10 python3-pip
-    - python3 -m pip install black
+  extends:
+    - .ubuntu
+  artifacts:
+    paths:
+      - temp_warnings.txt
+      - clang_tidy_warnings.txt
+      - sorted_warnings.txt
+    expire_in: 1 day
+    when: always
   script:
-    LC_ALL=C.UTF-8 bash ./tools/ci/check_code_format.sh
+    - source $(pkg-config --variable=prefix yottadb)/ydb_env_set
+    - apt update -qq && apt-get install -y -qq git wget gnupg
+    - apt install -y clang-format-10 python3-pip clang-tidy-10
+    - ln -s /usr/bin/clang-tidy-10 /usr/bin/clang-tidy
+    - python3 -m pip install black
+    - LC_ALL=C.UTF-8 bash ./tools/ci/check_code_format.sh
