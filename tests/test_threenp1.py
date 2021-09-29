@@ -202,7 +202,12 @@ def do_step(first: int, last: int, gvstats: dict):
 # spelled out using the strings in the program source line labelled "digits".
 # Furthermore, the strings are in a number of international languages when
 # YottaDB is run in UTF-8 mode.
-def test_threeenp1():
+#
+# The arguments fatal_signal_flag and exit_code are passed with default values
+# and are required for a different test case (test_fatal_signal.py).
+# These arguments are needed to check the exit codes of the do_block processes,
+# when test_threeenp1 is invoked by test_fatal_signal.
+def test_threeenp1(fatal_signal_flag=False, exit_code=0):
     # Initialize global variables and store in an object for
     # easy argument passing
     gvnlist = GVNList()
@@ -265,6 +270,8 @@ def test_threeenp1():
         # Wait for threads to finish
         for process in processes:
             process.join()
+            if fatal_signal_flag:
+                assert process.exitcode == exit_code
         end_time = datetime.datetime.now()  # Get ending time
 
         # Time between start_time and end_time is the elapsed time
