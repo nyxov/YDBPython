@@ -29,6 +29,7 @@ TEST_DATA_DIRECTORY = "/tmp/test_yottadb/"
 CUR_DIR = os.getcwd()
 
 SIMPLE_DATA = (
+    (("^Test5", ()), "test5value"),
     (("^test1", ()), "test1value"),
     (("^test2", ("sub1",)), "test2value"),
     (("^test3", ()), "test3value1"),
@@ -47,7 +48,6 @@ SIMPLE_DATA = (
     (("^test4", ("sub3", "subsub1")), "test4sub3subsub1"),
     (("^test4", ("sub3", "subsub2")), "test4sub3subsub2"),
     (("^test4", ("sub3", "subsub3")), "test4sub3subsub3"),
-    (("^Test5", ()), "test5value"),
     (("^test6", ("sub6", "subsub6")), "test6value"),
     (("^test7", (b"sub1\x80",)), "test7value"),  # Test subscripts with non-UTF-8 data
     (("^test7", (b"sub2\x80", "sub7")), "test7sub2value"),
@@ -153,10 +153,7 @@ def setup_db() -> str:
     db["gld"] = db["dir"] + "test_db.gld"
     os.environ["ydb_gbldir"] = db["gld"]
 
-    execute(
-        f"{YDB_INSTALL_DIR}/mumps -run GDE change -segment default -allocation=1000 -file={db['dir'] + 'test_db.dat'} -null_subscripts=always"
-    )
-    execute(f"{YDB_INSTALL_DIR}/mupip create")
+    execute(f"{CUR_DIR}/tests/createdb.sh {YDB_INSTALL_DIR} {db['dir'] + 'test_db.dat'}")
 
     return db
 

@@ -244,7 +244,6 @@ def tp(callback: object, args: tuple = None, transid: str = "", varnames: Sequen
 
 class SubscriptsIter:
     def __init__(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()):
-        self.index = 0
         self.varname = varname
         self.subsarray = list(subsarray)
 
@@ -255,33 +254,109 @@ class SubscriptsIter:
         try:
             if len(self.subsarray) > 0:
                 sub_next = subscript_next(self.varname, self.subsarray)
+                self.subsarray[-1] = sub_next
             else:
+                # There are no subscripts and this is a variable-level iteration,
+                # so do not modify subsarray (it is empty), but update the variable
+                # name to the next variable instead.
                 sub_next = subscript_next(self.varname)
-            self.subsarray[-1] = sub_next
+                self.varname = sub_next
         except YDBNodeEnd:
             raise StopIteration
-        self.index += 1
-        return (sub_next, self.index)
+        return sub_next
 
     def __reversed__(self):
         result = []
-        index = 0
         while True:
             try:
                 sub_next = subscript_previous(self.varname, self.subsarray)
                 if len(self.subsarray) != 0:
                     self.subsarray[-1] = sub_next
                 else:
-                    return (sub_next, 1)
-                index += 1
-                result.append((sub_next, index))
+                    # There are no subscripts and this is a variable-level iteration,
+                    # so do not modify subsarray (it is empty), but update the variable
+                    # name to the next variable instead.
+                    self.varname = sub_next
+                result.append(sub_next)
             except YDBNodeEnd:
                 break
         return result
 
 
-def subscripts(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> SubscriptsIter:
+def subscripts(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> SubscriptsIter:
     return SubscriptsIter(varname, subsarray)
+
+
+class NodesIter:
+    def __init__(self, varname: AnyStr, subsarray: Tuple[AnyStr] = ()):
+        self.varname = varname
+        self.subsarray = [bytes(x, encoding="UTF-8") for x in subsarray]
+        self.initialized = False
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if not self.initialized:
+            self.initialized = True
+            status = data(self.varname)
+            if 0 == len(self.subsarray) and (1 == status or 11 == status):
+                return tuple(self.subsarray)
+        try:
+            self.subsarray = node_next(self.varname, self.subsarray)
+        except YDBNodeEnd:
+            raise StopIteration
+        return self.subsarray
+
+    def __reversed__(self):
+        return NodesIterReversed(self.varname, self.subsarray)
+
+
+class NodesIterReversed:
+    def __init__(self, varname: AnyStr, subsarray: Tuple[AnyStr] = ()):
+        self.varname = varname
+        self.subsarray = [bytes(x) for x in subsarray]
+        self.reversed = [bytes(x) for x in subsarray]
+        self.initialized = False
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        # If this is the first iteration, then the last node of the reversed node iteration
+        # is not yet known. So first look that up and return it, then signal to future calls
+        # that this node is known by setting self.initialized, in which case future iterations
+        # will skip last node lookup and simply return the preceding node via node_previous().
+        if not self.initialized:
+            # If the given subscript array points to a node or tree, append a "" subscript
+            # to the subscript list to attempt to look up last subscript at the depth
+            # of that array +1. If the subscript array doesn't point to a node or tree, then
+            # it can be used as is to look up the last subscript at the given depth.
+            if 0 < data(self.varname, self.subsarray):
+                self.reversed.append("")
+            while not self.initialized:
+                try:
+                    # If there is another subscript level, add its last subscript to the subscript list
+                    self.reversed.insert(len(self.reversed) - 1, subscript_previous(self.varname, self.reversed))
+                except YDBNodeEnd:
+                    # Remove "" subscript now that the search for the last node is complete
+                    self.reversed.pop()
+                    self.initialized = True
+            return tuple(self.reversed)
+
+        try:
+            self.reversed = node_previous(self.varname, self.reversed)
+        except YDBNodeEnd:
+            raise StopIteration
+
+        return self.reversed
+
+    def __reversed__(self):
+        return NodesIter(self.varname, self.subarray)
+
+
+def nodes(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> NodesIter:
+    return NodesIter(varname, subsarray)
 
 
 class Key:

@@ -11,11 +11,8 @@
 #################################################################
 import pytest  # type: ignore # ignore due to pytest not having type annotations
 import os
-import sys
-from typing import NamedTuple, Callable, Tuple
 
 import yottadb
-from yottadb import YDBError
 
 
 # Constants for loading varnames and other things with
@@ -47,12 +44,12 @@ def test_wordfreq(new_db):
             for word in words:
                 yottadb.incr(words_var, (word.encode(),))
 
-    for subscript, discard in yottadb.subscripts(words_var, (b"",)):
+    for subscript in yottadb.subscripts(words_var, (b"",)):
         count = yottadb.get(words_var, (subscript,))
         yottadb.set(index_var, (count, subscript), b"")
 
-    for word, discard in reversed(yottadb.subscripts(index_var, (b"",))):
-        for count, discard in yottadb.subscripts(index_var, (word, b"")):
+    for word in reversed(yottadb.subscripts(index_var, (b"",))):
+        for count in yottadb.subscripts(index_var, (word, b"")):
             print("{}\t{}".format(word, count))
 
     yottadb.delete_tree(words_var)

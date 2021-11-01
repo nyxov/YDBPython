@@ -20,11 +20,11 @@ import datetime
 import time
 import os
 import re
-from typing import NamedTuple, Callable, Tuple, Sequence, Optional
+from typing import NamedTuple, Callable, Tuple, Sequence, Optional, AnyStr
 
 import yottadb
 from yottadb import YDBError, YDBNodeEnd
-from conftest import lock_value, str2zwr_tests, set_ci_environment, reset_ci_environment, setup_db, teardown_db
+from conftest import lock_value, str2zwr_tests, set_ci_environment, reset_ci_environment, setup_db, teardown_db, SIMPLE_DATA
 
 
 def test_ci_table(new_db):
@@ -849,6 +849,64 @@ def test_module_node_previous(simple_data):
             break
 
 
+def test_nodes_iter(simple_data):
+    nodes = [
+        (),
+        (b"sub1",),
+        (b"sub1", b"subsub1"),
+        (b"sub1", b"subsub2"),
+        (b"sub1", b"subsub3"),
+        (b"sub2",),
+        (b"sub2", b"subsub1"),
+        (b"sub2", b"subsub2"),
+        (b"sub2", b"subsub3"),
+        (b"sub3",),
+        (b"sub3", b"subsub1"),
+        (b"sub3", b"subsub2"),
+        (b"sub3", b"subsub3"),
+    ]
+
+    # Validate NodesIter.__next__() using a node in the middle of a tree
+    i = 0
+    for node in yottadb.nodes("^test4"):
+        assert node == nodes[i]
+        i += 1
+
+    # Validate NodesIter.__next__() using a node in the middle of a tree
+    i = 0
+    # Omit "sub1" tree by excluding first 5 elements, including ("sub2",), since
+    # this will be the starting subsarray for the call
+    some_nodes = nodes[6:]
+    for node in yottadb.nodes("^test4", ("sub2",)):
+        assert node == some_nodes[i]
+        i += 1
+
+    # Validate NodesIter.__reversed__()
+    i = 0
+    nodes = list(reversed(nodes))
+    for node in reversed(yottadb.nodes("^test4")):
+        print(f"node: {node}")
+        print(f"nodes[i]: {nodes[i]}")
+        assert node == nodes[i]
+        i += 1
+
+    # Validate NodesIter.__reversed__() using a node in the middle of a tree
+    i = 0
+    # Omit "sub3" tree by excluding first 4 elements since the nodes list has already been reversed above
+    nodes = nodes[4:]
+    for node in reversed(yottadb.nodes("^test4", ("sub2",))):
+        assert node == nodes[i]
+        i += 1
+
+    # Confirm errors from node_next()/node_previous() are raised as exceptions
+    with pytest.raises(ValueError):
+        for node in yottadb.nodes("a" * (yottadb.YDB_MAX_IDENT + 1)):
+            pass
+    with pytest.raises(ValueError):
+        for node in reversed(yottadb.nodes("a" * (yottadb.YDB_MAX_IDENT + 1))):
+            pass
+
+
 def test_module_subscript_next(simple_data):
     assert yottadb.subscript_next(varname="^test1") == b"^test2"
     assert yottadb.subscript_next(varname="^test2") == b"^test3"
@@ -914,6 +972,163 @@ def test_module_subscript_previous(simple_data):
     assert yottadb.subscript_previous(varname="^test7", subsarray=(b"sub2\x80",)) == b"sub1\x80"
     with pytest.raises(YDBNodeEnd):
         yottadb.subscript_previous(varname="^test7", subsarray=(b"sub1\x80",))
+
+
+def test_subscripts_iter(simple_data):
+    subs = [b"sub1", b"sub2", b"sub3"]
+
+    # Validate SubscriptsIter.__next__() starting from the first subscript of a subscript level
+    i = 0
+    for subscript in yottadb.subscripts("^test4", ("",)):
+        assert subscript == subs[i]
+        i += 1
+
+    # Validate SubscriptsIter.__next__() using a subscript in the middle of a subscript level
+    i = 1
+    for subscript in yottadb.subscripts("^test4", ("sub1",)):
+        assert subscript == subs[i]
+        i += 1
+
+    # Validate SubscriptsIter.__reversed__() starting from the first subscript of a subscript level
+    i = 0
+    rsubs = list(reversed(subs))
+    for subscript in reversed(yottadb.subscripts("^test4", ("",))):
+        assert subscript == rsubs[i]
+        i += 1
+
+    # Validate SubscriptsIter.__reversed__() using a subscript in the middle of a subscript level
+    i = 1
+    for subscript in reversed(yottadb.subscripts("^test4", ("sub3",))):
+        assert subscript == rsubs[i]
+        i += 1
+
+    varnames = [b"^Test5", b"^test1", b"^test2", b"^test3", b"^test4", b"^test6", b"^test7"]
+    i = 0
+    for subscript in yottadb.subscripts("^%"):
+        assert subscript == varnames[i]
+        i += 1
+    assert len(varnames) == i
+
+    i = 0
+    rvarnames = list(reversed(varnames))
+    for subscript in reversed(yottadb.subscripts("^z")):
+        assert subscript == rvarnames[i]
+        i += 1
+    assert len(rvarnames) == i
+
+    # Confirm errors from subscript_next()/subscript_previous() are raised as exceptions
+    with pytest.raises(ValueError):
+        for subscript in yottadb.subscripts("a" * (yottadb.YDB_MAX_IDENT + 1)):
+            pass
+    with pytest.raises(ValueError):
+        for subscript in reversed(yottadb.subscripts("a" * (yottadb.YDB_MAX_IDENT + 1))):
+            pass
+
+
+# Helper function that creates a node + value tuple that mirrors the
+# format used in SIMPLE_DATA to simplify output verification in
+# test_all_nodes_iter.
+def assemble_node(gblname: str, node_subs: Tuple[bytes]) -> Tuple[Tuple[str, Tuple[AnyStr, ...]], str]:
+    subs = []
+    for sub in node_subs:
+        try:
+            subs.append(sub.decode("utf-8"))
+        except UnicodeError:
+            subs.append(sub)
+    node = ((gblname.decode("utf-8"), tuple(subs)), yottadb.get(gblname, node_subs).decode("utf-8"))
+    return node
+
+
+def test_all_nodes_iter(simple_data):
+    # Get all nodes in database using forward subscripts() and forward nodes()
+    gblname = "^%"
+    all_nodes = []
+    for gblname in yottadb.subscripts(gblname):
+        for node_subs in yottadb.nodes(gblname):
+            all_nodes.append(assemble_node(gblname, node_subs))
+    for expected, actual in zip(SIMPLE_DATA, all_nodes):
+        assert expected == actual
+
+    # Initialize result set in proper order
+    sdata = [
+        (("^Test5", ()), "test5value"),
+        (("^test1", ()), "test1value"),
+        (("^test2", ("sub1",)), "test2value"),
+        (("^test3", ("sub1", "sub2")), "test3value3"),
+        (("^test3", ("sub1",)), "test3value2"),
+        (("^test3", ()), "test3value1"),
+        (("^test4", ("sub3", "subsub3")), "test4sub3subsub3"),
+        (("^test4", ("sub3", "subsub2")), "test4sub3subsub2"),
+        (("^test4", ("sub3", "subsub1")), "test4sub3subsub1"),
+        (("^test4", ("sub3",)), "test4sub3"),
+        (("^test4", ("sub2", "subsub3")), "test4sub2subsub3"),
+        (("^test4", ("sub2", "subsub2")), "test4sub2subsub2"),
+        (("^test4", ("sub2", "subsub1")), "test4sub2subsub1"),
+        (("^test4", ("sub2",)), "test4sub2"),
+        (("^test4", ("sub1", "subsub3")), "test4sub1subsub3"),
+        (("^test4", ("sub1", "subsub2")), "test4sub1subsub2"),
+        (("^test4", ("sub1", "subsub1")), "test4sub1subsub1"),
+        (("^test4", ("sub1",)), "test4sub1"),
+        (("^test4", ()), "test4"),
+        (("^test6", ("sub6", "subsub6")), "test6value"),
+        (("^test7", (b"sub4\x80", "sub7")), "test7sub4value"),
+        (("^test7", (b"sub3\x80", "sub7")), "test7sub3value"),
+        (("^test7", (b"sub2\x80", "sub7")), "test7sub2value"),
+        (("^test7", (b"sub1\x80",)), "test7value"),
+    ]
+    # Get all nodes in database using forward subscripts() and reverse nodes()
+    gblname = "^%"
+    all_nodes = []
+    for gblname in yottadb.subscripts(gblname):
+        for node_subs in reversed(yottadb.nodes(gblname)):
+            all_nodes.append(assemble_node(gblname, node_subs))
+    for expected, actual in zip(sdata, all_nodes):
+        assert expected == actual
+
+    # Initialize result set in proper order
+    sdata = [
+        (("^test7", (b"sub1\x80",)), "test7value"),
+        (("^test7", (b"sub2\x80", "sub7")), "test7sub2value"),
+        (("^test7", (b"sub3\x80", "sub7")), "test7sub3value"),
+        (("^test7", (b"sub4\x80", "sub7")), "test7sub4value"),
+        (("^test6", ("sub6", "subsub6")), "test6value"),
+        (("^test4", ()), "test4"),
+        (("^test4", ("sub1",)), "test4sub1"),
+        (("^test4", ("sub1", "subsub1")), "test4sub1subsub1"),
+        (("^test4", ("sub1", "subsub2")), "test4sub1subsub2"),
+        (("^test4", ("sub1", "subsub3")), "test4sub1subsub3"),
+        (("^test4", ("sub2",)), "test4sub2"),
+        (("^test4", ("sub2", "subsub1")), "test4sub2subsub1"),
+        (("^test4", ("sub2", "subsub2")), "test4sub2subsub2"),
+        (("^test4", ("sub2", "subsub3")), "test4sub2subsub3"),
+        (("^test4", ("sub3",)), "test4sub3"),
+        (("^test4", ("sub3", "subsub1")), "test4sub3subsub1"),
+        (("^test4", ("sub3", "subsub2")), "test4sub3subsub2"),
+        (("^test4", ("sub3", "subsub3")), "test4sub3subsub3"),
+        (("^test3", ()), "test3value1"),
+        (("^test3", ("sub1",)), "test3value2"),
+        (("^test3", ("sub1", "sub2")), "test3value3"),
+        (("^test2", ("sub1",)), "test2value"),
+        (("^test1", ()), "test1value"),
+        (("^Test5", ()), "test5value"),
+    ]
+    # Get all nodes in database using reverse subscripts() and forward nodes()
+    gblname = "^zzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+    all_nodes = []
+    for gblname in reversed(yottadb.subscripts(gblname)):
+        for node_subs in yottadb.nodes(gblname):
+            all_nodes.append(assemble_node(gblname, node_subs))
+    for expected, actual in zip(sdata, all_nodes):
+        assert expected == actual
+
+    # Get all nodes in database using reverse subscripts() and reverse nodes()
+    gblname = "^zzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+    all_nodes = []
+    for gblname in reversed(yottadb.subscripts(gblname)):
+        for node_subs in reversed(yottadb.nodes(gblname)):
+            all_nodes.append(assemble_node(gblname, node_subs))
+    for expected, actual in zip(reversed(SIMPLE_DATA), all_nodes):
+        assert expected == actual
 
 
 def test_import():
