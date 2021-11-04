@@ -35,6 +35,7 @@ import _yottadb
 import yottadb
 import psutil
 import os
+import re
 
 from conftest import set_ci_environment, reset_ci_environment
 
@@ -214,21 +215,14 @@ def test_incr_increment():
     This function tests the validation of the incr function's increment parameter.
     It tests that the incr function:
         1) Raises a TypeError if the value that is passed to it is not a str object
-        2) Accepts a value up to _yottadb.YDB_MAX_STR in length without raising an exception
-        3) Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
+        2) Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
     """
     key = {"varname": "test", "subsarray": ("b",)}
     # Case 1: Raises a TypeError if the value that is passed to it is not a str object
     with pytest.raises(TypeError):
         _yottadb.incr(**key, increment=1)
 
-    # Case 2: Accepts a value up to _yottadb.YDB_MAX_STR in length without raising an exception
-    try:
-        _yottadb.incr(**key, increment="1" * (_yottadb.YDB_MAX_STR))
-    except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
-        pass
-
-    # Case 3: Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
+    # Case 2: Raises a ValueError if the value is longer than _yottadb.YDB_MAX_STR
     with pytest.raises(ValueError):
         _yottadb.incr(**key, increment="1" * (_yottadb.YDB_MAX_STR + 1))
 
@@ -255,10 +249,19 @@ It tests that the lock function:
     """
 
 
+def test_lock_YDBError():
+    # Case 0: Raises a YDBError if the underlying ydb_lock_s() call fails for some reason,
+    # e.g. with a bad variable name
+    with pytest.raises(yottadb.YDBError) as e:
+        _yottadb.lock((("\x80", ()),))
+        assert yottadb.YDB_ERR_INVVARNAME == e.code()
+
+
 def test_lock_typeerror():
     # Case 1: Raises a Type Error if the value is a not a list or tuple.
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError) as e:
         _yottadb.lock("not list or tuple")
+    assert re.match("'keys' argument invalid: key must be list or tuple.", str(e.value))  # Confirm correct TypeError message
 
 
 def test_lock_max_keys_ok(new_db):
@@ -304,6 +307,7 @@ def test_lock_varname_max_ident(new_db):
     _yottadb.lock((("a" * (_yottadb.YDB_MAX_IDENT),),))
     try:
         _yottadb.lock((("a" * (_yottadb.YDB_MAX_IDENT + 1),),))
+        assert False
     except yottadb.YDBError as e:
         assert _yottadb.YDB_ERR_VARNAME2LONG == e.code()
 
@@ -338,6 +342,7 @@ def test_lock_max_subscript_length():
     # Case 13: Accepts an item in a subsarray of length _yottadb.YDB_MAX_STR without raising an exception
     try:
         _yottadb.lock((("test", ["a" * (_yottadb.YDB_MAX_STR)]),))
+        assert False
     except _yottadb.YDBError:  # Testing C-extention's validation, not YottaDB's
         pass
 
@@ -427,11 +432,11 @@ def test_str2zwr_input():
     with pytest.raises(TypeError):
         _yottadb.str2zwr(1)
 
-    # Case 2: Accepts a value up to _yottadb.YDB_MAX_STR without raising an exception
-    try:
-        _yottadb.str2zwr("b" * _yottadb.YDB_MAX_STR)
-    except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
-        pass
+    # Case 2: Accepts a value up to _yottadb.YDB_MAX_STR - 2 without raising an exception
+    # The - 2 is necessary since ydb_str2zwr() introduces 2 double-quote characters at the
+    # start and end of the string. Other Simple API functions don't do this, so YDB_MAX_STR
+    # is used in those cases.
+    _yottadb.str2zwr("b" * (_yottadb.YDB_MAX_STR - 2))
 
     # Case 3: Raises a ValueError if input is longer than _yottadb.YDB_MAX_STR
     with pytest.raises(ValueError):
@@ -553,11 +558,11 @@ def test_zwr2str_input():
     with pytest.raises(TypeError):
         _yottadb.zwr2str(1)
 
-    # Case 2: Accepts a value up to _yottadb.YDB_MAX_STR without raising an exception
-    try:
-        _yottadb.zwr2str("b" * _yottadb.YDB_MAX_STR)
-    except _yottadb.YDBError:  # testing c-extentions validation not YottaDB's
-        pass
+    # Case 2: Accepts a value up to _yottadb.YDB_MAX_STR - 2 without raising an exception
+    # The - 2 is necessary since ydb_zwr2str() introduces 2 double-quote characters at the
+    # start and end of the string. Other Simple API functions don't do this, so YDB_MAX_STR
+    # is used in those cases.
+    _yottadb.zwr2str("b" * _yottadb.YDB_MAX_STR)
 
     # Case 3: Raises a ValueError if input is longer than _yottadb.YDB_MAX_STR
     with pytest.raises(ValueError):
@@ -578,6 +583,7 @@ def test_ci_input():
     # Confirm YDB error when output value is longer than input string
     try:
         _yottadb.ci("StringExtend", [123], has_retval=True)
+        assert False
     except yottadb.YDBError as e:
         assert _yottadb.YDB_ERR_INVSTRLEN == e.code()
 
@@ -639,6 +645,19 @@ def test_ci_input():
     with pytest.raises(ValueError):
         _yottadb.open_ci_table("")
 
+    # Ensure YDBError raised for failure in underlying C call, e.g.
+    # YDB_ERR_CITABOPN or YDB_ERR_PARAMINVALID
+    try:
+        _yottadb.open_ci_table("\x80")
+        assert False
+    except yottadb.YDBError as e:
+        assert yottadb.YDB_ERR_CITABOPN == e.code()
+    try:
+        _yottadb.switch_ci_table(-1)
+        assert False
+    except yottadb.YDBError as e:
+        assert yottadb.YDB_ERR_PARAMINVALID == e.code()
+
     reset_ci_environment(previous)
 
 
@@ -699,6 +718,7 @@ def test_validation_exception_message(simple_data):
 
     try:
         yottadb.lock(keys_to_lock)
+        assert False
     except ValueError as e:
         assert (
             str(e)

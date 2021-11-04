@@ -137,10 +137,21 @@ def test_cip(new_db):
     reset_ci_environment(previous)
 
 
+# Confirm delete_node() and delete_tree() raise YDBError exceptions
+def test_delete_errors():
+    with pytest.raises(yottadb.YDBError):
+        yottadb.delete_node(varname="\x80")
+    with pytest.raises(yottadb.YDBError):
+        yottadb.delete_tree(varname="\x80")
+
+
 def test_message():
     assert yottadb.message(yottadb.YDB_ERR_INVSTRLEN) == "%YDB-E-INVSTRLEN, Invalid string length !UL: max !UL"
-    with pytest.raises(yottadb.YDBError):
+    try:
         yottadb.message(0)  # Raises unknown error number error
+        assert False
+    except yottadb.YDBError as e:
+        assert yottadb.YDB_ERR_UNKNOWNSYSERR == e.code()
 
 
 def test_release():
@@ -195,6 +206,11 @@ def test_Key_object(simple_data):
     assert key.varname_key == yottadb.Key(b"test3local")
     assert key.varname == b"test3local"
     assert key.subsarray == [b"sub1"]
+
+    # Key creation by setting parent explicitly
+    key = yottadb.Key("^myglobal")["sub1"]["sub2"]
+    key = yottadb.Key("sub3", parent=key)  # Raises TypeError for non-Key `parent` argument
+    assert '^myglobal("sub1","sub2","sub3")' == str(key)
 
     # YDBLVUNDEFError and YDBGVUNDEFError for Key.value return None
     key = yottadb.Key("^nonexistent")  # Undefined global
@@ -251,6 +267,11 @@ def test_Key_object(simple_data):
 
 
 def test_Key_construction_errors():
+    # Raise error if attempt to create Key from an object other than a Key
+    with pytest.raises(TypeError) as terr:
+        yottadb.Key(1)
+    assert re.match("'name' must be an instance of str or bytes", str(terr.value))  # Confirm correct TypeError message
+
     # Raise error if attempt to create Key from an object other than a Key
     with pytest.raises(TypeError) as terr:
         yottadb.Key("^test1", "not a Key object")
@@ -372,6 +393,10 @@ def test_Key_data(simple_data):
     assert yottadb.Key("^test3")["sub1"].data == yottadb.YDB_DATA_VALUE_DESC
     assert yottadb.Key("^test3")["sub1"]["sub2"].data == yottadb.YDB_DATA_VALUE_NODESC
 
+    # Confirm errors from C API are raised as YDBError exceptions
+    with pytest.raises(yottadb.YDBError):
+        yottadb.Key("^\x80").data
+
 
 def test_Key_has_value(simple_data):
     assert not yottadb.Key("nodata").has_value
@@ -382,6 +407,10 @@ def test_Key_has_value(simple_data):
     assert yottadb.Key("^test3")["sub1"].has_value
     assert yottadb.Key("^test3")["sub1"]["sub2"].has_value
 
+    # Confirm errors from C API are raised as YDBError exceptions
+    with pytest.raises(yottadb.YDBError):
+        yottadb.Key("^\x80").has_value
+
 
 def test_Key_has_tree(simple_data):
     assert not yottadb.Key("nodata").has_tree
@@ -391,6 +420,10 @@ def test_Key_has_tree(simple_data):
     assert yottadb.Key("^test3").has_tree
     assert yottadb.Key("^test3")["sub1"].has_tree
     assert not yottadb.Key("^test3")["sub1"]["sub2"].has_tree
+
+    # Confirm errors from C API are raised as YDBError exceptions
+    with pytest.raises(yottadb.YDBError):
+        yottadb.Key("^\x80").has_tree
 
 
 def test_Key_subscript_next(simple_data):
@@ -427,6 +460,10 @@ def test_Key_subscript_next(simple_data):
             assert sub == bytes(("sub" + str(count)).encode("ascii"))
         except YDBNodeEnd:
             break
+
+    # Confirm errors from C API are raised as YDBError exceptions
+    with pytest.raises(yottadb.YDBError):
+        yottadb.Key("^\x80").subscript_next()
 
 
 def test_Key_subscript_previous(simple_data):
@@ -466,12 +503,35 @@ def test_Key_subscript_previous(simple_data):
         except YDBNodeEnd:
             break
 
+    # Confirm errors from C API are raised as YDBError exceptions
+    # Note that a similar test case is not included in all test functions
+    # to reduce duplication, as the same exception mechanism for this case
+    # is operative across all wrapper functions and methods.
+    with pytest.raises(yottadb.YDBError):
+        yottadb.Key("^\x80").subscript_previous()
+
 
 # transaction decorator smoke tests
 @yottadb.transaction
 def simple_transaction(key1: yottadb.Key, value1: str, key2: yottadb.Key, value2: str) -> None:
     key1.value = value1
     key2.value = value2
+
+    rand = random.randint(0, 2)
+    if 0 == rand:
+        # Trigger YDBError to confirm exception raised to caller
+        yottadb.get("\x80")
+    elif 1 == rand:
+        # Trigger and catch YDBError, then manually return to confirm return error code
+        # to confirm value passed back to tp() by yottadb.transaction() as is
+        try:
+            yottadb.get("\x80")
+            assert False
+        except yottadb.YDBError as e:
+            return e.code()
+    else:
+        # Return None, to validate that YDB_OK will be returned to caller by yottadb.transaction()
+        return None
 
 
 def test_transaction_smoke_test1(new_db) -> None:
@@ -484,10 +544,13 @@ def test_transaction_smoke_test1(new_db) -> None:
     assert key1.data == yottadb.YDB_DATA_UNDEF
     assert key2.data == yottadb.YDB_DATA_UNDEF
 
-    simple_transaction(key1, value1, key2, value2)
+    try:
+        assert yottadb.YDB_OK == simple_transaction(key1, value1, key2, value2)
+        assert key1 == value1
+        assert key2 == value2
+    except YDBError as e:
+        assert yottadb.YDB_ERR_INVVARNAME == e.code()
 
-    assert key1 == value1
-    assert key2 == value2
     test_base_key.delete_tree()
 
 
@@ -510,6 +573,7 @@ def test_transaction_smoke_test2(new_db) -> None:
 
     try:
         simple_rollback_transaction(key1, value1, key2, value2)
+        assert False
     except yottadb.YDBTPRollback as e:
         print(str(e))
         assert str(e) == f"{yottadb.YDB_TP_ROLLBACK}, %YDB-TP-ROLLBACK: Transaction not committed."
@@ -768,6 +832,19 @@ def test_YDB_ERR_TIME2LONG(new_db):
         assert yottadb.YDB_ERR_TIME2LONG == e.code()
 
 
+def test_YDB_ERR_PARMOFLOW(new_db):
+    keys_to_lock = []
+    for i in range(0, 12):
+        keys_to_lock.append(yottadb.Key(f"^t{i}"))
+    # Attempt to get locks for more names than supported, i.e. 11,
+    # per https://docs.yottadb.com/MultiLangProgGuide/pythonprogram.html#python-lock.
+    with pytest.raises(ValueError) as e:
+        yottadb.lock(keys=keys_to_lock, timeout_nsec=(yottadb.YDB_MAX_TIME_NSEC + 1))
+    assert re.match(
+        "'keys' argument invalid: invalid sequence length 12: max 11", str(e.value)
+    )  # Confirm correct ValueError message
+
+
 def test_isv_error():
     with pytest.raises(ValueError) as verr:
         yottadb.get("$zyrelease", ("sub1", "sub2"))
@@ -906,6 +983,18 @@ def test_nodes_iter(simple_data):
         for node in reversed(yottadb.nodes("a" * (yottadb.YDB_MAX_IDENT + 1))):
             pass
 
+    # Confirm errors from underlying API calls are raised as exceptions
+    try:
+        for node in yottadb.nodes("\x80"):
+            pass
+    except yottadb.YDBError as e:
+        assert yottadb.YDB_ERR_INVVARNAME == e.code()
+    try:
+        for node in reversed(yottadb.nodes("\x80")):
+            pass
+    except yottadb.YDBError as e:
+        assert yottadb.YDB_ERR_INVVARNAME == e.code()
+
 
 def test_module_subscript_next(simple_data):
     assert yottadb.subscript_next(varname="^test1") == b"^test2"
@@ -1023,6 +1112,18 @@ def test_subscripts_iter(simple_data):
     with pytest.raises(ValueError):
         for subscript in reversed(yottadb.subscripts("a" * (yottadb.YDB_MAX_IDENT + 1))):
             pass
+
+    # Confirm errors from underlying API calls are raised as exceptions
+    try:
+        for subscript in yottadb.subscripts("\x80"):
+            pass
+    except yottadb.YDBError as e:
+        assert yottadb.YDB_ERR_INVVARNAME == e.code()
+    try:
+        for subscript in reversed(yottadb.subscripts("\x80")):
+            pass
+    except yottadb.YDBError as e:
+        assert yottadb.YDB_ERR_INVVARNAME == e.code()
 
 
 # Helper function that creates a node + value tuple that mirrors the
