@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -24,7 +24,8 @@ from typing import Union
 
 import yottadb
 
-YDB_INSTALL_DIR = os.environ["ydb_dist"]
+
+YDB_DIST = os.environ["ydb_dist"]
 TEST_DATA_DIRECTORY = "/tmp/test_yottadb/"
 CUR_DIR = os.getcwd()
 
@@ -69,12 +70,15 @@ str2zwr_tests = [
 # Set ydb_ci and ydb_routines for testing and return a dictionary
 # containing the previous values of these environment variables
 # to facilitate resetting the environment when testing is complete
-def set_ci_environment(cur_dir: str, ydb_ci: str) -> dict:
+def set_ci_environment(cur_dir: str, ydb_ci: str, prefix: bool = False) -> dict:
     previous = {}
     previous["calltab"] = os.environ.get("ydb_ci")
     previous["routines"] = os.environ.get("ydb_routines")
     os.environ["ydb_ci"] = ydb_ci
-    os.environ["ydb_routines"] = cur_dir + "/tests/m_routines"
+    if prefix:
+        os.environ["ydb_routines"] = cur_dir + "/tests/m_routines " + os.environ["ydb_routines"]
+    else:
+        os.environ["ydb_routines"] = cur_dir + "/tests/m_routines"
 
     return previous
 
@@ -109,7 +113,7 @@ def lock_value(key: Union[yottadb.Key, tuple], interval: float = 0.2, timeout: i
         yottadb.lock_incr(varname, subsarray, timeout_nsec=(timeout * 1_000_000_000))
         print("Lock Success")
         has_lock = True
-    except yottadb.YDBTimeoutError:
+    except yottadb.YDBLockTimeoutError:
         print("Lock Failed")
         sys.exit(1)
     except Exception as e:
@@ -131,10 +135,11 @@ def execute(command: str, stdin: str = "") -> str:
 
     :param command: the command to run
     :param stdin: optional text that may be piped to the command
-    :return: returns standard out decoded as a string.
+    :return: returns a 2-item list containing stdout and stderr decoded as a strings, in that order
     """
     process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-    return process.communicate(stdin.encode())[0].decode().strip()
+    output = process.communicate(stdin.encode())
+    return [output[0].decode().strip(), output[1].decode().strip()]  # 0 == stdout, 1 == stderr
 
 
 def setup_db() -> str:
@@ -153,7 +158,7 @@ def setup_db() -> str:
     db["gld"] = db["dir"] + "test_db.gld"
     os.environ["ydb_gbldir"] = db["gld"]
 
-    execute(f"{CUR_DIR}/tests/createdb.sh {YDB_INSTALL_DIR} {db['dir'] + 'test_db.dat'}")
+    execute(f"{CUR_DIR}/tests/createdb.sh {YDB_DIST} {db['dir'] + 'test_db.dat'}")
 
     return db
 

@@ -35,6 +35,13 @@
 
 #define YDBPY_CHECK_TYPE 2
 
+// Equivalent of `gparam_list` in `callg.h` from YDB, which is not included in `libyottadb.h`
+#define MAXVPARMS 36
+typedef struct {
+	intptr_t  n;
+	uintptr_t arg[MAXVPARMS];
+} gparam_list;
+
 /* Set of acceptable Python error types. Each type is named by prefixing a Python error name with `YDBPython`,
  * with the exception of YDBPython_NoError. This item doesn't represent a Python error, but is included at enum value 0
  * to prevent conflicts with YDB_OK which signals no error with a value of 0.
@@ -66,6 +73,7 @@ typedef enum YDBPythonSequenceType {
 #define YDBPY_ERR_CI_PARM_UNDEFINED		    "YottaDB call-in routine %s parameter %d not defined in call-in table"
 #define YDBPY_ERR_NOT_LIST_OR_TUPLE		    "key must be list or tuple."
 #define YDBPY_ERR_VARNAME_NOT_BYTES_LIKE	    "varname argument is not a bytes-like object (bytes or str)"
+#define YDBPY_ERR_ARG_NOT_BYTES_LIKE		    "argument is not a bytes-like object (bytes or str)"
 #define YDBPY_ERR_ITEM_NOT_BYTES_LIKE		    "item %ld is not a bytes-like object (bytes or str)"
 #define YDBPY_ERR_KEY_IN_SEQUENCE_NOT_LIST_OR_TUPLE "item %ld is not a list or tuple."
 #define YDBPY_ERR_KEY_IN_SEQUENCE_VARNAME_NOT_BYTES "item %ld in key sequence invalid: first element must be of type 'bytes'"
@@ -119,19 +127,6 @@ typedef struct {
 		} else {                                               \
 			COPY_DONE = FALSE;                             \
 		}                                                      \
-	}
-
-#define POPULATE_NEW_BUFFER(PYVARNAME, YDBVARNAME, VARNAMELEN, FUNCTIONNAME, RETURN_NULL)                      \
-	{                                                                                                      \
-		bool copy_success;                                                                             \
-                                                                                                               \
-		YDB_MALLOC_BUFFER(&(YDBVARNAME), (VARNAMELEN + 1));                                            \
-		YDB_COPY_BYTES_TO_BUFFER((PYVARNAME), (VARNAMELEN), &(YDBVARNAME), copy_success);              \
-		if (!copy_success) {                                                                           \
-			PyErr_Format(YDBPythonError, "YDB_COPY_BYTES_TO_BUFFER failed in %s", (FUNCTIONNAME)); \
-			(RETURN_NULL) = true;                                                                  \
-		}                                                                                              \
-		(YDBVARNAME).buf_addr[VARNAMELEN] = '\0';                                                      \
 	}
 
 #define POPULATE_SUBS_USED_AND_SUBSARRAY(SUBSARRAY_PY, SUBSUSED, SUBSARRAY_YDB, RETURN_NULL)                      \
@@ -190,6 +185,33 @@ typedef struct {
 	{                                             \
 		assert(NULL != MESSAGE);              \
 		PyErr_SetObject(ERROR_TYPE, MESSAGE); \
+	}
+
+/* Allocate and populate a ydb_buffer_t struct from a Python AnyStr (`str` or `bytes`)
+ * object and return on failure.
+ */
+#define INVOKE_ANYSTR_TO_BUFFER(ANYSTR, BUFFER, IS_VARNAME)               \
+	{                                                                 \
+		int status;                                               \
+                                                                          \
+		status = anystr_to_buffer(ANYSTR, &(BUFFER), IS_VARNAME); \
+		if (YDB_OK != status) {                                   \
+			return NULL;                                      \
+		}                                                         \
+	}
+
+/* Allocate and populate a ydb_buffer_t array representing a set of subscripts.
+ * In case of failure, free the specified CLEANUP_BUF and return.
+ */
+#define INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(SUBSARRAY_PY, SUBS_USED, SUBSARRAY_YDB, CLEANUP_BUF) \
+	{                                                                                                                \
+		int status;                                                                                              \
+                                                                                                                         \
+		status = populate_subs_used_and_subsarray(SUBSARRAY_PY, &(SUBS_USED), &(SUBSARRAY_YDB));                 \
+		if (YDB_OK != status) {                                                                                  \
+			YDB_FREE_BUFFER(&(CLEANUP_BUF));                                                                 \
+			return NULL;                                                                                     \
+		}                                                                                                        \
 	}
 
 /* PYTHON EXCEPTION DECLARATIONS */

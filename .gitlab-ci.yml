@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2020-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -27,18 +27,37 @@ stages:
     - python3 -m pip install pytest-runner
     - python3 setup.py install --user
 
-
-.centos:
-  image: yottadb/yottadb-centos-base:latest-master
+.rocky:
+  image: yottadb/yottadb-rocky-base:latest-master
   before_script:
     - source $(pkg-config --variable=prefix yottadb)/ydb_env_set
-    - yum install -y python3 gcc python3-devel libffi-devel
+    - yum install -y python3 gcc python3-devel libffi-devel libasan
     - python3 setup.py install --user
 
-.test:
+.test_ubuntu:
   script:
+    # Set LD_PRELOAD and ASAN_OPTIONS in case YottaDB is built with ASAN. If it isn't, these variables will simply be ignored.
+    - export LD_PRELOAD=$(gcc -print-file-name=libasan.so)
+    - export ASAN_OPTIONS="detect_leaks=0:disable_coredump=0:unmap_shadow_on_exit=1:abort_on_error=1"
     - python3 -m pip install --user pytest pytest-order psutil
-    - python3 -m pytest tests/
+    - python3 -m pytest tests/ -vs 2> pytest.err 1> pytest.out
+  artifacts:
+    paths:
+      - ./*.out
+      - ./*.err
+    when: always
+
+.test_rocky:
+  script:
+    - export LD_PRELOAD=$(cat $(gcc -print-file-name=libasan.so) | cut -f 3 -d" ")
+    - export ASAN_OPTIONS="detect_leaks=0:disable_coredump=0:unmap_shadow_on_exit=1:abort_on_error=1"
+    - python3 -m pip install --user pytest pytest-order psutil
+    - python3 -m pytest tests/ -vs 2> pytest.err 1> pytest.out
+  artifacts:
+    paths:
+      - ./*.out
+      - ./*.err
+    when: always
 
 .debug:
   script:
@@ -49,20 +68,20 @@ test_ubuntu:
   stage: test
   extends:
     - .ubuntu
-    - .test
+    - .test_ubuntu
 
-test_centos:
+test_rocky:
   stage: test
   extends:
-    - .centos
-    - .test
+    - .rocky
+    - .test_rocky
 
 test_ubuntu_debug:
   stage: test
   extends:
     - .ubuntu
     - .debug
-    - .test
+    - .test_ubuntu
 
 commit-verify:
   image: ubuntu:18.04
@@ -85,7 +104,6 @@ code-format-check:
       - temp_warnings.txt
       - clang_tidy_warnings.txt
       - sorted_warnings.txt
-    expire_in: 1 day
     when: always
   script:
     - source $(pkg-config --variable=prefix yottadb)/ydb_env_set

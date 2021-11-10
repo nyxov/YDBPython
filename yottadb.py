@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -59,6 +59,20 @@ def get_error_code(YDBError):
 # Attach error code lookup function to the YDBError class
 # as a method for convenience.
 setattr(YDBError, "code", get_error_code)
+
+
+def adjust_stdout_stderr() -> None:
+    """
+    Check whether stdout (file descriptor 1) and stderr (file descriptor 2) are the same file, and if so,
+    route stderr writes to stdout instead. This ensures that output appears in the order in which it was written.
+    Otherwise, owing to I/O buffering, output can appear in an order different from that in which it was written.
+
+    Application code which mixes Python and M code, and which explicitly redirects stdout or stderr
+    (e.g. by modifying sys.stdout or sys.stderr), should call this function as soon as possible after the redirection.
+
+    :returns: None
+    """
+    return _yottadb.adjust_stdout_stderr()
 
 
 def get(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> Optional[bytes]:
@@ -364,10 +378,14 @@ def tp(callback: object, args: tuple = None, transid: str = "", varnames: Tuple[
     one or more transactions so flagged, Durability of the later transaction ensures Durability of the the earlier
     "BATCH" transaction(s).
 
+    If varnames == ("*",), then all local variables are restored on a transaction restart.
+
     :param callback: A function object representing a Python function definition.
     :param args: A tuple of arguments accepted by the `callback` function.
     :param transid: A string that, when passed "BA" or "BATCH", optionally improves transaction throughput and latency,
         while removing the guarantee of Durability from ACID transactions.
+    :param varnames: A tuple of YottaDB local or global variable names to restore to their original values when the
+        transaction is restarted
     :returns: A bytes-like object representing the YottaDB $ZWRITE formatted `string` as a character string.
     """
     return _yottadb.tp(callback, args, kwargs, transid, varnames)

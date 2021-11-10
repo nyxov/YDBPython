@@ -663,16 +663,16 @@ def test_ci_input():
 
 # This test requires a lot of memory and will fail if there is not enough memory on the system that running
 # the tests so this test will be skipped if the available memory is less than
-# ((2 ** 32) + 1) str.
-@pytest.mark.skipif(psutil.virtual_memory().available < ((2**32) + 1), reason="not enough memory for this test.")
+# (2 ** 32) str.
+@pytest.mark.skipif(psutil.virtual_memory().available < (2**32), reason="not enough memory for this test.")
 def test_unsigned_int_length_bytes_overflow():
     """
     Python bytes objects may have more bytes than can be represented by a 32-bit unsigned integer.
-    Prior to validation a length that was 1 more than that length would act as if it was only a 1-byte
+    Prior to validation a length that was 1 more than that length would act as if it was only a 0-byte
     long bytes object. This tests all scenarios where that could happen and that when that happens the
     function will raise a ValueError instead of continuing as if a single byte was passed to it.
     """
-    BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = "1" * ((2**32) + 1)  # works for python 3.8/Ubuntu 20.04
+    BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = "1" * (2**32)  # works for python 3.8/Ubuntu 20.04
     varname_subsarray_functions = (
         _yottadb.data,
         _yottadb.delete,

@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-# Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.       #
+# Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -48,9 +48,10 @@ def test_wordfreq(new_db):
         count = yottadb.get(words_var, (subscript,))
         yottadb.set(index_var, (count, subscript), b"")
 
-    for word in reversed(yottadb.subscripts(index_var, (b"",))):
-        for count in yottadb.subscripts(index_var, (word, b"")):
-            print("{}\t{}".format(word, count))
+    with open("wordfreq.out", "w") as output_file:
+        for word in reversed(yottadb.subscripts(index_var, (b"",))):
+            for count in yottadb.subscripts(index_var, (word, b"")):
+                output_file.write(f"{word}\t{count}\n")
 
     yottadb.delete_tree(words_var)
     yottadb.delete_tree(index_var)
@@ -74,9 +75,10 @@ def test_wordfreq_key(new_db):
                 index[words[word.name].value][word.name].value = ""
 
             # Print the keys ordered by amount
-            for key1 in reversed(index):
-                for key2 in yottadb.Key("^index")[key1.name]:
-                    print("{}\t{}".format(key1.name, key2.name))
+            with open("wordfreq_key.out", "w") as output_file:
+                for key1 in reversed(index):
+                    for key2 in yottadb.Key("^index")[key1.name]:
+                        output_file.write(f"{key1.name}\t{key2.name}\n")
     except IOError:
         print("Failed to open file")
 

@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -36,14 +36,18 @@ def test_no_ydb_gbldir():
     # Unset $ydb_gbldir and $gtmgbldir prior to running any to prevent erroneous use of
     # any previously set global directory. This is done here since this test is run before
     # all other tests.
-    del os.environ["ydb_gbldir"]
-    del os.environ["gtmgbldir"]
+    try:
+        del os.environ["ydb_gbldir"]
+        del os.environ["gtmgbldir"]
+    except KeyError:
+        # Do not fail the test if these variables are already unset
+        pass
 
     cur_dir = os.getcwd()
     try:
-        previous = os.environ["ydb_gbldir"]
+        os.environ["ydb_gbldir"]
     except KeyError:
-        previous = ""
+        pass
     os.environ["ydb_gbldir"] = cur_dir + "/yottadb.gld"  # Set ydb_gbldir to non-existent global directory file
 
     lclname = b"^x"

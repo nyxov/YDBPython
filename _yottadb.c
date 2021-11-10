@@ -2,7 +2,7 @@
  *                                                              *
  * Copyright (c) 2019-2021 Peter Goss All rights reserved.      *
  *                                                              *
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.                                         *
  *                                                              *
  *  This source code contains the intellectual property         *
@@ -65,11 +65,68 @@ static unsigned int count_args(unsigned int in, unsigned int out) {
 		count += (total & 1);
 		total >>= 1;
 	}
-
 	return count;
 }
 
-static int anystr_to_buffer(PyObject *object, ydb_buffer_t *buffer) {
+/* Routine that raises the appropriate Python Error during validation of Python input
+ * parameters. The 2 types of errors that will be raised are:
+ *     1) TypeError in the case that the parameter is of the wrong type
+ *     2) ValueError if the parameter is of the right type but is invalid in some other way (e.g. too long)
+ *
+ * Parameters:
+ *     status  - the error message status number (specific values defined in _yottdb.h)
+ *     message - the message to be set in the Python exception.
+ */
+static void raise_ValidationError(YDBPythonErrorType err_type, char *format_prefix, char *err_format, ...) {
+	va_list args;
+	char	err_message[YDBPY_MAX_ERRORMSG];
+	char	prefixed_err_message[YDBPY_MAX_ERRORMSG];
+	int	copied;
+
+	va_start(args, err_format);
+	copied = vsnprintf(err_message, YDBPY_MAX_ERRORMSG, err_format, args);
+	assert(YDBPY_MAX_ERRORMSG > copied);
+	UNUSED(copied);
+	va_end(args);
+
+	if (NULL != format_prefix) {
+		copied = snprintf(prefixed_err_message, YDBPY_MAX_ERRORMSG, format_prefix, err_message);
+	} else {
+		copied = snprintf(prefixed_err_message, YDBPY_MAX_ERRORMSG, "%s", err_message);
+	}
+	assert(0 <= copied);
+	if (YDBPY_MAX_ERRORMSG <= copied) {
+		char * ellipsis = "...";
+		size_t ellipsis_len;
+
+		ellipsis_len = strlen(ellipsis);
+		memcpy(&prefixed_err_message[YDBPY_MAX_ERRORMSG - (ellipsis_len + 1)], ellipsis, ellipsis_len);
+		assert('\0' == prefixed_err_message[YDBPY_MAX_ERRORMSG - 1]);
+	}
+
+	switch (err_type) {
+	case YDBPython_TypeError:
+		PyErr_SetString(PyExc_TypeError, prefixed_err_message);
+		break;
+	case YDBPython_ValueError:
+		PyErr_SetString(PyExc_ValueError, prefixed_err_message);
+		break;
+	case YDBPython_OSError:
+		PyErr_SetString(PyExc_OSError, err_message);
+		break;
+	default:
+		// Only TypeError and ValueError are possible, so we should never get here.
+		assert(FALSE);
+		break;
+	}
+}
+
+/* Convert a PyObject referencing a Python `bytes` or `str` object to a ydb_buffer_t struct
+ * and validate the size of resulting buffer to enforce YottaDB variable name and value limits.
+ * If set, the `is_varname` flag signals that the object should be validated as a variable,
+ * otherwise the object will be validated as a value.
+ */
+static int anystr_to_buffer(PyObject *object, ydb_buffer_t *buffer, bool is_varname) {
 	char *	     bytes;
 	bool	     decref_object;
 	Py_ssize_t   bytes_ssize;
@@ -88,15 +145,32 @@ static int anystr_to_buffer(PyObject *object, ydb_buffer_t *buffer) {
 		// Object is a bytes object, no Unicode encoding needed
 		decref_object = FALSE;
 	} else {
-		/* Object is not bytes or str (Unicode). Signal this to
-		 * the caller and let it decide whether to issue an error
-		 * or check for additional Python types.
+		/* Object is not bytes or str (Unicode), but one of these types was expected.
+		 * So, raise an exception.
 		 */
-		return YDBPY_CHECK_TYPE;
+		raise_ValidationError(YDBPython_TypeError, NULL, YDBPY_ERR_ARG_NOT_BYTES_LIKE);
+		return !YDB_OK;
 	}
 
 	// Convert Python bytes object to C character string (char *)
 	bytes_ssize = PyBytes_Size(object);
+	if (UINT32_MAX < bytes_ssize) {
+		/* Python bytes objects may have more bytes than can be represented by a 32-bit unsigned integer.
+		 * If `object` is 1 more than INT32_MAX, `bytes_len` below would be set to 0, falsely indicating a
+		 * 0-byte long bytes object. So, we need to detect this integer overflow before calling Py_SAFE_DOWNCAST,
+		 * in which case we raise an exception, cleanup, and return the failure to the caller.
+		 */
+		if (is_varname) {
+			raise_ValidationError(YDBPython_ValueError, NULL, YDBPY_ERR_VARNAME_TOO_LONG, bytes_ssize, YDB_MAX_IDENT);
+		} else {
+			raise_ValidationError(YDBPython_ValueError, NULL, YDBPY_ERR_BYTES_TOO_LONG, bytes_ssize, YDB_MAX_STR);
+		}
+		if (decref_object) {
+			// Optionally cleanup new reference
+			Py_DECREF(object);
+		}
+		return !YDB_OK;
+	}
 	bytes_len = Py_SAFE_DOWNCAST(bytes_ssize, Py_ssize_t, unsigned int);
 	bytes = PyBytes_AsString(object);
 
@@ -113,9 +187,28 @@ static int anystr_to_buffer(PyObject *object, ydb_buffer_t *buffer) {
 	// Defer error emission until after optional cleanup to reduce duplication
 	if (!done) {
 		PyErr_SetString(YDBPythonError, "failed to copy bytes object to buffer array");
+		YDB_FREE_BUFFER(buffer);
 		return !YDB_OK;
 	}
 
+	/* Enforce variable name length limit, i.e. YDB_MAX_IDENT for locals and YDB_MAX_IDENT + 1 for globals.
+	 * YDB_MAX_IDENT + 1 is acceptable for global variable names, since '^' does not count toward variable
+	 * name length. If the variable name is too long, raise an exception.
+	 */
+	if (is_varname) {
+		if ((('^' == buffer->buf_addr[0]) && ((YDB_MAX_IDENT + 1) < buffer->len_used))
+		    || (('^' != buffer->buf_addr[0]) && ((YDB_MAX_IDENT) < buffer->len_used))) {
+			raise_ValidationError(YDBPython_ValueError, NULL, YDBPY_ERR_VARNAME_TOO_LONG, buffer->len_used,
+					      YDB_MAX_IDENT);
+			YDB_FREE_BUFFER(buffer);
+			return !YDB_OK;
+		}
+	} else if ((YDB_MAX_STR) < buffer->len_used) {
+		// This is a value and not a variable, so accept up to YDB_MAX_STR length
+		raise_ValidationError(YDBPython_ValueError, NULL, YDBPY_ERR_VARNAME_TOO_LONG, buffer->len_used, YDB_MAX_IDENT);
+		YDB_FREE_BUFFER(buffer);
+		return !YDB_OK;
+	}
 	return YDB_OK;
 }
 
@@ -159,7 +252,6 @@ static int anystr_to_ydb_string_t(PyObject *object, ydb_string_t *buffer) {
 	if (decref_object) {
 		Py_DECREF(object);
 	}
-
 	return YDB_OK;
 }
 
@@ -217,7 +309,6 @@ static int object_to_ydb_string_t(PyObject *object, ydb_string_t *buffer) {
 			status = !YDB_OK;
 		}
 	}
-
 	return status;
 }
 
@@ -238,88 +329,7 @@ static ydb_buffer_t *create_empty_buffer_array(int num, int len) {
 	return_buffer_array = malloc(num * sizeof(ydb_buffer_t));
 	for (i = 0; i < num; i++)
 		YDB_MALLOC_BUFFER(&return_buffer_array[i], len);
-
 	return return_buffer_array;
-}
-
-/* Routine that raises the appropriate Python Error during validation of Python input
- * parameters. The 2 types of errors that will be raised are:
- *     1) TypeError in the case that the parameter is of the wrong type
- *     2) ValueError if the parameter is of the right type but is invalid in some other way (e.g. too long)
- *
- * Parameters:
- *     status  - the error message status number (specific values defined in _yottdb.h)
- *     message - the message to be set in the Python exception.
- */
-static void raise_ValidationError(YDBPythonErrorType err_type, char *format_prefix, char *err_format, ...) {
-	va_list args;
-	char	err_message[YDBPY_MAX_ERRORMSG];
-	char	prefixed_err_message[YDBPY_MAX_ERRORMSG];
-	int	copied;
-
-	va_start(args, err_format);
-	copied = vsnprintf(err_message, YDBPY_MAX_ERRORMSG, err_format, args);
-	assert(YDBPY_MAX_ERRORMSG > copied);
-	UNUSED(copied);
-	va_end(args);
-
-	if (NULL != format_prefix) {
-		copied = snprintf(prefixed_err_message, YDBPY_MAX_ERRORMSG, format_prefix, err_message);
-	} else {
-		copied = snprintf(prefixed_err_message, YDBPY_MAX_ERRORMSG, "%s", err_message);
-	}
-	assert(0 <= copied);
-	if (YDBPY_MAX_ERRORMSG <= copied) {
-		char * ellipsis = "...";
-		size_t ellipsis_len;
-
-		ellipsis_len = strlen(ellipsis);
-		memcpy(&prefixed_err_message[YDBPY_MAX_ERRORMSG - (ellipsis_len + 1)], ellipsis, ellipsis_len);
-		assert('\0' == prefixed_err_message[YDBPY_MAX_ERRORMSG - 1]);
-	}
-
-	switch (err_type) {
-	case YDBPython_TypeError:
-		PyErr_SetString(PyExc_TypeError, prefixed_err_message);
-		break;
-	case YDBPython_ValueError:
-		PyErr_SetString(PyExc_ValueError, prefixed_err_message);
-		break;
-	case YDBPython_OSError:
-		PyErr_SetString(PyExc_OSError, err_message);
-		break;
-	default:
-		// Only TypeError and ValueError are possible, so we should never get here.
-		assert(FALSE);
-		break;
-	}
-}
-
-/* Safely downcasts src_len (Py_ssize_t) and stores in dest_len (unsigned int).
- *
- * First checks that the value of src_len is within bounds of the YDB limit signaled
- * by IS_VARNAME, i.e. YDB_MAX_IDENT for variable names (IS_VARNAME) or YDB_MAX_STR
- * for string values (!IS_VARNAME). If this check succeeds, Py_SAFE_DOWNCAST is invoked.
- * Otherwise, a Python ValueError is raised.
- */
-int cast_pyssize_t_to_unsigned_int(unsigned int *dest_len, Py_ssize_t src_len, bool is_varname) {
-	Py_ssize_t max_len;
-	char *	   err_msg;
-
-	if (is_varname) {
-		max_len = YDB_MAX_IDENT;
-		err_msg = YDBPY_ERR_VARNAME_TOO_LONG;
-	} else {
-		max_len = YDB_MAX_STR;
-		err_msg = YDBPY_ERR_BYTES_TOO_LONG;
-	}
-	if (max_len < src_len) {
-		raise_ValidationError(YDBPython_ValueError, NULL, err_msg, src_len, max_len);
-		return !YDB_OK;
-	} else {
-		(*dest_len) = Py_SAFE_DOWNCAST(src_len, Py_ssize_t, unsigned int);
-		return YDB_OK;
-	}
 }
 
 /* Conversion Utilities */
@@ -392,7 +402,6 @@ static PyObject *new_object_from_object_and_string(PyObject *object, ydb_string_
 	if (NULL != ret) {
 		Py_DECREF(object);
 	}
-
 	return ret;
 }
 
@@ -496,7 +505,6 @@ static bool is_valid_sequence(PyObject *object, YDBPythonSequenceType sequence_t
 	}
 
 	Py_DECREF(sequence);
-
 	return TRUE;
 }
 
@@ -510,7 +518,7 @@ static bool is_valid_sequence(PyObject *object, YDBPythonSequenceType sequence_t
  * Parameters:
  *    sequence    - a Python Object that is expected to be a Python Sequence containing Strings.
  */
-bool convert_py_sequence_to_ydb_buffer_array(PyObject *sequence, int sequence_len, ydb_buffer_t *buffer_array) {
+int convert_py_sequence_to_ydb_buffer_array(PyObject *sequence, int sequence_len, ydb_buffer_t *buffer_array) {
 	PyObject *bytes, *seq;
 	int	  status;
 
@@ -518,23 +526,41 @@ bool convert_py_sequence_to_ydb_buffer_array(PyObject *sequence, int sequence_le
 	if (!seq) {
 		PyErr_SetString(YDBPythonError, "Can't convert none sequence to buffer array.");
 		FREE_BUFFER_ARRAY(buffer_array, 0);
-		return FALSE;
+		return !YDB_OK;
 	}
 
 	for (int i = 0; i < sequence_len; i++) {
 
-		bytes = PySequence_GetItem(seq, i);		    // New reference
-		status = anystr_to_buffer(bytes, &buffer_array[i]); // Allocates buffer
+		bytes = PySequence_GetItem(seq, i);			   // New reference
+		status = anystr_to_buffer(bytes, &buffer_array[i], FALSE); // Allocates buffer
 		Py_DECREF(bytes);
 		if (YDB_OK != status) {
 			FREE_BUFFER_ARRAY(buffer_array, i);
 			Py_DECREF(seq);
-			return FALSE;
+			return !YDB_OK;
 		}
 	}
 
 	Py_DECREF(seq);
-	return TRUE;
+	return YDB_OK;
+}
+
+int populate_subs_used_and_subsarray(PyObject *pysubs, int *ret_subs_used, ydb_buffer_t **subsarray) {
+	int status = YDB_OK;
+	int subs_used;
+
+	subs_used = 0;
+	(*subsarray) = NULL;
+	if (Py_None != pysubs) {
+		subs_used = PySequence_Length(pysubs);
+		(*subsarray) = malloc(subs_used * sizeof(ydb_buffer_t));
+		status = convert_py_sequence_to_ydb_buffer_array(pysubs, subs_used, (*subsarray));
+		if (YDB_OK != status) {
+			FREE_BUFFER_ARRAY((*subsarray), subs_used);
+		}
+	}
+	(*ret_subs_used) = subs_used;
+	return status;
 }
 
 /* converts an array of ydb_buffer_ts into a sequence (Tuple) of Python strings.
@@ -550,7 +576,6 @@ PyObject *convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
 	return_tuple = PyTuple_New(len); // New Reference
 	for (i = 0; i < len; i++)
 		PyTuple_SetItem(return_tuple, i, Py_BuildValue("y#", buffer_array[i].buf_addr, buffer_array[i].len_used));
-
 	return return_tuple;
 }
 
@@ -566,9 +591,10 @@ PyObject *convert_ydb_buffer_array_to_py_tuple(ydb_buffer_t *buffer_array, int l
  *                          RETURN_IF_INVALID_SEQUENCE macro.
  */
 static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
-	bool	      done, convert_success;
+	bool	      done;
 	Py_ssize_t    len_ssize, sequence_len_ssize;
 	unsigned int  len;
+	int	      status;
 	char *	      bytes_c;
 	ydb_buffer_t *varname_y, *subsarray_y;
 
@@ -597,8 +623,8 @@ static bool load_YDBKey(YDBKey *dest, PyObject *varname, PyObject *subsarray) {
 		sequence_len_ssize = PySequence_Length(subsarray);
 		dest->subs_used = Py_SAFE_DOWNCAST(sequence_len_ssize, Py_ssize_t, unsigned int);
 		subsarray_y = malloc(dest->subs_used * sizeof(ydb_buffer_t));
-		convert_success = convert_py_sequence_to_ydb_buffer_array(subsarray, dest->subs_used, subsarray_y);
-		if (convert_success) {
+		status = convert_py_sequence_to_ydb_buffer_array(subsarray, dest->subs_used, subsarray_y);
+		if (YDB_OK == status) {
 			dest->subsarray = subsarray_y;
 		} else {
 			YDB_FREE_BUFFER(varname_y);
@@ -909,11 +935,10 @@ static int set_routine_name(char *routine_name) {
 	if (NULL != ci_info.ci_info.rtn_name.address) {
 		free(ci_info.ci_info.rtn_name.address);
 	}
-	ci_info.ci_info.rtn_name.address = malloc((ci_info.ci_info.rtn_name.length + 1) * sizeof(char));
-	memcpy(ci_info.ci_info.rtn_name.address, routine_name, ci_info.ci_info.rtn_name.length + 1);
+	ci_info.ci_info.rtn_name.address = malloc((ci_info.ci_info.rtn_name.length) * sizeof(char));
+	memcpy(ci_info.ci_info.rtn_name.address, routine_name, ci_info.ci_info.rtn_name.length);
 	ci_info.ci_info.handle = NULL;
 	ci_info.has_parm_types = FALSE;
-
 	return YDB_OK;
 }
 
@@ -932,24 +957,23 @@ static void free_ci_name_descriptor() {
 
 static PyObject *ci_wrapper(PyObject *args, PyObject *kwds, bool is_cip) {
 	bool	      return_null = false;
-	int	      status, cur_index, has_retval;
-	PyObject *    routine, *routine_args, *seq, *py_arg, *ret_value_py;
-	unsigned int  inmask, outmask, routine_name_len, io_args, num_args, cur_arg;
+	int	      status, has_retval;
+	PyObject *    routine, *routine_args, *seq, *py_arg, *ret;
+	unsigned int  inmask, outmask, io_args, num_args, cur_index, cur_arg;
 	ydb_buffer_t  routine_name;
 	ydb_string_t *args_ydb;
-	Py_ssize_t    routine_len;
 	ydb_string_t  ret_val;
-	void **	      arg_values;
+	gparam_list   arg_values;
 	ci_parm_type  parm_types;
 
 	seq = routine_args = NULL;
 	has_retval = FALSE;
-	ret_value_py = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	ret = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 
 	// Parse and validate
 	static char *kwlist[] = {"routine", "args", "has_retval", NULL};
 	// Parsed values are borrowed references, do not Py_DECREF them.
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|Op", kwlist, &routine, &routine_len, &routine_args, &has_retval)) {
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|Op", kwlist, &routine, &routine_args, &has_retval)) {
 		return NULL;
 	}
 	if (Py_None == routine) {
@@ -958,17 +982,12 @@ static PyObject *ci_wrapper(PyObject *args, PyObject *kwds, bool is_cip) {
 	}
 
 	// Lookup routine parameter information for construction of argument array
-	status = cast_pyssize_t_to_unsigned_int(&routine_name_len, routine_len, TRUE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
 	if (is_cip) {
-		POPULATE_NEW_BUFFER(routine, routine_name, routine_name_len, "cip() routine name", return_null);
+		return_null = anystr_to_buffer(routine, &routine_name, FALSE);
 	} else {
-		POPULATE_NEW_BUFFER(routine, routine_name, routine_name_len, "ci() routine name", return_null);
+		return_null = anystr_to_buffer(routine, &routine_name, FALSE);
 	}
 	if (return_null) {
-		YDB_FREE_BUFFER(&routine_name);
 		return NULL;
 	}
 	assert(routine_name.len_used < routine_name.len_alloc);
@@ -1015,11 +1034,7 @@ static PyObject *ci_wrapper(PyObject *args, PyObject *kwds, bool is_cip) {
 			YDB_FREE_BUFFER(&routine_name);
 			return NULL;
 		}
-		status = cast_pyssize_t_to_unsigned_int(&num_args, PySequence_Length(seq), FALSE);
-		if (YDB_OK != status) {
-			YDB_FREE_BUFFER(&routine_name);
-			return NULL;
-		}
+		num_args = Py_SAFE_DOWNCAST(PySequence_Length(seq), Py_ssize_t, unsigned int);
 	}
 
 	// Setup for Call
@@ -1116,32 +1131,31 @@ static PyObject *ci_wrapper(PyObject *args, PyObject *kwds, bool is_cip) {
 		ret_val.address = NULL;
 	}
 	num_args++; // Include ci_name_descriptor in argument list
-	arg_values
-	    = (void **)malloc(sizeof(void *) * (num_args + 1 + 1)); // +1 for num_args variable itself, +1 for ci_name_descriptor
-	arg_values[0] = (void *)(uintptr_t)num_args;
+	arg_values.n = (intptr_t)num_args;
 	num_args--; // Exclude routine name from loops over argument list
 
 	// Populate array of variadic arguments for function call
-	cur_index = 1; // +1 for num_args variable
+	cur_index = 0;
 	if (is_cip) {
-		arg_values[cur_index] = (void *)(uintptr_t)&ci_info.ci_info;
+		arg_values.arg[cur_index] = (uintptr_t)&ci_info.ci_info;
 	} else {
-		arg_values[cur_index] = (void *)(uintptr_t)routine_name.buf_addr;
+		arg_values.arg[cur_index] = (uintptr_t)routine_name.buf_addr;
 	}
 	cur_index++;
 	if (has_retval) {
-		arg_values[cur_index] = (void *)(uintptr_t)&ret_val;
+		arg_values.arg[cur_index] = (uintptr_t)&ret_val;
 		num_args--; // Exclude ret_val from argument loop
 		cur_index++;
 	}
 	for (cur_arg = 0; cur_arg < num_args; cur_arg++, cur_index++) {
-		arg_values[cur_index] = (void *)&args_ydb[cur_arg];
+		arg_values.arg[cur_index] = (uintptr_t)&args_ydb[cur_arg];
 	}
+	assert((num_args + has_retval + 1) == cur_index); // +1 for ci_name_descriptor
 
 	if (is_cip) {
-		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_cip, (uintptr_t)arg_values);
+		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_cip, (uintptr_t)&arg_values);
 	} else {
-		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_ci, (uintptr_t)arg_values);
+		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_ci, (uintptr_t)&arg_values);
 	}
 	if (YDB_OK != status) {
 		FREE_STRING_ARRAY(args_ydb, num_args);
@@ -1177,35 +1191,32 @@ static PyObject *ci_wrapper(PyObject *args, PyObject *kwds, bool is_cip) {
 		// Construct Python return value, if a return value was issued. See above comment for details.
 		if (has_retval) {
 			assert(NULL != ret_val.address);
-			ret_value_py = Py_BuildValue("s#", ret_val.address, (Py_ssize_t)ret_val.length);
+			ret = Py_BuildValue("s#", ret_val.address, (Py_ssize_t)ret_val.length);
 			free(ret_val.address);
 		} else {
 			Py_INCREF(Py_None);
-			ret_value_py = Py_None;
+			ret = Py_None;
 		}
 	}
 	YDB_FREE_BUFFER(&routine_name);
 	FREE_STRING_ARRAY(args_ydb, num_args);
-	free(arg_values);
 
 	if (return_null) {
 		return NULL;
 	} else {
-		return ret_value_py;
+		return ret;
 	}
 }
 
 /* Wrapper for ydb_cip() */
 static PyObject *cip(PyObject *self, PyObject *args, PyObject *kwds) {
 	UNUSED(self);
-
 	return ci_wrapper(args, kwds, TRUE);
 }
 
 /* Wrapper for ydb_ci() */
 static PyObject *ci(PyObject *self, PyObject *args, PyObject *kwds) {
 	UNUSED(self);
-
 	return ci_wrapper(args, kwds, FALSE);
 }
 
@@ -1213,7 +1224,7 @@ static PyObject *open_ci_table(PyObject *self, PyObject *args, PyObject *kwds) {
 	char *	   filename;
 	int	   status;
 	Py_ssize_t filename_len;
-	PyObject * ret_value_py;
+	PyObject * ret;
 	uintptr_t  ret_value;
 
 	UNUSED(self);
@@ -1232,18 +1243,17 @@ static PyObject *open_ci_table(PyObject *self, PyObject *args, PyObject *kwds) {
 			return NULL;
 		}
 		/* Create Python object to return */
-		ret_value_py = Py_BuildValue("k", ret_value); // New Reference
+		ret = Py_BuildValue("k", ret_value); // New Reference
 	} else {
 		raise_ValidationError(YDBPython_ValueError, NULL, YDBPY_ERR_EMPTY_FILENAME);
 		return NULL;
 	}
-
-	return ret_value_py;
+	return ret;
 }
 
 static PyObject *switch_ci_table(PyObject *self, PyObject *args, PyObject *kwds) {
 	int	  status;
-	PyObject *ret_value_py;
+	PyObject *ret;
 	uintptr_t ret_value, handle;
 
 	UNUSED(self);
@@ -1261,15 +1271,14 @@ static PyObject *switch_ci_table(PyObject *self, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 	/* Create Python object to return */
-	ret_value_py = Py_BuildValue("k", ret_value); // New Reference
-
-	return ret_value_py;
+	ret = Py_BuildValue("k", ret_value); // New Reference
+	return ret;
 }
 
 static PyObject *message(PyObject *self, PyObject *args, PyObject *kwds) {
 	int	     err_num, status;
-	PyObject *   ret_value_py;
-	ydb_buffer_t ret;
+	PyObject *   ret;
+	ydb_buffer_t ret_val;
 
 	UNUSED(self);
 
@@ -1279,174 +1288,161 @@ static PyObject *message(PyObject *self, PyObject *args, PyObject *kwds) {
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "i", kwlist, &err_num))
 		return NULL;
 
-	YDB_MALLOC_BUFFER(&ret, YDBPY_MAX_ERRORMSG);
-	status = ydb_message(err_num, &ret);
+	YDB_MALLOC_BUFFER(&ret_val, YDBPY_MAX_ERRORMSG);
+	status = ydb_message(err_num, &ret_val);
 	if (YDB_OK != status) {
 		raise_YDBError(status);
 		assert(YDB_ERR_INVSTRLEN != status);
 		return NULL;
 	}
-	ret.buf_addr[ret.len_used] = '\0';
+	ret_val.buf_addr[ret_val.len_used] = '\0';
 	/* Create Python object to return */
-	ret_value_py = Py_BuildValue("s#", ret.buf_addr, ret.len_used); // New Reference
-
-	return ret_value_py;
+	ret = Py_BuildValue("s#", ret_val.buf_addr, ret_val.len_used); // New Reference
+	return ret;
 }
 
 static PyObject *release(PyObject *self) {
 	int	     status;
-	PyObject *   ret_value_py;
-	ydb_buffer_t ret, varname;
+	PyObject *   ret;
+	ydb_buffer_t ret_value, varname;
 	char	     release[YDBPY_MAX_ERRORMSG];
 
 	UNUSED(self);
 
-	ret.buf_addr = release;
-	ret.len_alloc = YDBPY_MAX_ERRORMSG;
-	ret.len_used = 0;
+	ret_value.buf_addr = release;
+	ret_value.len_alloc = YDBPY_MAX_ERRORMSG;
+	ret_value.len_used = 0;
 	YDB_STRING_TO_BUFFER("$ZYRELEASE", &varname);
-	status = ydb_get_s(&varname, 0, NULL, &ret);
+	status = ydb_get_s(&varname, 0, NULL, &ret_value);
 	if (YDB_OK != status) {
 		raise_YDBError(status);
 		assert(YDB_ERR_INVSTRLEN != status);
 		return NULL;
 	}
-	ret.buf_addr[ret.len_used] = '\0';
+	ret_value.buf_addr[ret_value.len_used] = '\0';
 	/* Create Python object to return */
-	ret_value_py = Py_BuildValue("s#", ret.buf_addr, ret.len_used); // New Reference
+	ret = Py_BuildValue("s#", ret_value.buf_addr, ret_value.len_used); // New Reference
+	return ret;
+}
 
-	return ret_value_py;
+static PyObject *adjust_stdout_stderr(PyObject *self) {
+	int status;
+
+	UNUSED(self);
+
+	status = ydb_stdout_stderr_adjust();
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+		return NULL;
+	}
+
+	Py_INCREF(Py_None);
+	return Py_None;
 }
 
 /* Wrapper for ydb_data_s */
 static PyObject *data(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
-	char *	      varname_py;
+	PyObject *    varname_py;
 	int	      subs_used, status;
-	Py_ssize_t    py_varname_len;
-	unsigned int  ydb_varname_len, ret_value_ydb;
-	PyObject *    subsarray_py, *ret_value_py;
+	unsigned int  ret_value;
+	PyObject *    subsarray_py, *ret;
 	ydb_buffer_t  varname_ydb;
 	ydb_buffer_t *subsarray_ydb;
 
 	UNUSED(self);
-	ret_value_py = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	ret = NULL;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subs_used = 0;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subsarray_ydb = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 	/* Default values for optional arguments passed from Python */
 	subsarray_py = Py_None;
 
-	/* parse and validate */
+	/* Parse */
 	static char *kwlist[] = {"varname", "subsarray", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|O", kwlist, &varname_py, &py_varname_len, &subsarray_py))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O", kwlist, &varname_py, &subsarray_py))
 		return NULL;
 
-	/* validate */
-	status = cast_pyssize_t_to_unsigned_int(&ydb_varname_len, py_varname_len, TRUE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
+	/* Validate */
 	RETURN_IF_INVALID_SEQUENCE(subsarray_py, YDBPython_SubsarraySequence);
 
-	/* Setup for Call */
-	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "data()", return_NULL);
-	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
-	if (!return_NULL) {
-		/* Call the wrapped function */
-		status = ydb_data_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value_ydb);
-		/* check status for Errors and Raise Exception */
-		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
-		}
+	/* Setup for call */
+	INVOKE_ANYSTR_TO_BUFFER(varname_py, varname_ydb, TRUE);
+	INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(subsarray_py, subs_used, subsarray_ydb, varname_ydb);
 
-		/* Create Python object to return */
-		if (!return_NULL)
-			ret_value_py = Py_BuildValue("I", ret_value_ydb); // New Reference
-
-		/* Free allocated memory */
-		FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
-	}
-
+	/* Call the wrapped function */
+	status = ydb_data_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value);
+	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 	YDB_FREE_BUFFER(&varname_ydb);
 
-	if (return_NULL)
-		return NULL;
-	else
-		return ret_value_py;
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+	} else {
+		ret = Py_BuildValue("I", ret_value); // New Reference
+	}
+	return ret;
 }
 
 /* Wrapper for ydb_delete_s() */
 static PyObject *delete_wrapper(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
 	int	      deltype, status, subs_used;
-	Py_ssize_t    py_varname_len;
-	unsigned int  ydb_varname_len;
-	char *	      varname_py;
-	PyObject *    subsarray_py;
+	PyObject *    varname_py, *subsarray_py;
+	PyObject *    ret;
 	ydb_buffer_t  varname_ydb;
 	ydb_buffer_t *subsarray_ydb;
 
 	UNUSED(self);
+	ret = NULL;
+	subs_used = 0;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subsarray_ydb = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 	/* Default values for optional arguments passed from Python */
 	subsarray_py = Py_None;
 	deltype = YDB_DEL_NODE;
 
-	/* parse and validate */
+	/* Parse */
 	static char *kwlist[] = {"varname", "subsarray", "delete_type", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|Oi", kwlist, &varname_py, &py_varname_len, &subsarray_py, &deltype)) {
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|Oi", kwlist, &varname_py, &subsarray_py, &deltype)) {
 		return NULL;
 	}
 
-	/* validate varname */
-	status = cast_pyssize_t_to_unsigned_int(&ydb_varname_len, py_varname_len, TRUE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
+	/* Validate */
 	RETURN_IF_INVALID_SEQUENCE(subsarray_py, YDBPython_SubsarraySequence);
 
-	/* Setup for Call */
-	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "delete_wrapper()", return_NULL);
-	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
-	if (!return_NULL) {
-		/* Call the wrapped function */
-		status = ydb_delete_s(&varname_ydb, subs_used, subsarray_ydb, deltype);
-		/* check status for Errors and Raise Exception */
-		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
-		}
-		/* Free allocated memory */
-		FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
-	}
+	/* Setup for call */
+	INVOKE_ANYSTR_TO_BUFFER(varname_py, varname_ydb, TRUE);
+	INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(subsarray_py, subs_used, subsarray_ydb, varname_ydb);
 
+	/* Call the wrapped function */
+	status = ydb_delete_s(&varname_ydb, subs_used, subsarray_ydb, deltype);
 	YDB_FREE_BUFFER(&varname_ydb);
+	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 
-	if (return_NULL) {
-		return NULL;
+	if (YDB_OK != status) {
+		raise_YDBError(status);
 	} else {
 		Py_INCREF(Py_None);
-		return Py_None;
+		ret = Py_None;
 	}
+	return ret;
 }
 
 /* Wrapper for ydb_delete_excl_s() */
 static PyObject *delete_excel(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
-	bool	      success;
 	int	      namecount, status;
 	ydb_buffer_t *varnames_ydb;
-	PyObject *    varnames_py;
+	PyObject *    varnames_py, *ret;
 
 	UNUSED(self);
+	ret = NULL;
 	/* Default values for optional arguments passed from Python */
 	varnames_py = Py_None;
 
 	/* parse and validate */
 	static char *kwlist[] = {"varnames", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|O", kwlist, &varnames_py))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|O", kwlist, &varnames_py)) {
 		return NULL;
+	}
 	RETURN_IF_INVALID_SEQUENCE(varnames_py, YDBPython_VarnameSequence);
 
 	/* Setup for Call */
@@ -1455,8 +1451,8 @@ static PyObject *delete_excel(PyObject *self, PyObject *args, PyObject *kwds) {
 		namecount = PySequence_Length(varnames_py);
 	if (0 < namecount) {
 		varnames_ydb = malloc(namecount * sizeof(ydb_buffer_t));
-		success = convert_py_sequence_to_ydb_buffer_array(varnames_py, namecount, varnames_ydb);
-		if (!success) {
+		status = convert_py_sequence_to_ydb_buffer_array(varnames_py, namecount, varnames_ydb);
+		if (YDB_OK != status) {
 			FREE_BUFFER_ARRAY(varnames_ydb, namecount);
 			return NULL;
 		}
@@ -1465,164 +1461,130 @@ static PyObject *delete_excel(PyObject *self, PyObject *args, PyObject *kwds) {
 	}
 
 	status = ydb_delete_excl_s(namecount, varnames_ydb);
-	/* check status for Errors and Raise Exception */
+	FREE_BUFFER_ARRAY(varnames_ydb, namecount);
+	/* Check status for errors and raise Exception */
 	if (YDB_OK != status) {
 		raise_YDBError(status);
-		return_NULL = true;
-	}
-
-	/* free allocated memory */
-	FREE_BUFFER_ARRAY(varnames_ydb, namecount);
-
-	if (return_NULL) {
-		return NULL;
 	} else {
 		Py_INCREF(Py_None);
-		return Py_None;
+		ret = Py_None;
 	}
+	return ret;
 }
 
 /* Wrapper for ydb_get_s() */
 static PyObject *get(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
 	int	      subs_used, status;
-	unsigned int  ydb_varname_len;
-	Py_ssize_t    py_varname_len;
-	char *	      varname_py;
-	PyObject *    subsarray_py, *ret_value_py;
-	ydb_buffer_t  varname_ydb, ret_value_ydb;
+	PyObject *    varname_py;
+	PyObject *    subsarray_py, *ret;
+	ydb_buffer_t  varname_ydb, ret_value;
 	ydb_buffer_t *subsarray_ydb;
 
 	UNUSED(self);
-	ret_value_py = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	ret = NULL;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subs_used = 0;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subsarray_ydb = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 	/* Default values for optional arguments passed from Python */
 	subsarray_py = Py_None;
 
-	/* parse and validate */
+	/* Parse */
 	static char *kwlist[] = {"varname", "subsarray", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|O", kwlist, &varname_py, &py_varname_len, &subsarray_py))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O", kwlist, &varname_py, &subsarray_py))
 		return NULL;
-	/* validate varname */
-	status = cast_pyssize_t_to_unsigned_int(&ydb_varname_len, py_varname_len, TRUE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
+	/* Validate */
 	RETURN_IF_INVALID_SEQUENCE(subsarray_py, YDBPython_SubsarraySequence);
 
-	/* Setup for Call */
-	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "get()", return_NULL);
-	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
-	YDB_MALLOC_BUFFER(&ret_value_ydb, YDBPY_DEFAULT_VALUE_LEN);
-	if (!return_NULL) {
+	/* Setup for call */
+	INVOKE_ANYSTR_TO_BUFFER(varname_py, varname_ydb, TRUE);
+	INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(subsarray_py, subs_used, subsarray_ydb, varname_ydb);
+	YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_VALUE_LEN);
+
+	/* Call the wrapped function */
+	status = ydb_get_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value);
+	/* Check to see if length of string was longer than YDBPY_DEFAULT_VALUE_LEN. If so, try again
+	 * with proper length */
+	if (YDB_ERR_INVSTRLEN == status) {
+		FIX_BUFFER_LENGTH(ret_value);
 		/* Call the wrapped function */
-		status = ydb_get_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value_ydb);
-
-		/* Check to see if length of string was longer than YDBPY_DEFAULT_VALUE_LEN. If so, try again
-		 * with proper length */
-		if (YDB_ERR_INVSTRLEN == status) {
-			FIX_BUFFER_LENGTH(ret_value_ydb);
-			/* Call the wrapped function */
-			status = ydb_get_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value_ydb);
-			assert(YDB_ERR_INVSTRLEN != status);
-		}
-		/* check status for Errors and Raise Exception */
-		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
-		}
-		/* Create Python object to return */
-		if (!return_NULL) {
-			/* New Reference */
-			ret_value_py = Py_BuildValue("y#", ret_value_ydb.buf_addr, (Py_ssize_t)ret_value_ydb.len_used);
-		}
-		FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
+		status = ydb_get_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value);
+		assert(YDB_ERR_INVSTRLEN != status);
 	}
-
-	/* Free allocated memory */
+	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 	YDB_FREE_BUFFER(&varname_ydb);
-	YDB_FREE_BUFFER(&ret_value_ydb);
-
-	if (return_NULL)
-		return NULL;
-	else
-		return ret_value_py;
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+	} else {
+		/* Create Python object to return */
+		/* New Reference */
+		ret = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
+	}
+	YDB_FREE_BUFFER(&ret_value);
+	return ret;
 }
 
 /* Wrapper for ydb_incr_s() */
 static PyObject *incr(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
 	int	      status, subs_used;
-	Py_ssize_t    py_varname_len, increment_py_len;
-	unsigned int  ydb_varname_len, increment_ydb_len;
-	char *	      varname_py, *increment_py;
-	PyObject *    subsarray_py, *ret_value_py;
-	ydb_buffer_t  increment_ydb, ret_value_ydb, varname_ydb;
+	Py_ssize_t    increment_py_len;
+	PyObject *    varname_py, *increment_py;
+	PyObject *    subsarray_py, *ret;
+	ydb_buffer_t  increment_ydb, ret_value, varname_ydb;
 	ydb_buffer_t *subsarray_ydb;
 
 	UNUSED(self);
-	ret_value_py = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	ret = NULL;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subs_used = 0;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subsarray_ydb = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 	/* Default values for optional arguments passed from Python */
 	subsarray_py = Py_None;
-	increment_py = "1";
-	increment_py_len = 1;
+	increment_py = Py_None;
 
-	/* parse and validate */
+	/* Parse */
 	static char *kwlist[] = {"varname", "subsarray", "increment", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|Os#", kwlist, &varname_py, &py_varname_len, &subsarray_py, &increment_py,
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OO", kwlist, &varname_py, &subsarray_py, &increment_py,
 					 &increment_py_len)) {
 		return NULL;
 	}
-
-	/* validate varname */
-	status = cast_pyssize_t_to_unsigned_int(&ydb_varname_len, py_varname_len, TRUE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
+	/* Validate */
 	RETURN_IF_INVALID_SEQUENCE(subsarray_py, YDBPython_SubsarraySequence);
-	status = cast_pyssize_t_to_unsigned_int(&increment_ydb_len, increment_py_len, FALSE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
 
 	/* Setup for Call */
-	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "incr() for varname", return_NULL);
-	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
-	POPULATE_NEW_BUFFER(increment_py, increment_ydb, increment_ydb_len, "incr() for increment", return_NULL);
-	YDB_MALLOC_BUFFER(&ret_value_ydb, CANONICAL_NUMBER_TO_STRING_MAX);
-	if (!return_NULL) {
-		/* Call the wrapped function */
-		status = ydb_incr_s(&varname_ydb, subs_used, subsarray_ydb, &increment_ydb, &ret_value_ydb);
-		/* Check status for errors and raise exception */
+	INVOKE_ANYSTR_TO_BUFFER(varname_py, varname_ydb, TRUE);
+	INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(subsarray_py, subs_used, subsarray_ydb, varname_ydb);
+	if (Py_None == increment_py) {
+		// No value was specified, or it was None, so set node to a default of 1.
+		YDB_MALLOC_BUFFER(&increment_ydb, YDBPY_DEFAULT_VALUE_LEN);
+		increment_ydb.len_used = snprintf(increment_ydb.buf_addr, YDBPY_DEFAULT_VALUE_LEN, "1");
+	} else {
+		status = anystr_to_buffer(increment_py, &increment_ydb, FALSE);
 		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
+			YDB_FREE_BUFFER(&varname_ydb);
+			FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
+			return NULL;
 		}
-
-		/* Create Python object to return */
-		if (!return_NULL) {
-			/* New Reference */
-			ret_value_py = Py_BuildValue("y#", ret_value_ydb.buf_addr, (Py_ssize_t)ret_value_ydb.len_used);
-		}
-		FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 	}
+	YDB_MALLOC_BUFFER(&ret_value, CANONICAL_NUMBER_TO_STRING_MAX);
 
-	/* Free allocated memory */
+	/* Call the wrapped function */
+	status = ydb_incr_s(&varname_ydb, subs_used, subsarray_ydb, &increment_ydb, &ret_value);
+	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 	YDB_FREE_BUFFER(&varname_ydb);
 	YDB_FREE_BUFFER(&increment_ydb);
-	YDB_FREE_BUFFER(&ret_value_ydb);
-
-	if (return_NULL) {
-		return NULL;
+	if (YDB_OK != status) {
+		raise_YDBError(status);
 	} else {
-		return ret_value_py;
+		/* Create Python object to return. Creates a new reference */
+		ret = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
 	}
+	YDB_FREE_BUFFER(&ret_value);
+	return ret;
 }
 
 /* Wrapper for ydb_lock_s() */
 static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool		   return_NULL = false;
+	bool		   return_null = false;
 	bool		   success = true;
 	int		   len_keys, status;
 	unsigned long long timeout_nsec;
@@ -1660,46 +1622,42 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 		}
 	}
 
-	if (!return_NULL) {
-		void **arg_values;
-		int    num_args, cur_key, cur_index;
+	if (!return_null) {
+		gparam_list arg_values;
+		int	    cur_key, cur_index;
 
-		num_args = YDB_LOCK_MIN_ARGS + (len_keys * YDB_LOCK_ARGS_PER_KEY);
-		arg_values = (void **)malloc(sizeof(void *) * (num_args + 1)); // +1 for num_args variable itself
-
-		arg_values[0] = (void *)(uintptr_t)num_args;
-		arg_values[1] = (void *)timeout_nsec;
-		arg_values[2] = (void *)(uintptr_t)len_keys;
+		arg_values.n = (intptr_t)(YDB_LOCK_MIN_ARGS + (len_keys * YDB_LOCK_ARGS_PER_KEY));
+		arg_values.arg[0] = timeout_nsec;
+		arg_values.arg[1] = (uintptr_t)len_keys;
 
 		/* Initialize arg_values index to the first location after the elements
 		 * initialized above.
 		 */
-		cur_index = YDB_LOCK_MIN_ARGS + 1; // +1 for num_args variable itself
+		cur_index = YDB_LOCK_MIN_ARGS;
 		if (NULL != keys_ydb) {
 			for (cur_key = 0; cur_key < len_keys; cur_key++) {
-				arg_values[cur_index] = (void *)keys_ydb[cur_key].varname;
-				arg_values[cur_index + 1] = (void *)(uintptr_t)keys_ydb[cur_key].subs_used;
-				arg_values[cur_index + 2] = (void *)keys_ydb[cur_key].subsarray;
+				arg_values.arg[cur_index] = (uintptr_t)keys_ydb[cur_key].varname;
+				arg_values.arg[cur_index + 1] = (uintptr_t)keys_ydb[cur_key].subs_used;
+				arg_values.arg[cur_index + 2] = (uintptr_t)keys_ydb[cur_key].subsarray;
 				cur_index += YDB_LOCK_ARGS_PER_KEY;
 			}
 		}
 
-		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_lock_s, (uintptr_t)arg_values);
-		free(arg_values);
+		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_lock_s, (uintptr_t)&arg_values);
 		/* check for errors */
 		if (YDB_LOCK_TIMEOUT == status) {
 			PyErr_SetString(YDBLockTimeoutError, "Not able to acquire all requested locks in the specified time.");
-			return_NULL = true;
+			return_null = true;
 		} else if (YDB_OK != status) {
 			raise_YDBError(status);
-			return_NULL = true;
+			return_null = true;
 		}
 	}
 
 	/* Free allocated memory */
 	free_YDBKey_array(keys_ydb, len_keys);
 
-	if (return_NULL) {
+	if (return_null) {
 		return NULL;
 	} else {
 		Py_INCREF(Py_None);
@@ -1709,533 +1667,412 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /* Wrapper for ydb_lock_decr_s() */
 static PyObject *lock_decr(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
 	int	      status, subs_used;
-	Py_ssize_t    py_varname_len;
-	unsigned int  ydb_varname_len;
-	char *	      varname_py;
-	PyObject *    subsarray_py;
+	PyObject *    varname_py, *subsarray_py;
+	PyObject *    ret;
 	ydb_buffer_t  varname_ydb;
 	ydb_buffer_t *subsarray_ydb;
 
 	UNUSED(self);
+	ret = NULL;
+	subs_used = 0;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subsarray_ydb = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 	/* Default values for optional arguments passed from Python */
 	subsarray_py = Py_None;
 
-	/* parse and validate */
+	/* Parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|O", kwlist, &varname_py, &py_varname_len, &subsarray_py))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O", kwlist, &varname_py, &subsarray_py))
 		return NULL;
-	/* validate varname */
-	status = cast_pyssize_t_to_unsigned_int(&ydb_varname_len, py_varname_len, TRUE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
 	RETURN_IF_INVALID_SEQUENCE(subsarray_py, YDBPython_SubsarraySequence);
 
 	/* Setup for Call */
-	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "lock_decr()", return_NULL);
-	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
-	if (!return_NULL) {
-		/* Call the wrapped function */
-		status = ydb_lock_decr_s(&varname_ydb, subs_used, subsarray_ydb);
-		/* check status for Errors and Raise Exception */
-		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
-		}
-		FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
-	}
+	INVOKE_ANYSTR_TO_BUFFER(varname_py, varname_ydb, TRUE);
+	INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(subsarray_py, subs_used, subsarray_ydb, varname_ydb);
 
-	/* Free allocated memory */
+	/* Call the wrapped function */
+	status = ydb_lock_decr_s(&varname_ydb, subs_used, subsarray_ydb);
 	YDB_FREE_BUFFER(&varname_ydb);
-
-	if (return_NULL) {
-		return NULL;
+	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
+	if (YDB_OK != status) {
+		raise_YDBError(status);
 	} else {
 		Py_INCREF(Py_None);
-		return Py_None;
+		ret = Py_None;
 	}
+	return ret;
 }
 
 /* Wrapper for ydb_lock_incr_s() */
 static PyObject *lock_incr(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool		   return_NULL = false;
 	int		   status, subs_used;
-	Py_ssize_t	   py_varname_len;
-	unsigned int	   ydb_varname_len;
-	char *		   varname_py;
+	PyObject *	   varname_py, *subsarray_py;
+	PyObject *	   ret;
 	unsigned long long timeout_nsec;
-	PyObject *	   subsarray_py;
 	ydb_buffer_t	   varname_ydb;
 	ydb_buffer_t *	   subsarray_ydb;
 
 	UNUSED(self);
+	ret = NULL;
+	subs_used = 0;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subsarray_ydb = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 	/* Default values for optional arguments passed from Python */
 	subsarray_py = Py_None;
 	timeout_nsec = 0;
 
-	/* parse and validate */
+	/* Parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "timeout_nsec", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|OK", kwlist, &varname_py, &py_varname_len, &subsarray_py, &timeout_nsec)) {
-		return NULL;
-	}
-	/* validate varname */
-	status = cast_pyssize_t_to_unsigned_int(&ydb_varname_len, py_varname_len, TRUE);
-	if (YDB_OK != status) {
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OK", kwlist, &varname_py, &subsarray_py, &timeout_nsec)) {
 		return NULL;
 	}
 	RETURN_IF_INVALID_SEQUENCE(subsarray_py, YDBPython_SubsarraySequence);
 
 	/* Setup for Call */
-	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "lock_incr()", return_NULL);
-	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
-	if (!return_NULL) {
-		/* Call the wrapped function */
-		status = ydb_lock_incr_s(timeout_nsec, &varname_ydb, subs_used, subsarray_ydb);
-		/* check status for Errors and Raise Exception */
-		if (YDB_LOCK_TIMEOUT == status) {
-			PyErr_SetString(YDBLockTimeoutError, "Not able to acquire all requested locks in the specified time.");
-			return_NULL = true;
-		} else if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
-		}
-		FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
-	}
+	INVOKE_ANYSTR_TO_BUFFER(varname_py, varname_ydb, TRUE);
+	INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(subsarray_py, subs_used, subsarray_ydb, varname_ydb);
 
-	/* Free allocated memory */
+	/* Call the wrapped function */
+	status = ydb_lock_incr_s(timeout_nsec, &varname_ydb, subs_used, subsarray_ydb);
 	YDB_FREE_BUFFER(&varname_ydb);
-
-	if (return_NULL) {
-		return NULL;
+	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
+	if (YDB_LOCK_TIMEOUT == status) {
+		PyErr_SetString(YDBLockTimeoutError, "Not able to acquire all requested locks in the specified time.");
+	} else if (YDB_OK != status) {
+		raise_YDBError(status);
 	} else {
 		Py_INCREF(Py_None);
-		return Py_None;
+		ret = Py_None;
 	}
+	return ret;
 }
 
 /* Wrapper for ydb_node_next_s() */
 static PyObject *node_next(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
 	int	      max_subscript_string, ret_subsarray_num_elements, ret_subs_used, status, subs_used;
-	Py_ssize_t    py_varname_len;
-	unsigned int  ydb_varname_len;
-	char *	      varname_py;
-	PyObject *    subsarray_py, *ret_subsarray_py;
+	PyObject *    varname_py;
+	PyObject *    subsarray_py, *ret;
 	ydb_buffer_t  varname_ydb;
-	ydb_buffer_t *ret_subsarray_ydb, *subsarray_ydb;
+	ydb_buffer_t *ret_subsarray, *subsarray_ydb;
 
 	UNUSED(self);
-	ret_subsarray_py = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	ret = NULL;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subs_used = 0;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subsarray_ydb = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 	/* Default values for optional arguments passed from Python */
 	subsarray_py = Py_None;
 
-	/* parse and validate */
+	/* Parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|O", kwlist, &varname_py, &py_varname_len, &subsarray_py))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O", kwlist, &varname_py, &subsarray_py))
 		return NULL;
-
-	/* validate varname */
-	status = cast_pyssize_t_to_unsigned_int(&ydb_varname_len, py_varname_len, TRUE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
 	RETURN_IF_INVALID_SEQUENCE(subsarray_py, YDBPython_SubsarraySequence);
 
 	/* Setup for Call */
-	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "node_next()", return_NULL);
-	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
+	INVOKE_ANYSTR_TO_BUFFER(varname_py, varname_ydb, TRUE);
+	INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(subsarray_py, subs_used, subsarray_ydb, varname_ydb);
 	max_subscript_string = YDBPY_DEFAULT_SUBSCRIPT_LEN;
 	ret_subsarray_num_elements = YDBPY_DEFAULT_SUBSCRIPT_COUNT;
 	ret_subs_used = ret_subsarray_num_elements;
-	ret_subsarray_ydb = create_empty_buffer_array(ret_subs_used, max_subscript_string);
-	if (!return_NULL) {
-		/* Call the wrapped function */
-		status = ydb_node_next_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray_ydb);
+	ret_subsarray = create_empty_buffer_array(ret_subs_used, max_subscript_string);
 
-		/* If not enough buffers in ret_subsarray */
-		if (YDB_ERR_INSUFFSUBS == status) {
-			FREE_BUFFER_ARRAY(ret_subsarray_ydb, ret_subsarray_num_elements);
-			ret_subsarray_num_elements = ret_subs_used;
-			ret_subsarray_ydb = create_empty_buffer_array(ret_subs_used, max_subscript_string);
-			/* recall the wrapped function */
-			status = ydb_node_next_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray_ydb);
-		}
-
-		/* if a buffer is not long enough */
-		while (YDB_ERR_INVSTRLEN == status) {
-			FIX_BUFFER_LENGTH(ret_subsarray_ydb[ret_subs_used]);
-			ret_subs_used = ret_subsarray_num_elements;
-			/* recall the wrapped function */
-			status = ydb_node_next_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray_ydb);
-		}
-		assert(YDB_ERR_INVSTRLEN != status);
-		/* check status for Errors and Raise Exception */
-		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
-		}
-		/* Create Python object to return */
-		if (!return_NULL) {
-			/* New Reference */
-			ret_subsarray_py = convert_ydb_buffer_array_to_py_tuple(ret_subsarray_ydb, ret_subs_used);
-		}
-		FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
+	/* Call the wrapped function */
+	status = ydb_node_next_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray);
+	/* If not enough buffers in ret_subsarray */
+	if (YDB_ERR_INSUFFSUBS == status) {
+		FREE_BUFFER_ARRAY(ret_subsarray, ret_subsarray_num_elements);
+		ret_subsarray_num_elements = ret_subs_used;
+		ret_subsarray = create_empty_buffer_array(ret_subs_used, max_subscript_string);
+		/* Re-call the wrapped function */
+		status = ydb_node_next_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray);
 	}
-
-	/* Free allocated memory */
+	/* If a buffer is not long enough */
+	while (YDB_ERR_INVSTRLEN == status) {
+		FIX_BUFFER_LENGTH(ret_subsarray[ret_subs_used]);
+		ret_subs_used = ret_subsarray_num_elements;
+		/* Re-call the wrapped function */
+		status = ydb_node_next_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray);
+	}
 	YDB_FREE_BUFFER(&varname_ydb);
-	FREE_BUFFER_ARRAY(ret_subsarray_ydb, ret_subsarray_num_elements);
+	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
+	assert(YDB_ERR_INVSTRLEN != status);
 
-	if (return_NULL)
-		return NULL;
-	else
-		return ret_subsarray_py;
+	/* Check status for errors and Raise Exception */
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+	} else {
+		/* Create Python object to return */
+		/* New Reference */
+		ret = convert_ydb_buffer_array_to_py_tuple(ret_subsarray, ret_subs_used);
+	}
+	FREE_BUFFER_ARRAY(ret_subsarray, ret_subsarray_num_elements);
+	return ret;
 }
 
 /* Wrapper for ydb_node_previous_s() */
 static PyObject *node_previous(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
 	int	      max_subscript_string, ret_subsarray_num_elements, ret_subs_used, status, subs_used;
-	Py_ssize_t    py_varname_len;
-	unsigned int  ydb_varname_len;
-	char *	      varname_py;
-	PyObject *    subsarray_py, *ret_subsarray_py;
+	PyObject *    varname_py;
+	PyObject *    subsarray_py, *ret;
 	ydb_buffer_t  varname_ydb;
-	ydb_buffer_t *ret_subsarray_ydb, *subsarray_ydb;
+	ydb_buffer_t *ret_subsarray, *subsarray_ydb;
 
 	UNUSED(self);
-	ret_subsarray_py = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	ret = NULL;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subs_used = 0;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subsarray_ydb = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 	/* Default values for optional arguments passed from Python */
 	subsarray_py = Py_None;
 
-	/* parse and validate */
+	/* Parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|O", kwlist, &varname_py, &py_varname_len, &subsarray_py))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O", kwlist, &varname_py, &subsarray_py))
 		return NULL;
-
-	/* validate varname */
-	status = cast_pyssize_t_to_unsigned_int(&ydb_varname_len, py_varname_len, TRUE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
 	RETURN_IF_INVALID_SEQUENCE(subsarray_py, YDBPython_SubsarraySequence);
 
 	/* Setup for Call */
-	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "node_previous()", return_NULL);
-	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
-
+	INVOKE_ANYSTR_TO_BUFFER(varname_py, varname_ydb, TRUE);
+	INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(subsarray_py, subs_used, subsarray_ydb, varname_ydb);
 	max_subscript_string = YDBPY_DEFAULT_SUBSCRIPT_LEN;
 	ret_subsarray_num_elements = YDBPY_DEFAULT_SUBSCRIPT_COUNT;
 	ret_subs_used = ret_subsarray_num_elements;
-	ret_subsarray_ydb = create_empty_buffer_array(ret_subs_used, max_subscript_string);
-	if (!return_NULL) {
-		/* Call the wrapped function */
-		status = ydb_node_previous_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray_ydb);
+	ret_subsarray = create_empty_buffer_array(ret_subs_used, max_subscript_string);
 
-		/* If not enough buffers in ret_subsarray */
-		if (YDB_ERR_INSUFFSUBS == status) {
-			FREE_BUFFER_ARRAY(ret_subsarray_ydb, ret_subsarray_num_elements);
-			ret_subsarray_num_elements = ret_subs_used;
-			ret_subsarray_ydb = create_empty_buffer_array(ret_subs_used, max_subscript_string);
-			/* recall the wrapped function */
-			status = ydb_node_previous_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray_ydb);
-		}
-		/* if a buffer is not long enough */
-		while (YDB_ERR_INVSTRLEN == status) {
-			FIX_BUFFER_LENGTH(ret_subsarray_ydb[ret_subs_used]);
-			ret_subs_used = ret_subsarray_num_elements;
-			/* recall the wrapped function */
-			status = ydb_node_previous_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray_ydb);
-		}
-		assert(YDB_ERR_INVSTRLEN != status);
-		/* check status for Errors and Raise Exception */
-		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
-		}
-
-		/* Create Python object to return */
-		if (!return_NULL) {
-			/* New Reference */
-			ret_subsarray_py = convert_ydb_buffer_array_to_py_tuple(ret_subsarray_ydb, ret_subs_used);
-		}
-		FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
+	/* Call the wrapped function */
+	status = ydb_node_previous_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray);
+	/* If not enough buffers in ret_subsarray */
+	if (YDB_ERR_INSUFFSUBS == status) {
+		FREE_BUFFER_ARRAY(ret_subsarray, ret_subsarray_num_elements);
+		ret_subsarray_num_elements = ret_subs_used;
+		ret_subsarray = create_empty_buffer_array(ret_subs_used, max_subscript_string);
+		/* Re-call the wrapped function */
+		status = ydb_node_previous_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray);
 	}
-
-	/* Free allocated memory */
+	/* If a buffer is not long enough */
+	while (YDB_ERR_INVSTRLEN == status) {
+		FIX_BUFFER_LENGTH(ret_subsarray[ret_subs_used]);
+		ret_subs_used = ret_subsarray_num_elements;
+		/* Re-call the wrapped function */
+		status = ydb_node_previous_s(&varname_ydb, subs_used, subsarray_ydb, &ret_subs_used, ret_subsarray);
+	}
+	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 	YDB_FREE_BUFFER(&varname_ydb);
-	FREE_BUFFER_ARRAY(ret_subsarray_ydb, ret_subsarray_num_elements);
+	assert(YDB_ERR_INVSTRLEN != status);
 
-	if (return_NULL)
-		return NULL;
-	else
-		return ret_subsarray_py;
+	/* Check status for errors and raise Exception */
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+	} else {
+		/* Create Python object to return. Creates a new reference */
+		ret = convert_ydb_buffer_array_to_py_tuple(ret_subsarray, ret_subs_used);
+	}
+	FREE_BUFFER_ARRAY(ret_subsarray, ret_subsarray_num_elements);
+	return ret;
 }
 
 /* Wrapper for ydb_set_s() */
 static PyObject *set(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
 	int	      status = YDB_OK, subs_used;
-	Py_ssize_t    py_varname_len, value_py_len;
-	unsigned int  ydb_varname_len, value_ydb_len;
-	char *	      varname_py, *value_py;
-	PyObject *    subsarray_py;
+	PyObject *    varname_py, *value_py, *subsarray_py;
+	PyObject *    ret;
 	ydb_buffer_t  value_ydb, varname_ydb;
 	ydb_buffer_t *subsarray_ydb;
 
 	UNUSED(self);
+	ret = NULL;
+	subs_used = 0;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subsarray_ydb = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 	/* Default values for optional arguments passed from Python */
 	subsarray_py = Py_None;
-	value_py = "";
-	value_py_len = 0;
+	value_py = Py_None;
 
-	/* parse and validate */
+	/* Parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", "value", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|Os#", kwlist, &varname_py, &py_varname_len, &subsarray_py, &value_py,
-					 &value_py_len)) {
-		return NULL;
-	}
-	/* validate varname */
-	status = cast_pyssize_t_to_unsigned_int(&ydb_varname_len, py_varname_len, TRUE);
-	if (YDB_OK != status) {
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OO", kwlist, &varname_py, &subsarray_py, &value_py)) {
 		return NULL;
 	}
 	RETURN_IF_INVALID_SEQUENCE(subsarray_py, YDBPython_SubsarraySequence);
-	status = cast_pyssize_t_to_unsigned_int(&value_ydb_len, value_py_len, FALSE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
 
 	/* Setup for Call */
-	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "set() for varname", return_NULL);
-	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
-	POPULATE_NEW_BUFFER(value_py, value_ydb, value_ydb_len, "set() for value", return_NULL);
-	if (!return_NULL) {
-		/* Call the wrapped function */
-		status = ydb_set_s(&varname_ydb, subs_used, subsarray_ydb, &value_ydb);
-		/* check status for Errors and Raise Exception */
+	INVOKE_ANYSTR_TO_BUFFER(varname_py, varname_ydb, TRUE);
+	INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(subsarray_py, subs_used, subsarray_ydb, varname_ydb);
+	if (Py_None == value_py) {
+		// No value was specified, or it was None, so set node to empty string.
+		YDB_MALLOC_BUFFER(&value_ydb, YDBPY_DEFAULT_VALUE_LEN);
+		value_ydb.buf_addr[0] = '\0';
+		value_ydb.len_used = 0;
+	} else {
+		status = anystr_to_buffer(value_py, &value_ydb, FALSE);
 		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
+			FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
+			YDB_FREE_BUFFER(&varname_ydb);
+			return NULL;
 		}
-		FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 	}
 
-	/* Free allocated memory */
+	/* Call the wrapped function */
+	status = ydb_set_s(&varname_ydb, subs_used, subsarray_ydb, &value_ydb);
+	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 	YDB_FREE_BUFFER(&varname_ydb);
 	YDB_FREE_BUFFER(&value_ydb);
 
-	if (return_NULL)
-		return NULL;
-	else {
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+	} else {
 		Py_INCREF(Py_None);
-		return Py_None;
+		ret = Py_None;
 	}
+	return ret;
 }
 
 /* Wrapper for ydb_str2zwr_s() */
 static PyObject *str2zwr(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
 	int	     status;
 	Py_ssize_t   str_py_len;
-	unsigned int str_ydb_len;
-	char *	     str_py;
+	PyObject *   str_py, *ret;
 	ydb_buffer_t str_ydb, zwr_ydb;
-	PyObject *   zwr_py;
 
 	UNUSED(self);
-	/* Default values for optional arguments passed from Python */
-	str_py = "";
-	str_py_len = 0;
+	ret = NULL;
 
-	/* parse and validate */
+	/* Parse */
 	static char *kwlist[] = {"input", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|", kwlist, &str_py, &str_py_len))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|", kwlist, &str_py, &str_py_len))
 		return NULL;
-	status = cast_pyssize_t_to_unsigned_int(&str_ydb_len, str_py_len, FALSE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
 
 	/* Setup for Call */
-	POPULATE_NEW_BUFFER(str_py, str_ydb, str_ydb_len, "ydb_str2zwr", return_NULL);
+	INVOKE_ANYSTR_TO_BUFFER(str_py, str_ydb, FALSE);
 	YDB_MALLOC_BUFFER(&zwr_ydb, YDBPY_DEFAULT_VALUE_LEN);
-	if (!return_NULL) {
-		/* Call the wrapped function */
+
+	/* Call the wrapped function */
+	status = ydb_str2zwr_s(&str_ydb, &zwr_ydb);
+	/* Re-call with properly sized buffer if zwr_buf is not long enough */
+	if (YDB_ERR_INVSTRLEN == status) {
+		FIX_BUFFER_LENGTH(zwr_ydb);
+		/* recall the wrapped function */
 		status = ydb_str2zwr_s(&str_ydb, &zwr_ydb);
-
-		/* recall with properly sized buffer if zwr_buf is not long enough */
-		if (YDB_ERR_INVSTRLEN == status) {
-			FIX_BUFFER_LENGTH(zwr_ydb);
-			/* recall the wrapped function */
-			status = ydb_str2zwr_s(&str_ydb, &zwr_ydb);
-			assert(YDB_ERR_INVSTRLEN != status);
-		}
-		/* check status for Errors and Raise Exception */
-		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
-		}
-
-		/* Create Python object to return */
-		if (!return_NULL) {
-			/* New Reference */
-			zwr_py = Py_BuildValue("y#", zwr_ydb.buf_addr, (Py_ssize_t)zwr_ydb.len_used);
-		}
+		assert(YDB_ERR_INVSTRLEN != status);
 	}
-	/* free allocated memory */
 	YDB_FREE_BUFFER(&str_ydb);
-	YDB_FREE_BUFFER(&zwr_ydb);
 
-	if (return_NULL)
-		return NULL;
-	else
-		return zwr_py;
+	/* Check status for Errors and Raise Exception */
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+	} else {
+		/* Create Python object to return. Creates a new reference */
+		ret = Py_BuildValue("y#", zwr_ydb.buf_addr, (Py_ssize_t)zwr_ydb.len_used);
+	}
+	YDB_FREE_BUFFER(&zwr_ydb);
+	return ret;
 }
 
 /* Wrapper for ydb_subscript_next_s() */
 static PyObject *subscript_next(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
 	int	      status, subs_used;
-	Py_ssize_t    py_varname_len;
-	unsigned int  ydb_varname_len;
-	char *	      varname_py;
-	PyObject *    subsarray_py, *ret_value_py;
-	ydb_buffer_t  ret_value_ydb, varname_ydb;
+	PyObject *    varname_py;
+	PyObject *    subsarray_py, *ret;
+	ydb_buffer_t  ret_value, varname_ydb;
 	ydb_buffer_t *subsarray_ydb;
 
 	UNUSED(self);
-	ret_value_py = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	ret = NULL;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subs_used = 0;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subsarray_ydb = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 	/* Default values for optional arguments passed from Python */
 	subsarray_py = Py_None;
 
-	/* parse and validate */
+	/* Parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|O", kwlist, &varname_py, &py_varname_len, &subsarray_py))
-		return NULL;
-
-	/* validate varname */
-	status = cast_pyssize_t_to_unsigned_int(&ydb_varname_len, py_varname_len, TRUE);
-	if (YDB_OK != status) {
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O", kwlist, &varname_py, &subsarray_py)) {
 		return NULL;
 	}
 	RETURN_IF_INVALID_SEQUENCE(subsarray_py, YDBPython_SubsarraySequence);
 
 	/* Setup for Call */
-	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "subscript_next()", return_NULL);
-	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
-	YDB_MALLOC_BUFFER(&ret_value_ydb, YDBPY_DEFAULT_SUBSCRIPT_LEN);
-	if (!return_NULL) {
-		/* Call the wrapped function */
-		status = ydb_subscript_next_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value_ydb);
+	INVOKE_ANYSTR_TO_BUFFER(varname_py, varname_ydb, TRUE);
+	INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(subsarray_py, subs_used, subsarray_ydb, varname_ydb);
+	YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_SUBSCRIPT_LEN);
 
-		/* check to see if length of string was longer than YDBPY_DEFAULT_SUBSCRIPT_LEN is so, try again
-		 * with proper length */
-		if (YDB_ERR_INVSTRLEN == status) {
-			FIX_BUFFER_LENGTH(ret_value_ydb);
-			/* recall the wrapped function */
-			status = ydb_subscript_next_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value_ydb);
-			assert(YDB_ERR_INVSTRLEN != status);
-		}
-		/* check status for Errors and Raise Exception */
-		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
-		}
-
-		/* Create Python object to return */
-		if (!return_NULL) {
-			/* New Reference */
-			ret_value_py = Py_BuildValue("y#", ret_value_ydb.buf_addr, (Py_ssize_t)ret_value_ydb.len_used);
-		}
-		FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
+	/* Call the wrapped function */
+	status = ydb_subscript_next_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value);
+	/* Check whether length of string was longer than YDBPY_DEFAULT_SUBSCRIPT_LEN is so, try again
+	 * with proper length */
+	if (YDB_ERR_INVSTRLEN == status) {
+		FIX_BUFFER_LENGTH(ret_value);
+		/* recall the wrapped function */
+		status = ydb_subscript_next_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value);
+		assert(YDB_ERR_INVSTRLEN != status);
 	}
-
-	/* Free allocated memory */
+	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 	YDB_FREE_BUFFER(&varname_ydb);
-	YDB_FREE_BUFFER(&ret_value_ydb);
 
-	if (return_NULL)
-		return NULL;
-	else
-		return ret_value_py;
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+	} else {
+		/* Create Python object to return. Creates new reference */
+		ret = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
+	}
+	YDB_FREE_BUFFER(&ret_value);
+	return ret;
 }
 
 /* Wrapper for ydb_subscript_previous_s() */
 static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
 	int	      status, subs_used;
-	Py_ssize_t    py_varname_len;
-	unsigned int  ydb_varname_len;
-	char *	      varname_py;
-	PyObject *    subsarray_py, *ret_value_py;
-	ydb_buffer_t  ret_value_ydb, varname_ydb;
+	PyObject *    varname_py;
+	PyObject *    subsarray_py, *ret;
+	ydb_buffer_t  ret_value, varname_ydb;
 	ydb_buffer_t *subsarray_ydb;
 
 	UNUSED(self);
-	ret_value_py = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	ret = NULL;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subs_used = 0;	      // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
+	subsarray_ydb = NULL; // Initialize to prevent "maybe-uninitialized" compiler warning on old versions of GCC
 	/* Default values for optional arguments passed from Python */
 	subsarray_py = Py_None;
 
-	/* Setup for Call */
+	/* Parse and validate */
 	static char *kwlist[] = {"varname", "subsarray", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|O", kwlist, &varname_py, &py_varname_len, &subsarray_py))
-		return NULL;
-
-	/* validate varname */
-	status = cast_pyssize_t_to_unsigned_int(&ydb_varname_len, py_varname_len, TRUE);
-	if (YDB_OK != status) {
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O", kwlist, &varname_py, &subsarray_py)) {
 		return NULL;
 	}
 	RETURN_IF_INVALID_SEQUENCE(subsarray_py, YDBPython_SubsarraySequence);
 
-	/* Setup for Call */
-	POPULATE_NEW_BUFFER(varname_py, varname_ydb, ydb_varname_len, "subscript_previous()", return_NULL);
-	POPULATE_SUBS_USED_AND_SUBSARRAY(subsarray_py, subs_used, subsarray_ydb, return_NULL);
-	YDB_MALLOC_BUFFER(&ret_value_ydb, YDBPY_DEFAULT_SUBSCRIPT_LEN);
-	if (!return_NULL) {
-		/* Call the wrapped function */
-		status = ydb_subscript_previous_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value_ydb);
+	/* Setup for call */
+	INVOKE_ANYSTR_TO_BUFFER(varname_py, varname_ydb, TRUE);
+	INVOKE_POPULATE_SUBS_USED_AND_SUBSARRAY_AND_CLEANUP_VARNAME(subsarray_py, subs_used, subsarray_ydb, varname_ydb);
+	YDB_MALLOC_BUFFER(&ret_value, YDBPY_DEFAULT_SUBSCRIPT_LEN);
 
-		/* check to see if length of string was longer than YDBPY_DEFAULT_SUBSCRIPT_LEN is so, try again
-		 * with proper length */
-		if (YDB_ERR_INVSTRLEN == status) {
-			FIX_BUFFER_LENGTH(ret_value_ydb);
-			status = ydb_subscript_previous_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value_ydb);
-			assert(YDB_ERR_INVSTRLEN != status);
-		}
-		/* check status for Errors and Raise Exception */
-		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
-		}
+	/* Call the wrapped function */
+	status = ydb_subscript_previous_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value);
 
-		/* Create Python object to return */
-		if (!return_NULL) {
-			/* New Reference */
-			ret_value_py = Py_BuildValue("y#", ret_value_ydb.buf_addr, (Py_ssize_t)ret_value_ydb.len_used);
-		}
-		FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
+	/* Check whether length of string was longer than YDBPY_DEFAULT_SUBSCRIPT_LEN.
+	 * If so, try again with proper length
+	 */
+	if (YDB_ERR_INVSTRLEN == status) {
+		FIX_BUFFER_LENGTH(ret_value);
+		status = ydb_subscript_previous_s(&varname_ydb, subs_used, subsarray_ydb, &ret_value);
+		assert(YDB_ERR_INVSTRLEN != status);
 	}
-
-	/* Free allocated memory */
 	YDB_FREE_BUFFER(&varname_ydb);
-	YDB_FREE_BUFFER(&ret_value_ydb);
+	FREE_BUFFER_ARRAY(subsarray_ydb, subs_used);
 
-	if (return_NULL)
-		return NULL;
-	else
-		return ret_value_py;
+	/* Check status for Errors and Raise Exception */
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+	} else {
+		/* Create Python object to return. Creates a new reference */
+		ret = Py_BuildValue("y#", ret_value.buf_addr, (Py_ssize_t)ret_value.len_used);
+	}
+	YDB_FREE_BUFFER(&ret_value);
+	return ret;
 }
 
 /* Callback functions used by Wrapper for ydb_tp_s() */
@@ -2257,10 +2094,10 @@ static PyObject *subscript_previous(PyObject *self, PyObject *args, PyObject *kw
  *              value (tp()) just needs to return NULL.
  */
 static int callback_wrapper(void *function_with_arguments) {
-	int	  ret_value_ydb;
+	int	  ret_value;
 	bool	  decref_args = false;
 	bool	  decref_kwargs = false;
-	PyObject *function, *args, *kwargs, *ret_value_py;
+	PyObject *function, *args, *kwargs, *ret;
 	PyObject *err_object;
 
 	function = PyTuple_GetItem(function_with_arguments, 0); // Borrowed Reference
@@ -2276,14 +2113,14 @@ static int callback_wrapper(void *function_with_arguments) {
 		decref_kwargs = true;
 	}
 
-	ret_value_py = PyObject_Call(function, args, kwargs); // New Reference
+	ret = PyObject_Call(function, args, kwargs); // New Reference
 
 	if (decref_args)
 		Py_DECREF(args);
 	if (decref_kwargs)
 		Py_DECREF(kwargs);
 
-	if (NULL == ret_value_py) {
+	if (NULL == ret) {
 		/* No return value was specified, signalling that `function` raised an exception.
 		 * So, confirm that an exception was actually raised and determine the value to
 		 * return to ydb_tp_s based on that, specifically looking out for YDB_TP_RESTART
@@ -2310,20 +2147,18 @@ static int callback_wrapper(void *function_with_arguments) {
 			 */
 			return YDB_ERR_TPCALLBACKINVRETVAL;
 		}
-	} else if (!PyLong_Check(ret_value_py)) {
+	} else if (!PyLong_Check(ret)) {
 		PyErr_SetString(PyExc_TypeError, "Callback function must return value of type int.");
 		return YDB_ERR_TPCALLBACKINVRETVAL;
 	}
-	ret_value_ydb = (int)PyLong_AsLong(ret_value_py);
-	Py_DECREF(ret_value_py);
-
-	return ret_value_ydb;
+	ret_value = (int)PyLong_AsLong(ret);
+	Py_DECREF(ret);
+	return ret_value;
 }
 
 /* Wrapper for ydb_tp_s() */
 static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	      return_NULL = false;
-	bool	      success;
+	bool	      return_null = false;
 	int	      namecount, status;
 	char *	      transid;
 	PyObject *    callback, *callback_args, *callback_kwargs, *varnames_py, *function_with_arguments;
@@ -2342,27 +2177,27 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOsO", kwlist, &callback, &callback_args, &callback_kwargs, &transid,
 					 &varnames_py)) {
-		return_NULL = true;
+		return_null = true;
 	}
 
 	/* validate input */
 	if (!PyCallable_Check(callback)) {
 		PyErr_SetString(PyExc_TypeError, "'callback' must be a callable.");
-		return_NULL = true;
+		return_null = true;
 	}
 	if ((Py_None != callback_args) && !PyTuple_Check(callback_args)) {
 		PyErr_SetString(PyExc_TypeError, "'args' must be a tuple. "
 						 "(It will be passed to the callback "
 						 "function as positional arguments.)");
-		return_NULL = true;
+		return_null = true;
 	}
 	if ((Py_None != callback_kwargs) && !PyDict_Check(callback_kwargs)) {
 		PyErr_SetString(PyExc_TypeError, "'kwargs' must be a dictionary. "
 						 "(It will be passed to the callback function as keyword arguments.)");
-		return_NULL = true;
+		return_null = true;
 	}
 	RETURN_IF_INVALID_SEQUENCE(varnames_py, YDBPython_VarnameSequence);
-	if (!return_NULL) {
+	if (!return_null) {
 		/* Setup for Call */
 		/* New Reference */
 		function_with_arguments = Py_BuildValue("(OOO)", callback, callback_args, callback_kwargs);
@@ -2371,8 +2206,8 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 
 		if (0 < namecount) {
 			varnames_ydb = (ydb_buffer_t *)malloc(namecount * sizeof(ydb_buffer_t));
-			success = convert_py_sequence_to_ydb_buffer_array(varnames_py, namecount, varnames_ydb);
-			if (!success) {
+			status = convert_py_sequence_to_ydb_buffer_array(varnames_py, namecount, varnames_ydb);
+			if (YDB_OK != status) {
 				Py_DECREF(function_with_arguments);
 				return NULL;
 			}
@@ -2385,17 +2220,17 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 		/* Check status for errors and raise exception */
 		if (YDB_ERR_TPCALLBACKINVRETVAL == status) {
 			// Exception already raised in callback_wrapper
-			return_NULL = true;
+			return_null = true;
 		} else if (YDB_OK != status) {
 			raise_YDBError(status);
-			return_NULL = true;
+			return_null = true;
 		}
 		/* Free allocated memory */
 		Py_DECREF(function_with_arguments);
 		FREE_BUFFER_ARRAY(varnames_ydb, namecount);
 	}
 
-	if (return_NULL) {
+	if (return_null) {
 		return NULL;
 	} else {
 		return Py_BuildValue("i", status);
@@ -2404,59 +2239,45 @@ static PyObject *tp(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /* Wrapper for ydb_zwr2str_s() */
 static PyObject *zwr2str(PyObject *self, PyObject *args, PyObject *kwds) {
-	bool	     return_NULL = false;
 	int	     status;
 	Py_ssize_t   zwr_py_len;
-	unsigned int zwr_ydb_len;
-	char *	     zwr_py;
-	PyObject *   str_py;
+	PyObject *   zwr_py;
+	PyObject *   ret;
 	ydb_buffer_t zwr_ydb, str_ydb;
 
 	UNUSED(self);
-	/* Default values for optional arguments passed from Python */
-	zwr_py = "";
-	zwr_py_len = 0;
+	ret = NULL;
 
-	/* parse and validate */
+	/* Parse */
 	static char *kwlist[] = {"input", NULL};
 	/* Parsed values are borrowed references, do not Py_DECREF them. */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|K", kwlist, &zwr_py, &zwr_py_len))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|K", kwlist, &zwr_py, &zwr_py_len))
 		return NULL;
-	status = cast_pyssize_t_to_unsigned_int(&zwr_ydb_len, zwr_py_len, FALSE);
-	if (YDB_OK != status) {
-		return NULL;
-	}
 
 	/* Setup for Call */
-	POPULATE_NEW_BUFFER(zwr_py, zwr_ydb, zwr_ydb_len, "zwr2str()", return_NULL);
+	INVOKE_ANYSTR_TO_BUFFER(zwr_py, zwr_ydb, FALSE);
 	YDB_MALLOC_BUFFER(&str_ydb, YDBPY_DEFAULT_VALUE_LEN);
-	if (!return_NULL) {
-		/* Call the wrapped function */
+
+	/* Call the wrapped function */
+	status = ydb_zwr2str_s(&zwr_ydb, &str_ydb);
+	/* recall with properly sized buffer if zwr_ydb is not long enough */
+	if (YDB_ERR_INVSTRLEN == status) {
+		FIX_BUFFER_LENGTH(str_ydb);
+		/* recall the wrapped function */
 		status = ydb_zwr2str_s(&zwr_ydb, &str_ydb);
-		/* recall with properly sized buffer if zwr_ydb is not long enough */
-		if (YDB_ERR_INVSTRLEN == status) {
-			FIX_BUFFER_LENGTH(str_ydb);
-			/* recall the wrapped function */
-			status = ydb_zwr2str_s(&zwr_ydb, &str_ydb);
-			assert(YDB_ERR_INVSTRLEN != status);
-		}
-		/* check status for Errors and Raise Exception */
-		if (YDB_OK != status) {
-			raise_YDBError(status);
-			return_NULL = true;
-		}
-		if (!return_NULL) {
-			/* New Reference */
-			str_py = Py_BuildValue("y#", str_ydb.buf_addr, (Py_ssize_t)str_ydb.len_used);
-		}
+		assert(YDB_ERR_INVSTRLEN != status);
 	}
 	YDB_FREE_BUFFER(&zwr_ydb);
-	YDB_FREE_BUFFER(&str_ydb);
 
-	if (return_NULL)
-		return NULL;
-	else
-		return str_py;
+	/* Check status for errors and raise Exception */
+	if (YDB_OK != status) {
+		raise_YDBError(status);
+	} else {
+		/* New Reference */
+		ret = Py_BuildValue("y#", str_ydb.buf_addr, (Py_ssize_t)str_ydb.len_used);
+	}
+	YDB_FREE_BUFFER(&str_ydb);
+	return ret;
 }
 
 /*Comprehensive API
@@ -2541,6 +2362,9 @@ static PyMethodDef methods[] = {
      "open the specified call-in table file to allow calls to functions specified therein using ci() and cip()\n"},
     {"release", (PyCFunction)release, METH_NOARGS,
      "returns the release number of the active YottaDB installation. Equivalent to $ZYRELEASE in M.\n"},
+    {"adjust_stdout_stderr", (PyCFunction)adjust_stdout_stderr, METH_NOARGS,
+     "Check whether stdout (file descriptor 1) and stderr (file descriptor 2) are the same file, and if so, route stderr writes to "
+     "stdout instead.\n"},
     {"set", (PyCFunction)set, METH_VARARGS | METH_KEYWORDS, "sets the value of a node or raises exception"},
     {"str2zwr", (PyCFunction)str2zwr, METH_VARARGS | METH_KEYWORDS,
      "returns the zwrite formatted (Bytes Object) version of the"

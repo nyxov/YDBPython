@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -282,14 +282,14 @@ def test_lock_incr_timeout_error_varname_only(new_db):
     key = ("^test1", ())
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.2)
+    time.sleep(0.1)  # Sleep for half the time the lock is held by lock_value
     with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr("^test1")
     process.join()
     # Using bytes arguments
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.2)
+    time.sleep(0.1)  # Sleep for half the time the lock is held by lock_value
     with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr(b"^test1")
     process.join()
@@ -300,14 +300,14 @@ def test_lock_incr_timeout_error_varname_and_subscript(new_db):
     key = ("^test2", ("sub1",))
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.2)
+    time.sleep(0.1)  # Sleep for half the time the lock is held by lock_value
     with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr("^test2", ("sub1",))
     process.join()
     # Using bytes arguments
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.2)
+    time.sleep(0.1)  # Sleep for half the time the lock is held by lock_value
     with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr(b"^test2", (b"sub1",))
     process.join()
@@ -315,14 +315,14 @@ def test_lock_incr_timeout_error_varname_and_subscript(new_db):
     key2 = ("^test2", ("sub1",))
     process = multiprocessing.Process(target=lock_value, args=(key2,))
     process.start()
-    time.sleep(0.2)
+    time.sleep(0.1)  # Sleep for half the time the lock is held by lock_value
     with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr("^test2", ("sub1",))
     process.join()
     # Using bytes arguments
     process = multiprocessing.Process(target=lock_value, args=(key2,))
     process.start()
-    time.sleep(0.2)
+    time.sleep(0.1)  # Sleep for half the time the lock is held by lock_value
     with pytest.raises(_yottadb.YDBLockTimeoutError):
         _yottadb.lock_incr(b"^test2", (b"sub1",))
     process.join()

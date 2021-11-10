@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -14,6 +14,7 @@
 from setuptools import setup, Extension, find_packages
 import os
 import pathlib
+import subprocess
 import re
 
 
@@ -23,6 +24,10 @@ if YDB_DIST is None:
     print("error: $ydb_dist is not set in the environment")
     print("help: run `source $(pkg-config --variable=prefix yottadb)/ydb_env_set`")
     exit(1)
+
+
+def run_shell_cmd(cmd: str) -> str:
+    return subprocess.run(cmd, stdout=subprocess.PIPE, shell=True).stdout.decode()
 
 
 def create_constants_from_header_file():
@@ -69,7 +74,28 @@ def create_constants_from_header_file():
         header_file.write(header_file_text)
 
 
+# Define link and compile argument lists before calling setup() to allow optional
+# arguments to be appended prior to compilation.
+extra_link_args = ["-lyottadb", "-lffi", "-Wl,-rpath=" + YDB_DIST]
+extra_compile_args = ["--std=c99", "-Wall", "-Wextra", "-pedantic", "-Wno-cast-function-type"]
+# Check whether YDB was compiled with address sanitization (ASAN). If so, compile YDBPython with it also.
+use_asan = int(run_shell_cmd("nm $ydb_dist/libyottadb.so | grep -c 'U __asan_init'"))
+if use_asan:
+    print("YDBPython: YottaDB was compiled with address sanitization (ASAN). Compiling YDBPython WITH ASAN...")
+    # Set required environment variables
+    os.environ["LD_PRELOAD"] = run_shell_cmd("gcc -print-file-name=libasan.so").replace("\n", "")
+    os.environ["ASAN_OPTIONS"] = "detect_leaks=0:disable_coredump=0:unmap_shadow_on_exit=1:abort_on_error=1"
+    ld_preload = run_shell_cmd("gcc -print-file-name=libasan.so").replace("\n", "")
+    # Add ASAN compiler and linker arguments
+    extra_link_args.append("-fsanitize=address")
+    extra_compile_args.append("-fsanitize=address")
+    assert ld_preload == os.environ["LD_PRELOAD"]
+else:
+    print("YDBPython: YottaDB was NOT compiled with address sanitization (ASAN). Compiling YDBPython WITHOUT ASAN.")
+
+
 create_constants_from_header_file()
+
 
 setup(
     name="yottadb",
@@ -81,10 +107,10 @@ setup(
             include_dirs=[YDB_DIST],
             library_dirs=[YDB_DIST],
             undef_macros=["NDEBUG"],  # Uncomment to enable asserts if a Debug build is desired
-            extra_link_args=["-lyottadb", "-lffi", "-Wl,-rpath=" + YDB_DIST],
+            extra_link_args=extra_link_args,
             # Set `-Wno-cast-function-type` to suppress 'cast between incompatible function types' warning
             # See discussion at: https://gitlab.com/YottaDB/DB/YDBDoc/-/merge_requests/482#note_686747517
-            extra_compile_args=["--std=c99", "-Wall", "-Wextra", "-pedantic", "-Wno-cast-function-type"],
+            extra_compile_args=extra_compile_args,
         )
     ],
     py_modules=["_yottadb", "yottadb"],
