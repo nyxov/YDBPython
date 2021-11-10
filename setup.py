@@ -14,31 +14,24 @@
 from setuptools import setup, Extension, find_packages
 import os
 import pathlib
-import csv
 import re
-from typing import Dict
 
+
+# Confirm $ydb_dist is set before running tests
 YDB_DIST = os.environ.get("ydb_dist")
 if YDB_DIST is None:
     print("error: $ydb_dist is not set in the environment")
     print("help: run `source $(pkg-config --variable=prefix yottadb)/ydb_env_set`")
     exit(1)
 
-ERROR_DEF_FILES = ["libydberrors.h", "libydberrors2.h"]
-ERROR_NAME_ALTERATIONS_FILE = "error_name_alterations.csv"
-
-
-def get_alteration_dict(filename: str) -> Dict[str, str]:
-    alterations = {}
-    alterations_file = pathlib.Path(".") / filename
-    with alterations_file.open() as f:
-        reader = csv.reader(f)
-        for row in reader:
-            alterations[row[0]] = row[1]
-    return alterations
-
 
 def create_constants_from_header_file():
+    """
+    Programmatically generates Python integer objects from YDB C constants found in libyottadb.h,
+    libydberrors.h, and libydberrors2.h and places in _yottadbconstants.h for inclusion in yottadb.py.
+
+    :returns: None.
+    """
     YDB_Dir = pathlib.Path(YDB_DIST)
     constants_header = pathlib.Path(".") / "_yottadbconstants.h"
     constant_data = []
@@ -76,7 +69,6 @@ def create_constants_from_header_file():
         header_file.write(header_file_text)
 
 
-# create_exceptions_from_error_codes()
 create_constants_from_header_file()
 
 setup(

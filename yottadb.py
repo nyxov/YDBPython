@@ -11,8 +11,7 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
-from typing import Optional, List, Union, Generator, Sequence, AnyStr, Any, Callable, NewType, Tuple
-import enum
+from typing import Optional, List, Union, Generator, AnyStr, Any, Callable, NewType, Tuple
 import copy
 import struct
 from builtins import property
@@ -21,7 +20,11 @@ import _yottadb
 from _yottadb import *
 
 
+# Create Type objects for each custom type used in this module
+# for use in type annotations
 Key = NewType("Key", object)
+SubscriptsIter = NewType("SubscriptsIter", object)
+NodesIter = NewType("NodesIter", object)
 
 # Get the maximum number of arguments accepted by ci()/cip()
 # based on whether the CPU architecture is 32-bit or 64-bit
@@ -58,13 +61,14 @@ def get_error_code(YDBError):
 setattr(YDBError, "code", get_error_code)
 
 
-class SearchSpace(enum.Enum):
-    LOCAL = enum.auto()
-    GLOBAL = enum.auto()
-    BOTH = enum.auto()
+def get(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> Optional[bytes]:
+    """
+    Retrieve the value of the local or global variable node specified by the `varname` and `subsarray` pair.
 
-
-def get(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Optional[bytes]:
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :returns: If the specified node has a value, returns it as a bytes object. If not, returns None.
+    """
     if "$" == varname[0] and () != subsarray:
         raise ValueError(f"YottaDB Intrinsic Special Variable (ISV) cannot be subscripted: {varname}")
     try:
@@ -77,12 +81,20 @@ def get(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Optional[bytes]:
             raise e
 
 
-def set(varname: AnyStr, subsarray: Sequence[AnyStr] = (), value: AnyStr = "") -> None:
+def set(varname: AnyStr, subsarray: Tuple[AnyStr] = (), value: AnyStr = "") -> None:
+    """
+    Set the local or global variable node specified by the `varname` and `subsarray` pair.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :param value: A bytes-like object representing the value of a YottaDB local or global variable node.
+    :returns: None.
+    """
     _yottadb.set(varname, subsarray, value)
     return None
 
 
-def ci(routine: AnyStr, args: Sequence[Any] = (), has_retval: bool = False) -> Any:
+def ci(routine: AnyStr, args: Tuple[Any] = (), has_retval: bool = False) -> Any:
     """
     Call an M routine specified in a YottaDB call-in table using the specified arguments, if any.
     If the routine has a return value, this must be indicated using the has_retval parameter by
@@ -115,7 +127,7 @@ def message(errnum: int) -> str:
     return _yottadb.message(errnum)
 
 
-def cip(routine: AnyStr, args: Sequence[Any] = (), has_retval: bool = False) -> Any:
+def cip(routine: AnyStr, args: Tuple[Any] = (), has_retval: bool = False) -> Any:
     """
     Call an M routine specified in a YottaDB call-in table using the specified arguments, if any,
     reusing the internal YottaDB call-in handle on subsequent calls to the same routine
@@ -177,19 +189,55 @@ def switch_ci_table(handle: int) -> int:
     return result
 
 
-def data(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> int:
+def data(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> int:
+    """
+    Get the following information about the status of the local or global variable node specified
+    by the `varname` and `subsarray` pair:
+
+    0: There is neither a value nor a subtree, i.e., it is undefined.
+    1: There is a value, but no subtree
+    10: There is no value, but there is a subtree.
+    11: There are both a value and a subtree.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :returns: 0, 1, 10, or 11, representing the various possible statuses of the specified node.
+    """
     return _yottadb.data(varname, subsarray)
 
 
-def delete_node(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
+def delete_node(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> None:
+    """
+    Deletes the value at the local or global variable node specified by the `varname` and `subsarray` pair.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :returns: None.
+    """
     _yottadb.delete(varname, subsarray, YDB_DEL_NODE)
 
 
-def delete_tree(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
+def delete_tree(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> None:
+    """
+    Deletes the value and any subtree of the local or global variable node specified by the `varname` and `subsarray` pair.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :returns: None.
+    """
     _yottadb.delete(varname, subsarray, YDB_DEL_TREE)
 
 
-def incr(varname: AnyStr, subsarray: Sequence[AnyStr] = (), increment: Union[int, float, str, bytes] = "1") -> bytes:
+def incr(varname: AnyStr, subsarray: Tuple[AnyStr] = (), increment: Union[int, float, str, bytes] = "1") -> bytes:
+    """
+    Increments the value of the local or global variable node specified by the `varname` and `subsarray` pair
+    by the amount specified by `increment`.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :param increment: A numeric value specifying the amount by which to increment the given node.
+    :returns: The new value of the node as a bytes object.
+    """
     if (
         not isinstance(increment, int)
         and not isinstance(increment, str)
@@ -206,51 +254,160 @@ def incr(varname: AnyStr, subsarray: Sequence[AnyStr] = (), increment: Union[int
     return _yottadb.incr(varname, subsarray, increment)
 
 
-def subscript_next(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> bytes:
+def subscript_next(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> bytes:
+    """
+    Retrieves the next subscript at the given subscript level of the local or global variable node
+    specified by the `varname` and `subsarray` pair.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :returns: The next subscript at the given subscript level as a bytes object.
+    """
     return _yottadb.subscript_next(varname, subsarray)
 
 
-def subscript_previous(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> bytes:
+def subscript_previous(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> bytes:
+    """
+    Retrieves the previous subscript at the given subscript level of the local or global variable node
+    specified by the `varname` and `subsarray` pair.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :returns: The previous subscript at the given subscript level as a bytes object.
+    """
     return _yottadb.subscript_previous(varname, subsarray)
 
 
-def node_next(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Tuple[bytes, ...]:
+def node_next(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> Tuple[bytes, ...]:
+    """
+    Retrieves the next node from the local or global variable node specified by the `varname`
+    and `subsarray` pair.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :returns: A subscript array representing the next node as a tuple of bytes objects.
+    """
     return _yottadb.node_next(varname, subsarray)
 
 
-def node_previous(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> Tuple[bytes, ...]:
+def node_previous(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> Tuple[bytes, ...]:
+    """
+    Retrieves the previous node from the local or global variable node specified by the `varname`
+    and `subsarray` pair.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :returns: A subscript array representing the previous node as a tuple of bytes objects.
+    """
     return _yottadb.node_previous(varname, subsarray)
 
 
-def lock_incr(varname: AnyStr, subsarray: Sequence[AnyStr] = (), timeout_nsec: int = 0) -> None:
+def lock_incr(varname: AnyStr, subsarray: Tuple[AnyStr] = (), timeout_nsec: int = 0) -> None:
+    """
+    Without releasing any locks held by the process attempt to acquire a lock on the local or global
+    variable node specified by the `varname` and `subsarray` pair, incrementing it if already held.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :param timeout_nsec: The time in nanoseconds that the function waits to acquire the requested lock.
+    :returns: None.
+    """
     return _yottadb.lock_incr(varname, subsarray, timeout_nsec)
 
 
-def lock_decr(varname: AnyStr, subsarray: Sequence[AnyStr] = ()) -> None:
+def lock_decr(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> None:
+    """
+    Decrements the lock count held by the process on the local or global variable node specified by
+    the `varname` and `subsarray` pair.
+
+    If the lock count goes from 1 to 0 the lock is released. If the specified lock is not held by the
+    process calling `lock_decr()`, the call is ignored.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :returns: None.
+    """
     return _yottadb.lock_decr(varname, subsarray)
 
 
 def str2zwr(string: AnyStr) -> bytes:
+    """
+    Converts the given bytes-like object into YottaDB $ZWRITE format.
+
+    :param string: A bytes-like object representing an arbitrary string.
+    :returns: A bytes-like object representing `string` in YottaDB $ZWRITE format.
+    """
     return _yottadb.str2zwr(string)
 
 
 def zwr2str(string: AnyStr) -> bytes:
+    """
+    Converts the given bytes-like object from YottaDB $ZWRITE format into regular
+    character string.
+
+    :param string: A bytes-like object representing an arbitrary string.
+    :returns: A bytes-like object representing the YottaDB $ZWRITE formatted `string` as a character string.
+    """
     return _yottadb.zwr2str(string)
 
 
-def tp(callback: object, args: tuple = None, transid: str = "", varnames: Sequence[AnyStr] = None, **kwargs) -> int:
+def tp(callback: object, args: tuple = None, transid: str = "", varnames: Tuple[AnyStr] = None, **kwargs) -> int:
+    """
+    Calls the function referenced by `callback` passing it the arguments specified by `args` using YottaDB Transaction Processing.
+
+    Transcation throughput and latency may be improved by passing a case-insensitive value of "BA" or "BATCH" to `transid`,
+    indicating that at transaction commit, YottaDB need not ensure Durability (it always ensures Atomicity, Consistency,
+    and Isolation).
+
+    Use of this value may improve latency and throughput for those applications where an alternative mechanism
+    (such as a checkpoint) provides acceptable Durability. If a transaction that is not flagged as "BATCH" follows
+    one or more transactions so flagged, Durability of the later transaction ensures Durability of the the earlier
+    "BATCH" transaction(s).
+
+    :param callback: A function object representing a Python function definition.
+    :param args: A tuple of arguments accepted by the `callback` function.
+    :param transid: A string that, when passed "BA" or "BATCH", optionally improves transaction throughput and latency,
+        while removing the guarantee of Durability from ACID transactions.
+    :returns: A bytes-like object representing the YottaDB $ZWRITE formatted `string` as a character string.
+    """
     return _yottadb.tp(callback, args, kwargs, transid, varnames)
 
 
 class SubscriptsIter:
-    def __init__(self, varname: AnyStr, subsarray: Sequence[AnyStr] = ()):
+    """
+    Iterator class for iterating over subscripts starting from the local or global variable node
+    specified by the `varname` and `subsarray` pair passed to the `__init__()` constructor.
+    """
+
+    def __init__(self, varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> SubscriptsIter:
+        """
+        Creates a `SubscriptsIter` class object from the local or global variable node specified
+        by the `varname` and `subsarray` pair.
+
+        :param varname: A bytes-like object representing a YottaDB local or global variable name.
+        :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+        :returns: A `SubscriptsIter` object.
+        """
         self.varname = varname
         self.subsarray = list(subsarray)
 
-    def __iter__(self):
+    def __iter__(self) -> SubscriptsIter:
+        """
+        Converts the current object to an iterator. Since this is already an iterator object, just
+        returns the object as is.
+
+        :returns: A `SubscriptsIter` object.
+        """
         return self
 
-    def __next__(self):
+    def __next__(self) -> bytes:
+        """
+        Returns the next subscript relative to the current local or global variable node represented by
+        the `self.varname` and `self.subsarray` pair, and updates `self.subsarray` with this next subscript
+        in preparation for the next `__next__()` call.
+
+        :returns: A bytes object representing the next subscript relative to the current local or global variable node.
+        """
         try:
             if len(self.subsarray) > 0:
                 sub_next = subscript_next(self.varname, self.subsarray)
@@ -265,7 +422,14 @@ class SubscriptsIter:
             raise StopIteration
         return sub_next
 
-    def __reversed__(self):
+    def __reversed__(self) -> list:
+        """
+        Creates a new iterable by compiling a list of all subscripts preceding the current local or global variable
+        node represented by the `self.varname` and `self.subsarray` pair. The result is the list of subscripts from
+        the current node in reverse order, which is then returned.
+
+        :returns: A list of bytes objects representing the set of subscripts preceding the current local or global variable node.
+        """
         result = []
         while True:
             try:
@@ -284,19 +448,55 @@ class SubscriptsIter:
 
 
 def subscripts(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> SubscriptsIter:
+    """
+    A convenience function that yields a `SubscriptsIter` class object from the local or global
+    variable node specified by the `varname` and `subsarray` pair, providing a more readable
+    interface for generating `SubscriptsIter` objects than calling the class constructor.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :returns: A `SubscriptsIter` object.
+    """
     return SubscriptsIter(varname, subsarray)
 
 
 class NodesIter:
+    """
+    Iterator class for iterating over YottaDB local or global variable nodes starting from the node
+    specified by the `varname` and `subsarray` pair passed to the `__init__()` constructor.
+    """
+
     def __init__(self, varname: AnyStr, subsarray: Tuple[AnyStr] = ()):
+        """
+        Creates a `NodesIter` class object from the local or global variable node specified
+        by the `varname` and `subsarray` pair.
+
+        :param varname: A bytes-like object representing a YottaDB local or global variable name.
+        :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+        :returns: A `NodesIter` object.
+        """
         self.varname = varname
         self.subsarray = [bytes(x, encoding="UTF-8") for x in subsarray]
         self.initialized = False
 
-    def __iter__(self):
+    def __iter__(self) -> NodesIter:
+        """
+        Converts the current object to an iterator. Since this is already an iterator object, just
+        returns the object as is.
+
+        :returns: A `NodesIter` object.
+        """
         return self
 
-    def __next__(self):
+    def __next__(self) -> Tuple[bytes]:
+        """
+        Returns the subscript array of the next node relative to the current local or global variable node represented by
+        the `self.varname` and `self.subsarray` pair, and updates `self.subsarray` with this new subscript array
+        in preparation for the next `__next__()` call.
+
+        :returns: A tuple of bytes objects representing the subscript array for the next node relative to the current local
+            or global variable node.
+        """
         if not self.initialized:
             self.initialized = True
             status = data(self.varname)
@@ -309,20 +509,53 @@ class NodesIter:
         return self.subsarray
 
     def __reversed__(self):
+        """
+        Creates a new iterable for iterating over nodes preceding the current local or global variable in reverse by
+        creating a new `NodesIterReversed` object and returning it.
+
+        :returns: A NodesIterReversed object.
+        """
         return NodesIterReversed(self.varname, self.subsarray)
 
 
 class NodesIterReversed:
+    """
+    Iterator class for iterating in reverse over YottaDB local or global variable nodes starting from the node
+    specified by the `varname` and `subsarray` pair passed to the `__init__()` constructor.
+    """
+
     def __init__(self, varname: AnyStr, subsarray: Tuple[AnyStr] = ()):
+        """
+        Creates a `NodesIterReversed` class object from the local or global variable node specified
+        by the `varname` and `subsarray` pair.
+
+        :param varname: A bytes-like object representing a YottaDB local or global variable name.
+        :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+        :returns: A `NodesIterReversed` object.
+        """
         self.varname = varname
         self.subsarray = [bytes(x) for x in subsarray]
         self.reversed = [bytes(x) for x in subsarray]
         self.initialized = False
 
     def __iter__(self):
+        """
+        Converts the current object to an iterator. Since this is already an iterator object, just
+        returns the object as is.
+
+        :returns: A `NodesIterReversed` object.
+        """
         return self
 
     def __next__(self):
+        """
+        Returns the subscript array of the previous node relative to the current local or global variable node represented by
+        the `self.varname` and `self.reversed` pair, and updates `self.reversed` with this new subscript array
+        in preparation for the next `__next__()` call.
+
+        :returns: A tuple of bytes objects representing the subscript array for the previous node relative to the current local
+            or global variable node.
+        """
         # If this is the first iteration, then the last node of the reversed node iteration
         # is not yet known. So first look that up and return it, then signal to future calls
         # that this node is known by setting self.initialized, in which case future iterations
@@ -352,19 +585,47 @@ class NodesIterReversed:
         return self.reversed
 
     def __reversed__(self):
+        """
+        Creates a new iterable for iterating over nodes following the current local or global variable by
+        creating a new `NodesIter` object and returning it.
+
+        :returns: A NodesIter object.
+        """
         return NodesIter(self.varname, self.subarray)
 
 
 def nodes(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> NodesIter:
+    """
+    A convenience function that yields a `NodesIter` class object from the local or global
+    variable node specified by the `varname` and `subsarray` pair, providing a more readable
+    interface for generating `NodesIter` objects than calling the class constructor.
+
+    :param varname: A bytes-like object representing a YottaDB local or global variable name.
+    :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
+    :returns: A `NodesIter` object.
+    """
     return NodesIter(varname, subsarray)
 
 
 class Key:
+    """
+    A class that represents a single YottaDB local or global variable node and supplies methods
+    for performing various database operations on or relative to that node.
+    """
+
     name: AnyStr
     parent: Key
     next_subsarray: List
 
-    def __init__(self, name: AnyStr, parent: Key = None) -> None:
+    def __init__(self, name: AnyStr, parent: Key = None) -> Key:
+        """
+        Creates a `NodesIterReversed` class object from the local or global variable node specified
+        by the `varname` and `subsarray` pair.
+
+        :param name: A bytes-like object representing a YottaDB local or global variable name, or subscript name.
+        :param parent: A `Key` object representing a valid YottaDB local or global variable node.
+        :returns: A `Key` object.
+        """
         if isinstance(name, str) or isinstance(name, bytes):
             self.name = name
         else:
@@ -389,12 +650,22 @@ class Key:
             self.next_subsarray.append("")
 
     def __repr__(self) -> str:
+        """
+        Produces a string representation of the current `Key` object that may be used to reproduce the object if passed to `eval()`.
+
+        :returns: A string representation of the current `Key` object for passage to `eval()`.
+        """
         result = f'{self.__class__.__name__}("{self.varname}")'
         for subscript in self.subsarray:
             result += f'["{subscript}"]'
         return result
 
     def __str__(self) -> str:
+        """
+        Produces a human-readable string representation of the current `Key` object.
+
+        :returns: A human-readable string representation of the current `Key` object.
+        """
         # Convert to ZWRITE format to allow decoding of binary blobs into `str` objects
         subscripts = ",".join([str2zwr(sub).decode("ascii") for sub in self.subsarray])
         if subscripts == "":
@@ -402,17 +673,47 @@ class Key:
         else:
             return f"{self.varname}({subscripts})"
 
-    def __setitem__(self, item, value):
+    def __setitem__(self, item: AnyStr, value: AnyStr) -> None:
+        """
+        Sets the value of the local or global variable node specified by the current `Key` object with
+        `item` appended to its subscript array to the value specified by `value`. This is done by creating
+        a new `Key` object from the current one in combination with the subscript name specified by `item`.
+
+        :param item: A bytes-like object representing a YottaDB subscript name.
+        :param value: A bytes-like object representing the value of a YottaDB local or global variable node.
+        :returns: None.
+        """
         Key(name=item, parent=self).value = value
 
     def __getitem__(self, item):
+        """
+        Creates a new `Key` object representing the local or global variable node specified by the current
+        `Key` object with `item` appended to its subscript array.
+
+        :param item: A bytes-like object representing a YottaDB subscript name.
+        :returns: A new `Key` object.
+        """
         return Key(name=item, parent=self)
 
     def __iadd__(self, num: Union[int, float, str, bytes]) -> Key:
+        """
+        Increments the value of the local or global variable node specified by the current `Key` object
+        by the amount specified by `num`.
+
+        :param num: A numeric value specifying the amount by which to increment the given node.
+        :returns: The current `Key` object.
+        """
         self.incr(num)
         return self
 
     def __isub__(self, num: Union[int, float, str, bytes]) -> Key:
+        """
+        Decrements the value of the local or global variable node specified by the current `Key` object
+        by the amount specified by `num`.
+
+        :param num: A numeric value specifying the amount by which to decrement the given node.
+        :returns: The current `Key` object.
+        """
         if isinstance(num, float):
             self.incr(-float(num))
         else:
@@ -420,12 +721,24 @@ class Key:
         return self
 
     def __eq__(self, other) -> bool:
+        """
+        Evaluates whether the current `Key` object represents the same YottaDB local or global variable name as `other`.
+
+        :param other: A `Key` object representing a valid YottaDB local or global variable node.
+        :returns: True if the two `Key`s represent the same node, or False otherwise.
+        """
         if isinstance(other, Key):
             return self.varname == other.varname and self.subsarray == other.subsarray
         else:
             return self.value == other
 
     def __iter__(self) -> Generator:
+        """
+        A Generator that returns the a `Key` object representing the node at the next subscript relative to the local or
+        global variable node represented by the current `Key` object on each iteration.
+
+        :returns: A `Key` object representing the node at the next subscript relative to the local or global variable.
+        """
         if len(self.subsarray) > 0:
             subscript_subsarray = list(self.subsarray)
         else:
@@ -440,6 +753,12 @@ class Key:
                 return
 
     def __reversed__(self) -> Generator:
+        """
+        A Generator that returns the a `Key` object representing the node at the previous subscript relative to the
+        local or global variable node represented by the current `Key` object on each iteration.
+
+        :returns: A `Key` object representing the node at the previous subscript relative to the local or global variable.
+        """
         if len(self.subsarray) > 0:
             subscript_subsarray = list(self.subsarray)
         else:
@@ -454,26 +773,74 @@ class Key:
                 return
 
     def get(self) -> Optional[bytes]:
+        """
+        Retrieve the value of the local or global variable node represented by the current `Key` object.
+
+        :returns: If the specified node has a value, returns it as a bytes object. If not, returns None.
+        """
         return get(self.varname, self.subsarray)
 
     def set(self, value: AnyStr = "") -> None:
+        """
+        Set the local or global variable node represented by the current `Key` object.
+
+        :param value: A bytes-like object representing the value of a YottaDB local or global variable node.
+        :returns: None.
+        """
         return set(self.varname, self.subsarray, value)
 
     @property
     def data(self) -> int:
+        """
+        Get the following information about the status of the local or global variable node represented
+        by the current `Key` object.
+
+        0: There is neither a value nor a subtree, i.e., it is undefined.
+        1: There is a value, but no subtree
+        10: There is no value, but there is a subtree.
+        11: There are both a value and a subtree.
+
+        :returns: 0, 1, 10, or 11, representing the various possible statuses of the specified node.
+        """
         return data(self.varname, self.subsarray)
 
     def delete_node(self) -> None:
+        """
+        Deletes the value at the local or global variable node represented by the current `Key` object.
+
+        :returns: None.
+        """
         delete_node(self.varname, self.subsarray)
 
     def delete_tree(self) -> None:
+        """
+        Deletes the value and any subtree of the local or global variable node represented by the current `Key` object.
+
+        :returns: None.
+        """
         delete_tree(self.varname, self.subsarray)
 
     def incr(self, increment: Union[int, float, str, bytes] = "1") -> bytes:
+        """
+        Increments the value of the local or global variable node represented by the current `Key` object
+        by the amount specified by `increment`.
+
+        :param increment: A numeric value specifying the amount by which to increment the given node.
+        :returns: The new value of the node as a bytes object.
+        """
         # incr() will enforce increment type
         return incr(self.varname, self.subsarray, increment)
 
-    def subscript_next(self, reset: bool = False) -> AnyStr:
+    def subscript_next(self, reset: bool = False) -> bytes:
+        """
+        Iterate over the subscripts at the given subscript level of the local or global variable node
+        represented by the current `Key` object. When all subscripts are exhausted this method will
+        raise `YDBNodeEnd` until the iteration is reset by passing a value of `True` to the `reset`
+        parameter.
+
+        :param reset: A boolean value indicating whether or not to reset subscripts iteration to the original node.
+        :returns: The next subscript at the given subscript level as a bytes object.
+        """
         if reset:
             self.next_subsarray.pop()
             self.next_subsarray.append("")
@@ -485,6 +852,15 @@ class Key:
         return next_sub
 
     def subscript_previous(self, reset: bool = False) -> bytes:
+        """
+        Iterate over the subscripts at the given subscript level of the local or global variable node
+        represented by the current `Key` object in reverse order. When all subscripts are exhausted
+        this method will raise `YDBNodeEnd` until the iteration is reset by passing a value of `True` to
+        the `reset` parameter.
+
+        :param reset: A boolean value indicating whether or not to reset subscripts iteration to the original node.
+        :returns: The previous subscript at the given subscript level as a bytes object.
+        """
         if reset:
             self.next_subsarray.pop()
             self.next_subsarray.append("")
@@ -496,16 +872,48 @@ class Key:
         return prev_sub
 
     def lock(self, timeout_nsec: int = 0) -> None:
+        """
+        Release any locks held by the process, and attempt to acquire a lock on the local or global variable node
+        represented by the current `Key` object.
+
+        The specified locks are released unconditionally, except in the case of an error. On return, the function will have acquired
+        the requested lock or else no locks.
+
+        :param timeout_nsec: The time in nanoseconds that the function waits to acquire the requested locks.
+        :returns: None.
+        """
         return lock((self,), timeout_nsec)
 
     def lock_incr(self, timeout_nsec: int = 0) -> None:
+        """
+        Without releasing any locks held by the process attempt to acquire a lock on the local or global
+        variable node represented by the current `Key` object, incrementing it if already held.
+
+        :param timeout_nsec: The time in nanoseconds that the function waits to acquire the requested lock.
+        :returns: None.
+        """
         return lock_incr(self.varname, self.subsarray, timeout_nsec)
 
     def lock_decr(self) -> None:
+        """
+        Decrements the lock count held by the process on the local or global variable node represented by
+        the current `Key` object.
+
+        If the lock count goes from 1 to 0 the lock is released. If the specified lock is not held by the
+        process calling `lock_decr()`, the call is ignored.
+
+        :returns: None.
+        """
         return lock_decr(self.varname, self.subsarray)
 
     @property
     def varname_key(self) -> Key:
+        """
+        Returns a `Key` object representing the unsubscripted local or global variable the node represented by
+        the current `Key` object falls under.
+
+        :returns: A `Key` object representing an unsubscripted local or global variable.
+        """
         if self.parent is None:
             return self
         ancestor = self.parent
@@ -515,10 +923,21 @@ class Key:
 
     @property
     def varname(self) -> AnyStr:
+        """
+        Returns the name of the local or global variable the node represented by the current `Key` object
+        falls under.
+
+        :returns: A bytes-like object representing a local or global variable name.
+        """
         return self.varname_key.name  # str or bytes
 
     @property
     def subsarray_keys(self) -> List["Key"]:
+        """
+        Returns a list of all parent `Key`s of the current `Key` object.
+
+        :returns: A list `Key` objects representing all parents nodes of the current `Key` object.
+        """
         if self.parent is None:
             return []
         subs_array = [self]
@@ -530,6 +949,11 @@ class Key:
 
     @property
     def subsarray(self) -> List[AnyStr]:
+        """
+        Returns the names of all subscripts of the current `Key` object.
+
+        :returns: A list of bytes-like objects representing the names of all subscripts of the current `Key` object.
+        """
         ret_list = []
         for key in self.subsarray_keys:
             ret_list.append(key.name)
@@ -537,15 +961,32 @@ class Key:
 
     @property
     def value(self) -> Optional[bytes]:
+        """
+        Retrieve the value of the local or global variable node represented by the current `Key` object.
+
+        :returns: If the specified node has a value, returns it as a bytes object. If not, returns None.
+        """
         return get(self.varname, self.subsarray)
 
     @value.setter
     def value(self, value: AnyStr) -> None:
+        """
+        Set the value of the local or global variable node represented by the current `Key` object.
+
+        :param value: A bytes-like object representing the value of a YottaDB local or global variable node.
+        :returns: None.
+        """
         # Value must be str or bytes
         set(self.varname, self.subsarray, value)
 
     @property
     def has_value(self):
+        """
+        Indicates whether the local or global variable node represented by the current `Key` object
+        has a value or not.
+
+        :returns: `True` if the node has a value, `False` otherwise.
+        """
         if self.data == YDB_DATA_VALUE_NODESC or self.data == YDB_DATA_VALUE_DESC:
             return True
         else:
@@ -553,6 +994,12 @@ class Key:
 
     @property
     def has_tree(self):
+        """
+        Indicates whether the local or global variable node represented by the current `Key` object
+        has a subtree or not.
+
+        :returns: `True` if the node has a subtree, `False` otherwise.
+        """
         if self.data == YDB_DATA_NOVALUE_DESC or self.data == YDB_DATA_VALUE_DESC:
             return True
         else:
@@ -560,6 +1007,12 @@ class Key:
 
     @property
     def subscripts(self) -> Generator:
+        """
+        A Generator that returns the next subscript at the current subscript level relative to the
+        local or global variable node represented by the current `Key` object on each iteration.
+
+        :returns: A bytes objects representing the subscript following the current local or global variable node.
+        """
         if len(self.subsarray) > 0:
             subscript_subsarray = list(self.subsarray)
         else:
@@ -579,13 +1032,36 @@ class Key:
 
 
 # Defined after Key class to allow access to that class
-def lock(keys: Sequence[tuple] = None, timeout_nsec: int = 0) -> None:
+def lock(keys: Tuple[Tuple[AnyStr, Tuple[AnyStr]]] = None, timeout_nsec: int = 0) -> None:
+    """
+    Release any locks held by the process, and attempt to acquire all the locks named by `keys`. Each element
+    of `keys` must be a tuple containing a bytes-like object representing a YottaDB local or global variable name
+    and another tuple of bytes-like objects representing a subscript array. Together, these compose a single YottaDB
+    key specification. For example, `("^myglobal", ("sub1", "sub2"))` represents the YottaDB node `^myglobal("sub1","sub2")`.
+
+    The specified locks are released unconditionally, except in the case of an error. On return, the function will
+    have acquired all requested locks or none of them. If no locks are requested (`keys` is empty), the function releases all
+    locks and returns `None`.
+
+    :param keys: A tuple of tuples, each representing a YottaDB local or global variable node.
+    :param timeout_nsec: The time in nanoseconds that the function waits to acquire the requested locks.
+    :returns: None.
+    """
     if keys is not None:
         keys = [(key.varname, key.subsarray) if isinstance(key, Key) else key for key in keys]
     return _yottadb.lock(keys=keys, timeout_nsec=timeout_nsec)
 
 
 def transaction(function) -> Callable[..., object]:
+    """
+    Convert the specified `function` into a transaction-safe function by wrapping it in a call to `tp()`. The new function
+    can then be used to call the original function with YottaDB Transaction Processing, without the need for an explicit call
+    to `tp()`. Can be used as a decorator.
+
+    :param function: A Python object representing a Python function definition.
+    :returns: A Python function object that may calls `function` using `tp()`.
+    """
+
     def wrapper(*args, **kwargs) -> int:
         def wrapped_transaction(*args, **kwargs):
             ret_val = YDB_OK
