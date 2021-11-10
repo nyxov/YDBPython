@@ -1137,25 +1137,25 @@ static PyObject *ci_wrapper(PyObject *args, PyObject *kwds, bool is_cip) {
 	// Populate array of variadic arguments for function call
 	cur_index = 0;
 	if (is_cip) {
-		arg_values.arg[cur_index] = (uintptr_t)&ci_info.ci_info;
+		arg_values.arg[cur_index] = &ci_info.ci_info;
 	} else {
-		arg_values.arg[cur_index] = (uintptr_t)routine_name.buf_addr;
+		arg_values.arg[cur_index] = routine_name.buf_addr;
 	}
 	cur_index++;
 	if (has_retval) {
-		arg_values.arg[cur_index] = (uintptr_t)&ret_val;
+		arg_values.arg[cur_index] = &ret_val;
 		num_args--; // Exclude ret_val from argument loop
 		cur_index++;
 	}
 	for (cur_arg = 0; cur_arg < num_args; cur_arg++, cur_index++) {
-		arg_values.arg[cur_index] = (uintptr_t)&args_ydb[cur_arg];
+		arg_values.arg[cur_index] = &args_ydb[cur_arg];
 	}
 	assert((num_args + has_retval + 1) == cur_index); // +1 for ci_name_descriptor
 
 	if (is_cip) {
-		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_cip, (uintptr_t)&arg_values);
+		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_cip, &arg_values);
 	} else {
-		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_ci, (uintptr_t)&arg_values);
+		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_ci, &arg_values);
 	}
 	if (YDB_OK != status) {
 		FREE_STRING_ARRAY(args_ydb, num_args);
@@ -1627,8 +1627,8 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 		int	    cur_key, cur_index;
 
 		arg_values.n = (intptr_t)(YDB_LOCK_MIN_ARGS + (len_keys * YDB_LOCK_ARGS_PER_KEY));
-		arg_values.arg[0] = timeout_nsec;
-		arg_values.arg[1] = (uintptr_t)len_keys;
+		arg_values.arg[0] = (void *)timeout_nsec;
+		arg_values.arg[1] = (void *)(uintptr_t)len_keys;
 
 		/* Initialize arg_values index to the first location after the elements
 		 * initialized above.
@@ -1636,14 +1636,14 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 		cur_index = YDB_LOCK_MIN_ARGS;
 		if (NULL != keys_ydb) {
 			for (cur_key = 0; cur_key < len_keys; cur_key++) {
-				arg_values.arg[cur_index] = (uintptr_t)keys_ydb[cur_key].varname;
-				arg_values.arg[cur_index + 1] = (uintptr_t)keys_ydb[cur_key].subs_used;
-				arg_values.arg[cur_index + 2] = (uintptr_t)keys_ydb[cur_key].subsarray;
+				arg_values.arg[cur_index] = keys_ydb[cur_key].varname;
+				arg_values.arg[cur_index + 1] = (void *)(uintptr_t)keys_ydb[cur_key].subs_used;
+				arg_values.arg[cur_index + 2] = keys_ydb[cur_key].subsarray;
 				cur_index += YDB_LOCK_ARGS_PER_KEY;
 			}
 		}
 
-		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_lock_s, (uintptr_t)&arg_values);
+		status = ydb_call_variadic_plist_func((ydb_vplist_func)&ydb_lock_s, &arg_values);
 		/* check for errors */
 		if (YDB_LOCK_TIMEOUT == status) {
 			PyErr_SetString(YDBLockTimeoutError, "Not able to acquire all requested locks in the specified time.");

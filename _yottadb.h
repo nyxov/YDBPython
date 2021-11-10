@@ -35,13 +35,6 @@
 
 #define YDBPY_CHECK_TYPE 2
 
-// Equivalent of `gparam_list` in `callg.h` from YDB, which is not included in `libyottadb.h`
-#define MAXVPARMS 36
-typedef struct {
-	intptr_t  n;
-	uintptr_t arg[MAXVPARMS];
-} gparam_list;
-
 /* Set of acceptable Python error types. Each type is named by prefixing a Python error name with `YDBPython`,
  * with the exception of YDBPython_NoError. This item doesn't represent a Python error, but is included at enum value 0
  * to prevent conflicts with YDB_OK which signals no error with a value of 0.
