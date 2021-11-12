@@ -27,6 +27,37 @@ from yottadb import YDBError, YDBNodeEnd
 from conftest import lock_value, str2zwr_tests, set_ci_environment, reset_ci_environment, setup_db, teardown_db, SIMPLE_DATA
 
 
+# Confirm that YDB_ERR_ZGBLDIRACC is raised when a YDB global directory
+# cannot be found. Use pytest-order run this test first in order to force
+# YDB to read the ydb_gbldir environment variable, which will not happen
+# if another test opens a Global Directory before this test runs.
+@pytest.mark.order(1)
+def test_no_ydb_gbldir():
+    # Unset $ydb_gbldir and $gtmgbldir prior to running any to prevent erroneous use of
+    # any previously set global directory. This is done here since this test is run before
+    # all other tests.
+    del os.environ["ydb_gbldir"]
+    del os.environ["gtmgbldir"]
+
+    cur_dir = os.getcwd()
+    try:
+        previous = os.environ["ydb_gbldir"]
+    except KeyError:
+        previous = ""
+    os.environ["ydb_gbldir"] = cur_dir + "/yottadb.gld"  # Set ydb_gbldir to non-existent global directory file
+
+    lclname = b"^x"
+    key = yottadb.Key(lclname)
+    try:
+        key.set("")
+        assert False  # Exception should be raised before hitting this assert
+    except YDBError as e:
+        assert yottadb.YDB_ERR_ZGBLDIRACC == e.code()
+        assert "150374122,(SimpleAPI),%YDB-E-ZGBLDIRACC, Cannot access global directory " + os.environ[
+            "ydb_gbldir"
+        ] + ".  Cannot continue.,%SYSTEM-E-ENO2, No such file or directory" == str(e)
+
+
 def test_ci_table(new_db):
     cur_dir = os.getcwd()
     previous = set_ci_environment(cur_dir, "")
@@ -958,20 +989,58 @@ def test_nodes_iter(simple_data):
         assert node == some_nodes[i]
         i += 1
 
+    # Validates support for subscripts that are both `bytes` and `str` objects,
+    # i.e. no TypeError if any subscripts are `bytes` objects.
+    i = 0
+    # Omit "sub1" tree by excluding first 6 elements, including ("sub2", "subsub1"), since
+    # this will be the starting subsarray for the call
+    some_nodes = nodes[7:]
+    for node in yottadb.nodes("^test4", (b"sub2", "subsub1")):
+        assert node == some_nodes[i]
+        i += 1
+
+    # Validates support for subscripts that are `bytes` objects,
+    # i.e. no TypeError if any subscripts are `bytes` objects.
+    i = 0
+    # Omit "sub1" tree by excluding first 5 elements, including ("sub2",), since
+    # this will be the starting subsarray for the call
+    some_nodes = nodes[6:]
+    for node in yottadb.nodes("^test4", (b"sub2",)):  # Subscript is `bytes`
+        assert node == some_nodes[i]
+        i += 1
+
     # Validate NodesIter.__reversed__()
     i = 0
-    nodes = list(reversed(nodes))
+    rnodes = list(reversed(nodes))
     for node in reversed(yottadb.nodes("^test4")):
         print(f"node: {node}")
         print(f"nodes[i]: {nodes[i]}")
-        assert node == nodes[i]
+        assert node == rnodes[i]
         i += 1
 
     # Validate NodesIter.__reversed__() using a node in the middle of a tree
     i = 0
     # Omit "sub3" tree by excluding first 4 elements since the nodes list has already been reversed above
-    nodes = nodes[4:]
+    nodes = rnodes[4:]
     for node in reversed(yottadb.nodes("^test4", ("sub2",))):
+        assert node == nodes[i]
+        i += 1
+
+    # Validates support for subscripts that are `bytes` objects,
+    # i.e. no TypeError if any subscripts are `bytes` objects.
+    i = 0
+    # Omit "sub3" tree by excluding first 4 elements since the nodes list has already been reversed above
+    nodes = rnodes[4:]
+    for node in reversed(yottadb.nodes("^test4", (b"sub2",))):  # Subscript is `bytes`
+        assert node == nodes[i]
+        i += 1
+
+    # Validates support for subscripts that are both `bytes` and `str` objects,
+    # i.e. no TypeError if any subscripts are `bytes` objects.
+    i = 0
+    # Omit "sub3" tree by excluding first 4 elements since the nodes list has already been reversed above
+    nodes = rnodes[4:]
+    for node in reversed(yottadb.nodes("^test4", (b"sub2", "subsub3"))):
         assert node == nodes[i]
         i += 1
 
@@ -1420,30 +1489,3 @@ def test_tp_callback_multi(new_db):
     assert int(apples.value) == int(apples_init) + num_procs
     assert int(bananas.value) == int(bananas_init) + num_procs
     assert int(oranges.value) == int(oranges_init) + num_procs
-
-
-# Confirm that YDB_ERR_ZGBLDIRACC is raised when a YDB global directory
-# cannot be found. Use pytest-order run this test first in order to force
-# YDB to read the ydb_gbldir environment variable, which will not happen
-# if another test opens a Global Directory before this test runs.
-@pytest.mark.order(1)
-def test_no_ydb_gbldir():
-    cur_dir = os.getcwd()
-    try:
-        previous = os.environ["ydb_gbldir"]
-    except KeyError:
-        previous = ""
-    os.environ["ydb_gbldir"] = cur_dir + "/yottadb.gld"  # Set ydb_gbldir to non-existent global directory file
-
-    lclname = b"^x"
-    key = yottadb.Key(lclname)
-    try:
-        key.set("")
-        assert False  # Exception should be raised before hitting this assert
-    except YDBError as e:
-        assert yottadb.YDB_ERR_ZGBLDIRACC == e.code()
-        assert "150374122,(SimpleAPI),%YDB-E-ZGBLDIRACC, Cannot access global directory " + os.environ[
-            "ydb_gbldir"
-        ] + ".  Cannot continue.,%SYSTEM-E-ENO2, No such file or directory" == str(e)
-
-    os.environ["ydb_gbldir"] = previous

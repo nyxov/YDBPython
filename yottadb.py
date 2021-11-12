@@ -476,7 +476,7 @@ class NodesIter:
         :returns: A `NodesIter` object.
         """
         self.varname = varname
-        self.subsarray = [bytes(x, encoding="UTF-8") for x in subsarray]
+        self.subsarray = [bytes(x, encoding="UTF-8") if isinstance(x, str) else x for x in subsarray]
         self.initialized = False
 
     def __iter__(self) -> NodesIter:
@@ -534,8 +534,8 @@ class NodesIterReversed:
         :returns: A `NodesIterReversed` object.
         """
         self.varname = varname
-        self.subsarray = [bytes(x) for x in subsarray]
-        self.reversed = [bytes(x) for x in subsarray]
+        self.subsarray = [bytes(x, encoding="UTF-8") if isinstance(x, str) else x for x in subsarray]
+        self.reversed = [bytes(x, encoding="UTF-8") if isinstance(x, str) else x for x in subsarray]
         self.initialized = False
 
     def __iter__(self):
