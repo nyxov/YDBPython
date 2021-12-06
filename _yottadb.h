@@ -92,6 +92,12 @@ typedef enum YDBPythonSequenceType {
 // Prevents compiler warnings for variables used only in asserts
 #define UNUSED(x) (void)(x)
 
+// Redefine __assert_fail from libc (used by assert.h) to enable custom assert message.
+void __assert_fail(const char * assertion, const char * file, unsigned int line, const char * function) {
+    fprintf(stderr, "Assertion '%s' failed in function '%s' in %s at line %d.\nPlease file a bug report at https://gitlab.com/YottaDB/Lang/YDBPython/-/issues\n", assertion, function, file, line);
+    abort();
+}
+
 /* A structure that represents a key using YDB C types. used internally for
  * converting between Python and YDB C types.
  */
