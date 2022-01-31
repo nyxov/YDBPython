@@ -3,7 +3,7 @@
 #                                                               #
 # Copyright (c) 2020-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -28,7 +28,7 @@ for file in $files_to_check ; do
       exit_code=1
     fi
   elif [[ "$file" == *".py" ]] || [[ "$file" == *".pyi" ]]; then
-    if ! black -l 132 -q --check "$file"; then
+    if ! black -l 132 -q --diff --check "$file"; then
       echo "    $file needs formatting with \"black\"."
 
       exit_code=1

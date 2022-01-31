@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2020-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -664,7 +664,7 @@ def test_ci_input():
 # This test requires a lot of memory and will fail if there is not enough memory on the system that running
 # the tests so this test will be skipped if the available memory is less than
 # ((2 ** 32) + 1) str.
-@pytest.mark.skipif(psutil.virtual_memory().available < ((2 ** 32) + 1), reason="not enough memory for this test.")
+@pytest.mark.skipif(psutil.virtual_memory().available < ((2**32) + 1), reason="not enough memory for this test.")
 def test_unsigned_int_length_bytes_overflow():
     """
     Python bytes objects may have more bytes than can be represented by a 32-bit unsigned integer.
@@ -672,7 +672,7 @@ def test_unsigned_int_length_bytes_overflow():
     long bytes object. This tests all scenarios where that could happen and that when that happens the
     function will raise a ValueError instead of continuing as if a single byte was passed to it.
     """
-    BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = "1" * ((2 ** 32) + 1)  # works for python 3.8/Ubuntu 20.04
+    BYTES_LONGER_THAN_UNSIGNED_INT_IN_LENGTH = "1" * ((2**32) + 1)  # works for python 3.8/Ubuntu 20.04
     varname_subsarray_functions = (
         _yottadb.data,
         _yottadb.delete,
