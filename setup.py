@@ -99,7 +99,7 @@ create_constants_from_header_file()
 
 setup(
     name="yottadb",
-    version="0.0.1",
+    version="1.0.0",
     ext_modules=[
         Extension(
             "_yottadb",
@@ -113,7 +113,7 @@ setup(
             extra_compile_args=extra_compile_args,
         )
     ],
-    py_modules=["_yottadb", "yottadb"],
+    py_modules=["yottadb"],
     packages=find_packages(include=["_yottadb", "_yottadb.*", "yottadb"]),
     package_data={"": ["_yottadb.pyi"]},
     include_package_data=True,
