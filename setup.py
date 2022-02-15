@@ -83,6 +83,8 @@ use_asan = int(run_shell_cmd("nm $ydb_dist/libyottadb.so | grep -c 'U __asan_ini
 if use_asan:
     print("YDBPython: YottaDB was compiled with address sanitization (ASAN). Compiling YDBPython WITH ASAN...")
     # Set required environment variables
+    # Note that it is acceptable to build YDBPython with `gcc` and ASAN even if `libyottadb.so` was compiled with
+    # `clang` and ASAN.
     os.environ["LD_PRELOAD"] = run_shell_cmd("gcc -print-file-name=libasan.so").replace("\n", "")
     os.environ["ASAN_OPTIONS"] = "detect_leaks=0:disable_coredump=0:unmap_shadow_on_exit=1:abort_on_error=1"
     ld_preload = run_shell_cmd("gcc -print-file-name=libasan.so").replace("\n", "")

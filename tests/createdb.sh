@@ -1,7 +1,7 @@
 #!/bin/bash
 #################################################################
 #								#
-# Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -10,6 +10,13 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
+
+# If YottaDB was compiled with clang and ASAN, LD_PRELOAD must be unset
+# to prevent ASAN from aborting with the following error:
+#   `ASan runtime does not come first in initial library list; you should either link runtime to your application or manually preload it with LD_PRELOAD.`
+if [[ $(strings $ydb_dist/libyottadb.so | grep -c clang) -ne 0 ]]; then
+    unset LD_PRELOAD
+fi
 
 $1/yottadb -run ^GDE <<FILE
 change -r DEFAULT -key_size=1019 -record_size=1048576
