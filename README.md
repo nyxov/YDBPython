@@ -1,7 +1,5 @@
 # YDBPython
 
-*Note:* YDBPython is currently in Alpha testing and is *not* advised for production use.
-
 YDBPython provides a Pythonic API for accessing YottaDB databases.
 
 ## Requirements
