@@ -20,3 +20,4 @@ no_note.txt
 sorted_warnings.txt
 warnings.txt
 tmp*
+*.so

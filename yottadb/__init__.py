@@ -11,6 +11,16 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
+"""
+YDBPython.
+
+YDBPython provides a Pythonic API for accessing YottaDB databases.
+"""
+
+__version__ = "1.0.0"
+__author__ = "YottaDB LLC"
+__credits__ = "Peter Goss"
+
 from typing import Optional, List, Union, Generator, AnyStr, Any, Callable, NewType, Tuple
 import copy
 import struct

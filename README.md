@@ -4,34 +4,44 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 
 ## Requirements
 
-1. Ubuntu Server 18.04 (or similar)
-2. Python > 3.6 (f-string and type annotation used)
-    1. including the 'python3-dev' package that contains `Python.h`
+1. Ubuntu Server 20.04 (or similar)
+2. Python > 3.6 (f-string and type annotation used), including the `python3-dev` package that contains `Python.h`
 3. libffi
-3. YottaDB
+4. YottaDB 1.34 or later
 
 ## Installation
 
-1. Install Ubuntu Server 18.04
+1. Install Ubuntu Server 20.04
 2. Install YottaDB per the [Quick Start](https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#quick-start) guide instructions or from [source](https://gitlab.com/YottaDB/DB/YDB)
-    Note: Ubuntu Server 20.04 will require YottaDB 1.29 or later.
-3. Get the code: `git clone https://gitlab.com/YottaDB/Lang/YDBPython.git`
-4. Install code:
-	1. Install prerequisites:
-		* Ubuntu/Debian: `sudo apt install python3-dev python3-setuptools libffi-dev`
-		* RHEL/CentOS: `yum install gcc python3 python3-setuptools python3-devel libffi-devel`
-		* Arch Linux: `sudo yay -Sy python-{virtualenv,setuptools,pip} libffi`
-	2. Set environment variables
-		1. Set YottaDB environment variables: `source $(pkg-config --variable=prefix yottadb)/ydb_env_set`
-		2. *Optional*: If YottaDB is built with Address Sanitization (ASAN) enabled, `LD_PRELOAD` and `ASAN_OPTIONS` must be set:
-			* `export ASAN_OPTIONS="detect_leaks=0:disable_coredump=0:unmap_shadow_on_exit=1:abort_on_error=1"`
-			* `export LD_PRELOAD=$(gcc -print-file-name=libasan.so)`
-	3. Enter code directory `cd YDBPython/`
-	4. Run `setup.py` to install:
-		1. Setup environment:
-			* Set the `$ydb_dist` environment variable, e.g. `export ydb_dist=*path_to_my_ydb_installation*`
-		2. Install YDBPython:
-			1. *Option 1*: Install in `venv`:
+3. Install prerequisites:
+	* Ubuntu/Debian: `sudo apt install python3-dev python3-setuptools libffi-dev pkg-config`
+	* RHEL/CentOS: `yum install gcc python3 python3-setuptools python3-devel libffi-devel pkg-config`
+	* Arch Linux: `sudo yay -Sy python-{setuptools,pip} libffi pkg-config`
+4. Set environment variables
+	1. Set YottaDB environment variables: `source $(pkg-config --variable=prefix yottadb)/ydb_env_set`
+	2. *Optional*: If YottaDB is built with Address Sanitization (ASAN) enabled, `LD_PRELOAD` and `ASAN_OPTIONS` must be set:
+		* `export ASAN_OPTIONS="detect_leaks=0:disable_coredump=0:unmap_shadow_on_exit=1:abort_on_error=1"`
+		* `export LD_PRELOAD=$(gcc -print-file-name=libasan.so)`
+5. Install:
+	* *Option 1*: From PyPI:
+		* *Option 1*: Install in `venv`:
+			1. Enter directory where install is desired, e.g. `cd my-python-project`
+			2. Install the `python3-venv` package:
+				* Ubuntu/Debian: `sudo apt install python3-venv`
+				* RHEL/CentOS: `sudo yum install python3-virtualenv`
+				* Arch Linux: `sudo yay -Sy install python3-virtualenv`
+			3. Create venv: `python3 -m venv .venv`
+			4. Activate venv: `source .venv/bin/activate`
+			5. Install into venv: `pip install yottadb`
+		* *Option 2*: Install to user:
+			* `pip3 install yottadb --user`
+		* *Option 3*: Install globally:
+			* `sudo -E pip3 install yottadb`
+	* *Option 2*: From source:
+		1. Get the code: `git clone https://gitlab.com/YottaDB/Lang/YDBPython.git`
+		2. Enter code directory `cd YDBPython/`
+		3. Run `setup.py` to install:
+			* *Option 1*: Install in `venv`:
 				1. Install the python3-venv package:
 					* Ubuntu/Debian: `sudo apt install python3-venv`
 					* RHEL/CentOS: `sudo yum install python3-virtualenv`
@@ -39,33 +49,31 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 				2. Create `venv`: `python3 -m venv .venv`
 				3. Activate `venv`: `source .venv/bin/activate`
 				4. Install into `venv`: `python setup.py install`
-			2. *Option 2*: Install to user:
-				* `python setup.py install --user`
-			3. *Option 3*: Install globally (not suggested):
+			* *Option 2*: Install to user:
+				* `python3 setup.py install --user`
+			* *Option 3*: Install globally (not suggested):
 				* `sudo -E python3 setup.py install`
-
-TODO: Add YDBPython to PyPI and add matching installation instructions to above list.
 
 ## Testing
 
-To run YDBPython's test suite:
+To run YDBPython's test suite with a YDBPython source installation:
 
-1. Install `pytest`, `pytest-order`, and `psutil`
-	1. If `pip` for `python3` is not installed do so: `sudo apt install python3-pip`
+1. Enter YDBPython directory containing code repository, e.g. `cd YDBPython/`
+2. Install `pytest`, `pytest-order`, and `psutil`
+	1. If `pip` for `python3` is not installed do so:
 		* Ubuntu/Debian: `sudo apt install python3-pip`
 		* RHEL/CentOS: `sudo yum install python3-pip`
 		* Arch Linux: `sudo yay -Sy install python3-pip`
 	2. Use `pip` to install `pytest`, `pytest-order`, `psutil`
-		1. *Option 1*: install into `venv`
+		* *Option 1*: install into `venv`
 			1. Activate `venv` if it is not already: `source .venv/bin/activate`
 			2. Install: `pip install pytest pytest-order psutil`
-		2. *Option 2*: install for user: `pip3 install --user pytest pytest-order psutil`
-		3. *Option 3*: install globally (not suggested): `sudo pip3 install pytest pytest-order psutil`
-2. Run the tests:
-		1. *Option 1*: in `venv`: `python -m pytest`
-		2. *Option 2*: with user installation: `python3 -m pytest`
-		3. *Option 3*: with global installation (not suggested): `python3 -m pytest`
-3. *Optional*: Cleanup between tests:
+		* *Option 2*: install for user: `pip3 install --user pytest pytest-order psutil`
+		* *Option 3*: install globally (not suggested): `sudo pip3 install pytest pytest-order psutil`
+3. Run the tests:
+	* *Option 1*: in `venv`: `python -m pytest`
+	* *Option 2*: with user or global installation: `python3 -m pytest`
+4. *Optional*: Cleanup between tests:
 	* When making changes to code between test runs, some cleanup may be needed to prevent new changes being ignored due to Python caching. To clean up these files: `for artifact in $(cat .gitignore); do rm -rf $artifact; done`. Note that this will delete all files listed in `.gitignore`, including core files. If these or any other such files need to be retained, move or rename them before running the aforementioned command.
 
 # Basic Example Usage
@@ -110,7 +118,7 @@ for subscript in key1.subscripts:  # Loop terminates immediately and displays no
 # Database transactions are also available
 @yottadb.transaction
 def simple_transaction(value):
-	# Set values directly with the set() function
+    # Set values directly with the set() function
     yottadb.set('test1', value=value)  # Set the local variable 'test1' to the given value
     yottadb.set('test2', value=value)  # Set the local variable 'test2' to the given value
     condition_a = False

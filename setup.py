@@ -77,6 +77,8 @@ def create_constants_from_header_file():
 # Define link and compile argument lists before calling setup() to allow optional
 # arguments to be appended prior to compilation.
 extra_link_args = ["-lyottadb", "-lffi", "-Wl,-rpath=" + YDB_DIST]
+# Set `-Wno-cast-function-type` to suppress 'cast between incompatible function types' warning
+# See discussion at: https://gitlab.com/YottaDB/DB/YDBDoc/-/merge_requests/482#note_686747517
 extra_compile_args = ["--std=c99", "-Wall", "-Wextra", "-pedantic", "-Wno-cast-function-type"]
 # Check whether YDB was compiled with address sanitization (ASAN). If so, compile YDBPython with it also.
 use_asan = int(run_shell_cmd("nm $ydb_dist/libyottadb.so | grep -c 'U __asan_init'"))
@@ -102,16 +104,31 @@ create_constants_from_header_file()
 setup(
     name="yottadb",
     version="1.0.0",
+    description="A Pythonic API for accessing YottaDB databases.",
+    long_description=(pathlib.Path(__file__).parent / "README.md").read_text(),
+    long_description_content_type="text/markdown",
+    url="https://yottadb.com",
+    project_urls={
+        "Documentation": "https://docs.yottadb.com/MultiLangProgGuide/pythonprogram.html",
+        "Source Code": "https://gitlab.com/YottaDB/Lang/YDBPython",
+        "Issue Tracker": "https://gitlab.com/YottaDB/Lang/YDBPython/-/issues",
+    },
+    author="YottaDB LLC",
+    author_email="info@yottadb.com",
+    license="GNU Affero General Public License v3",
+    classifiers=[
+        "License :: OSI Approved :: GNU Affero General Public License v3",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+    ],
     ext_modules=[
         Extension(
             "_yottadb",
             sources=["_yottadb.c"],
             include_dirs=[YDB_DIST],
             library_dirs=[YDB_DIST],
-            undef_macros=["NDEBUG"],  # Uncomment to enable asserts if a Debug build is desired
+            undef_macros=["NDEBUG"],  # Comment out to enable asserts if a Debug build is desired
             extra_link_args=extra_link_args,
-            # Set `-Wno-cast-function-type` to suppress 'cast between incompatible function types' warning
-            # See discussion at: https://gitlab.com/YottaDB/DB/YDBDoc/-/merge_requests/482#note_686747517
             extra_compile_args=extra_compile_args,
         )
     ],
