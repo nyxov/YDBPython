@@ -57,7 +57,7 @@ def test_no_ydb_gbldir():
         assert False  # Exception should be raised before hitting this assert
     except YDBError as e:
         assert yottadb.YDB_ERR_ZGBLDIRACC == e.code()
-        assert "150374122,(SimpleAPI),%YDB-E-ZGBLDIRACC, Cannot access global directory " + os.environ[
+        assert "418809578,(SimpleAPI),%YDB-E-ZGBLDIRACC, Cannot access global directory " + os.environ[
             "ydb_gbldir"
         ] + ".  Cannot continue.,%SYSTEM-E-ENO2, No such file or directory" == str(e)
 
