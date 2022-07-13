@@ -105,7 +105,7 @@ setup(
     name="yottadb",
     version="1.0.0",
     description="A Pythonic API for accessing YottaDB databases.",
-    long_description=(pathlib.Path(__file__).parent / "README.md").read_text(),
+    long_description=(pathlib.Path(__file__).parent / "README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
     url="https://yottadb.com",
     project_urls={
