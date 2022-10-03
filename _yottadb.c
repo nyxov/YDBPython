@@ -821,8 +821,7 @@ static void free_YDBKey_array(YDBKey *keysarray, int len) {
 	int i;
 	if (NULL != keysarray) {
 		for (i = 0; i < len; i++)
-			if (NULL != &keysarray[i])
-				free_YDBKey(&keysarray[i]);
+			free_YDBKey(&keysarray[i]);
 		free(keysarray);
 	}
 }
