@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -10,9 +10,8 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; Tests the updating of an output-only string parameter. If the value
-; passed is shorter than the value of p1 then INVSTRLEN should be
-; issued.
+; Tests the updating of an output-only string parameter. If the value passed is
+; shorter than the return value (p1), then the return value should be truncated.
 entry(p1)
-    set p1=1234567890
+	set p1=1234567890
 	quit p1

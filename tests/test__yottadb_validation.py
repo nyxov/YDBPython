@@ -580,13 +580,6 @@ def test_ci_input():
     cur_dir = os.getcwd()
     previous = set_ci_environment(cur_dir, cur_dir + "/tests/calltab.ci")
 
-    # Confirm YDB error when output value is longer than input string
-    try:
-        _yottadb.ci("StringExtend", [123], has_retval=True)
-        assert False
-    except yottadb.YDBError as e:
-        assert _yottadb.YDB_ERR_INVSTRLEN == e.code()
-
     # Raise TypeError when argument list is immutable,
     # but routine includes output arguments
     with pytest.raises(TypeError):
