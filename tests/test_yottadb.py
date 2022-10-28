@@ -93,8 +93,11 @@ def test_ci_table(new_db):
     assert "1234567890" == yottadb.ci("StringExtend", [""], has_retval=True)
     # Test routine with output parameter succeeds where the length of
     # the passed argument (4 bytes) is LESS than the length needed to store the result (10 bytes).
-    # In this case, the return value is truncated to fit the available space (4 bytes).
-    assert "1234" == yottadb.ci("StringExtend", [6789], has_retval=True)
+    # In this case, the output parameter value is truncated to fit the available space (4 bytes).
+    # The return value though is not truncated (i.e. it is 10 bytes long).
+    outargs = [6789]
+    assert "1234567890" == yottadb.ci("StringExtend", outargs, has_retval=True)
+    assert [1234] == outargs
 
     old_handle = cur_handle
     cur_handle = yottadb.open_ci_table(cur_dir + "/tests/testcalltab.ci")
