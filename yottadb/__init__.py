@@ -93,8 +93,6 @@ def get(varname: AnyStr, subsarray: Tuple[AnyStr] = ()) -> Optional[bytes]:
     :param subsarray: A tuple of bytes-like objects representing an array of YottaDB subscripts.
     :returns: If the specified node has a value, returns it as a bytes object. If not, returns None.
     """
-    if "$" == varname[0] and () != subsarray:
-        raise ValueError(f"YottaDB Intrinsic Special Variable (ISV) cannot be subscripted: {varname}")
     try:
         return _yottadb.get(varname, subsarray)
     except YDBError as e:
@@ -662,8 +660,6 @@ class Key:
         if parent is not None:
             if not isinstance(parent, Key):
                 raise TypeError("'parent' must be of type Key")
-            if "$" == parent.varname[0]:
-                raise ValueError(f"YottaDB Intrinsic Special Variable (ISV) cannot be subscripted: {parent.varname}")
         self.parent = parent
         if _yottadb.YDB_MAX_SUBS < len(self.subsarray):
             raise ValueError(f"Cannot create Key with {len(self.subsarray)} subscripts (max: {_yottadb.YDB_MAX_SUBS})")

@@ -319,17 +319,10 @@ def test_Key_construction_errors():
         yottadb.Key("^test1", "not a Key object")
     assert re.match("'parent' must be of type Key", str(terr.value))  # Confirm correct TypeError message
 
-    # Raise error if attempt to subscript an Intrinsic Special Variable
+    # No error when constructing a Key on an Intrinsic Special Variable
     i = 0
     oldkey = yottadb.Key("$zyrelease")
-    with pytest.raises(ValueError) as verr:
-        while i < 31:
-            newkey = oldkey[str(i)]
-            oldkey = newkey
-            i += 1
-    assert re.match(
-        "YottaDB Intrinsic Special Variable [(]ISV[)] cannot be subscripted: .*", str(verr.value)
-    )  # Confirm correct ValueError message
+    assert re.match("YottaDB r.*", oldkey.value.decode("utf-8"))
 
     # Raise error if attempt to create a Key with more than YDB_MAX_SUBS subscripts
     i = 0
@@ -888,11 +881,14 @@ def test_YDB_ERR_PARMOFLOW(new_db):
 
 
 def test_isv_error():
-    with pytest.raises(ValueError) as verr:
-        yottadb.get("$zyrelease", ("sub1", "sub2"))
-        assert re.match(
-            "YottaDB Intrinsic Special Variable [(]ISV[)] cannot be subscripted: .*", str(verr.value)
-        )  # Confirm correct ValueError message
+    # Error when attempting to get the value of a subscripted Intrinsic Special Variable
+    with pytest.raises(YDBError) as yerr:
+        yottadb.get("$zyrelease", ("sub1", "sub2"))  # Raises ISVSUBSCRIPTED
+    assert re.match(".*YDB-E-ISVSUBSCRIPTED.*", str(yerr.value))
+    # Error when attempting to set the value of a subscripted Intrinsic Special Variable
+    with pytest.raises(YDBError) as yerr:
+        yottadb.set("$zyrelease", ("sub1", "sub2"), "test")  # Raises SVNOSET
+    assert re.match(".*YDB-E-SVNOSET.*", str(yerr.value))
 
 
 @pytest.mark.parametrize("input, output1, output2", str2zwr_tests)
