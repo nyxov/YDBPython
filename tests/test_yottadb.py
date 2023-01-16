@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -824,7 +824,7 @@ def test_lock_incr_Key_timeout_error(new_db):
     key = yottadb.Key("^test2")["sub1"]
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.2)
+    time.sleep(0.1)  # Sleep just long enough for the process to start, but not so long that it exits
     with pytest.raises(yottadb.YDBLockTimeoutError):
         key.lock_incr()
     process.join()
@@ -832,7 +832,7 @@ def test_lock_incr_Key_timeout_error(new_db):
     key2 = yottadb.Key("^test2")["sub1"]
     process = multiprocessing.Process(target=lock_value, args=(key2,))
     process.start()
-    time.sleep(0.2)
+    time.sleep(0.1)  # Sleep just long enough for the process to start, but not so long that it exits
     with pytest.raises(yottadb.YDBLockTimeoutError):
         key2.lock_incr()
     process.join()
@@ -843,14 +843,14 @@ def test_lock_incr_Key_no_timeout(new_db):
     key = yottadb.Key("^test2")["sub1"]
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.2)
+    time.sleep(0.1)  # Sleep just long enough for the process to start, but not so long that it exits
     t1 = datetime.datetime.now()
     yottadb.Key("test2").lock_incr()
     t2 = datetime.datetime.now()
     time_elapse = t2.timestamp() - t1.timestamp()
     assert time_elapse < 0.01
     key.lock_decr()
-    time.sleep(0.2)
+    time.sleep(0.1)  # Sleep just long enough for the process to start, but not so long that it exits
     process.join()
 
 
