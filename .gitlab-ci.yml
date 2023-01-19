@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2020-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -106,8 +106,7 @@ code-format-check:
       - sorted_warnings.txt
     when: always
   script:
-    - apt update -qq && apt-get install -y -qq git wget gnupg pkg-config clang-format-10 python3-pip clang-tidy-10
+    - apt update -qq && apt-get install -y -qq git wget gnupg pkg-config clang-format-11 python3-pip clang-tidy-11
     - source $(pkg-config --variable=prefix yottadb)/ydb_env_set
-    - ln -s /usr/bin/clang-tidy-10 /usr/bin/clang-tidy
     - python3 -m pip install black
     - LC_ALL=C.UTF-8 bash ./tools/ci/check_code_format.sh
