@@ -41,10 +41,11 @@ stages:
     - export ASAN_OPTIONS="detect_leaks=0:disable_coredump=0:unmap_shadow_on_exit=1:abort_on_error=1"
     - python3 -m pip install --user pytest pytest-order psutil
     - python3 -m pytest tests/ -vs 2> pytest.err 1> pytest.out
+    - cat pytest.out pytest.err
+    - mkdir artifacts && cp *.err artifacts && cp *.out artifacts
   artifacts:
     paths:
-      - ./*.out
-      - ./*.err
+      - ./artifacts
     when: always
 
 .test_rocky:
@@ -53,10 +54,11 @@ stages:
     - export ASAN_OPTIONS="detect_leaks=0:disable_coredump=0:unmap_shadow_on_exit=1:abort_on_error=1"
     - python3 -m pip install --user pytest pytest-order psutil
     - python3 -m pytest tests/ -vs 2> pytest.err 1> pytest.out
+    - cat pytest.out pytest.err
+    - mkdir artifacts && cp *.err artifacts && cp *.out artifacts
   artifacts:
     paths:
-      - ./*.out
-      - ./*.err
+      - ./artifacts
     when: always
 
 .debug:

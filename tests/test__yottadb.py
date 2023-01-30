@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -333,25 +333,25 @@ def test_lock_incr_no_timeout(new_db):
     key = ("^test2", ("sub1",))
     process = multiprocessing.Process(target=lock_value, args=(key,))
     process.start()
-    time.sleep(0.2)
+    time.sleep(0.1)
     t1 = datetime.datetime.now()
     _yottadb.lock_incr("test2")
     t2 = datetime.datetime.now()
     time_elapse = t2.timestamp() - t1.timestamp()
     assert time_elapse < 0.01
     _yottadb.lock_decr("^test2", ("sub1",))
-    time.sleep(0.2)
+    time.sleep(0.1)
     process.join()
     # Using bytes arguments
     process = multiprocessing.Process(target=lock_value, args=(key,))
-    time.sleep(0.2)
+    time.sleep(0.1)
     t1 = datetime.datetime.now()
     _yottadb.lock_incr(b"test2")
     t2 = datetime.datetime.now()
     time_elapse = t2.timestamp() - t1.timestamp()
     assert time_elapse < 0.01
     _yottadb.lock_decr(b"^test2", (b"sub1",))
-    time.sleep(0.2)
+    time.sleep(0.1)
 
 
 # The following functions are Python function wrappers
