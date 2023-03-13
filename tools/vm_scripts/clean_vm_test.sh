@@ -3,7 +3,7 @@
 #                                                               #
 # Copyright (c) 2020-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -12,6 +12,12 @@
 #   the license, please stop and do not read further.           #
 #                                                               #
 #################################################################
+
+# This is a utility script intended for manual use by developers when setting up a virtual machine for testing YDBPython.
+# The script is to be run from within a guest VM, and will install YottaDB and YDBPython, and then run the YDBPython test suite.
+# This script is not intended for use in automated testing.
+# See also the following GitLab comment (https://gitlab.com/YottaDB/Lang/YDBPython/-/merge_requests/50#note_1312085723):
+# "I've never used this script myself, so I can't really say. It was originally contributed by @gossrock who I think found it useful in his development workflow, though I'm not sure about the details of his setup."
 
 set -e # Fail script if any command fails
 set -u # Enable detection of uninitialized variables
