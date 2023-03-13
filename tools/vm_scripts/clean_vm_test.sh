@@ -81,9 +81,9 @@ mkdir /tmp/tmp ; cd /tmp/tmp
 wget https://gitlab.com/YottaDB/DB/YDB/raw/master/sr_unix/ydbinstall.sh
 chmod +x ydbinstall.sh
 if [ "$OS" == "\"centos\"" ] && [ "$VERSION" == "\"7\"" ]; then
-  sudo ./ydbinstall.sh --force-install --utf8 default --verbose
+  sudo ./ydbinstall.sh --force-install --utf8 --verbose
 else
-  sudo ./ydbinstall.sh --utf8 default --verbose
+  sudo ./ydbinstall.sh --utf8 --verbose
 fi
 source $(pkg-config --variable=prefix yottadb)/ydb_env_set
 
