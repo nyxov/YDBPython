@@ -37,7 +37,7 @@ stages:
 # https://stackoverflow.com/questions/692000/how-do-i-write-standard-error-to-a-file-while-using-tee-with-a-pipe
 .test_ubuntu:
   script:
-    - python3 -m pip install --user pytest pytest-order psutil
+    - python3 -m pip install --user pytest pytest-order psutil requests
     - mkdir artifacts
     - python3 -m pytest tests/ -vs 1> artifacts/pytest.out 2> artifacts/pytest.err
   artifacts:
@@ -47,7 +47,7 @@ stages:
 
 .test_rocky:
   script:
-    - python3 -m pip install --user pytest pytest-order psutil
+    - python3 -m pip install --user pytest pytest-order psutil requests
     - mkdir artifacts
     - python3 -m pytest tests/ -vs 1> artifacts/pytest.out 2> artifacts/pytest.err
   artifacts:

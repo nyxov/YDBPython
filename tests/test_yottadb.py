@@ -21,11 +21,15 @@ import time
 import os
 import re
 import sys
-from typing import NamedTuple, Callable, Tuple, Sequence, Optional, AnyStr
+import json
+import requests
+from urllib.request import urlretrieve
+from typing import NamedTuple, Callable, Tuple, Sequence, AnyStr
 
 import yottadb
 from yottadb import YDBError, YDBNodeEnd
 from conftest import lock_value, str2zwr_tests, set_ci_environment, reset_ci_environment, setup_db, teardown_db, SIMPLE_DATA
+from conftest import execute
 
 
 # Confirm that YDB_ERR_ZGBLDIRACC is raised when a YDB global directory
@@ -1466,7 +1470,7 @@ def test_tp_callback_multi(new_db):
     # Define a simple wrapper function to call the callback function via tp().
     # This wrapper will then be used to spawn multiple processes, each of which
     # calls tp() using the callback function.
-    def wrapper(function: Callable[..., object], args: Sequence[Optional["Key"]]) -> int:
+    def wrapper(function: Callable[..., object], args: Sequence[yottadb.Key]) -> int:
         return yottadb.tp(function, args=args)
 
     # Create keys
@@ -1501,3 +1505,90 @@ def test_tp_callback_multi(new_db):
     assert int(apples.value) == int(apples_init) + num_procs
     assert int(bananas.value) == int(bananas_init) + num_procs
     assert int(oranges.value) == int(oranges_init) + num_procs
+
+
+def test_Key_load_tree(simple_data):
+    test4 = yottadb.Key("^test4")
+    test4_dict = test4.load_tree()
+
+    assert test4_dict["value"] == "test4"
+    assert test4_dict["sub1"]["value"] == "test4sub1"
+    assert test4_dict["sub1"]["subsub1"]["value"] == "test4sub1subsub1"
+    assert test4_dict["sub1"]["subsub2"]["value"] == "test4sub1subsub2"
+    assert test4_dict["sub1"]["subsub3"]["value"] == "test4sub1subsub3"
+    assert test4_dict["sub2"]["value"] == "test4sub2"
+    assert test4_dict["sub2"]["subsub1"]["value"] == "test4sub2subsub1"
+    assert test4_dict["sub2"]["subsub2"]["value"] == "test4sub2subsub2"
+    assert test4_dict["sub2"]["subsub3"]["value"] == "test4sub2subsub3"
+    assert test4_dict["sub3"]["value"] == "test4sub3"
+    assert test4_dict["sub3"]["subsub1"]["value"] == "test4sub3subsub1"
+    assert test4_dict["sub3"]["subsub2"]["value"] == "test4sub3subsub2"
+    assert test4_dict["sub3"]["subsub3"]["value"] == "test4sub3subsub3"
+
+
+def test_Key_save_tree(simple_data):
+    test4 = yottadb.Key("^test4")
+    test4_dict = test4.load_tree()
+
+    test4.delete_tree()
+    test4.save_tree(test4_dict)
+
+    assert test4.value == b"test4"
+    assert test4["sub1"].value == b"test4sub1"
+    assert test4["sub1"]["subsub1"].value == b"test4sub1subsub1"
+    assert test4["sub1"]["subsub2"].value == b"test4sub1subsub2"
+    assert test4["sub1"]["subsub3"].value == b"test4sub1subsub3"
+    assert test4["sub2"].value == b"test4sub2"
+    assert test4["sub2"]["subsub1"].value == b"test4sub2subsub1"
+    assert test4["sub2"]["subsub2"].value == b"test4sub2subsub2"
+    assert test4["sub2"]["subsub3"].value == b"test4sub2subsub3"
+    assert test4["sub3"].value == b"test4sub3"
+    assert test4["sub3"]["subsub1"].value == b"test4sub3subsub1"
+    assert test4["sub3"]["subsub2"].value == b"test4sub3subsub2"
+    assert test4["sub3"]["subsub3"].value == b"test4sub3subsub3"
+
+    test4_sub1 = yottadb.Key("^test4")["sub1"]
+    test4_sub1_dict = test4_sub1.load_tree()
+
+    test4_sub1.delete_tree()
+    test4_sub1.save_tree(test4_sub1_dict)
+
+    assert test4_sub1.value == b"test4sub1"
+    assert test4_sub1["subsub1"].value == b"test4sub1subsub1"
+    assert test4_sub1["subsub2"].value == b"test4sub1subsub2"
+    assert test4_sub1["subsub3"].value == b"test4sub1subsub3"
+
+
+def test_deserialize_JSON(new_db):
+    response = requests.get("https://rxnav.nlm.nih.gov/REST/relatedndc.json?relation=product&ndc=0069-3060")
+    json_data = json.loads(response.content)
+    key = yottadb.Key("^rxnav")
+    key.save_json(json_data)
+    loaded_json = key.load_json()
+    # Confirm that the JSON that was stored in YDB and retrieved matches
+    # the original source JSON. We assert on type to confirm that two
+    # different objects and types of objects are being compared.
+    assert type(loaded_json) == type(json_data)
+    assert loaded_json == json_data
+
+    response = requests.get("https://gitlab.com/api/v4/projects")
+    json_data = json.loads(response.content)
+    key = yottadb.Key("^v4")
+    key.save_json(json_data)
+    loaded_json = key.load_json()
+    assert type(loaded_json) == type(json_data)
+    assert loaded_json == json_data
+
+
+def test_manipulate_JSON_in_place(new_db):
+    response = requests.get("https://rxnav.nlm.nih.gov/REST/relatedndc.json?relation=product&ndc=0069-3060")
+    original_json = json.loads(response.content)
+    key = yottadb.Key("^rxnorm")
+    key.delete_tree()
+    key.save_json(original_json)
+
+    saved_json = key.load_json()
+    key["ndcInfoList"]["ndcInfo"]["3"]["ndc11"].value = b"00069306087"
+    revised_json = key.load_json()
+    assert revised_json["ndcInfoList"]["ndcInfo"][2]["ndc11"] != saved_json["ndcInfoList"]["ndcInfo"][2]["ndc11"]
+    assert revised_json["ndcInfoList"]["ndcInfo"][2]["ndc11"] == "00069306087"

@@ -2,7 +2,7 @@
 
 #################################################################
 #                                                               #
-# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.                                          #
 #                                                               #
 #	This source code contains the intellectual property           #
@@ -48,7 +48,7 @@ if echo "$skipextensions" | grep -q -w "$(echo "$file" | awk -F . '{print $NF}')
 fi
 
 # Below is a list of specific files that do not have a copyright so ignore them
-skiplist="COPYING README.md LICENSE .gitignore"
+skiplist="COPYING README.md LICENSE .gitignore .flake8"
 for skipfile in $skiplist; do
 	if [ $file = $skipfile ]; then
 		exit 1

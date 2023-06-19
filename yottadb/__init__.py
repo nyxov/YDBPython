@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -17,11 +17,11 @@ YDBPython.
 YDBPython provides a Pythonic API for accessing YottaDB databases.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "YottaDB LLC"
 __credits__ = "Peter Goss"
 
-from typing import Optional, List, Union, Generator, AnyStr, Any, Callable, NewType, Tuple
+from typing import Optional, List, Union, Generator, AnyStr, Any, Callable, NewType, Tuple, Mapping
 import copy
 import struct
 from builtins import property
@@ -399,6 +399,143 @@ def tp(callback: object, args: tuple = None, transid: str = "", varnames: Tuple[
     return _yottadb.tp(callback, args, kwargs, transid, varnames)
 
 
+def node_to_dict(key: Tuple[AnyStr, Tuple[AnyStr]], child_subs: List[AnyStr], result: dict) -> Mapping:
+    """
+    Recursively constructs a series of nested dictionaries representing a the YottaDB node specified by `key`
+    using the YottaDB subscripts in `subsarray` as keys. The last dictionary entry includes the value of the node.
+
+    Note: This function is for internal use only, and not intended for use by users of YDBPython.
+
+    :param key: A two-element tuple consisting of a YottaDB variable name and a tuple of YottaDB subscripts.
+    :param child_subs: A list of YottaDB subscripts that need to be converted to Python dictionary keys.
+    :param result: A previously allocated dictionary for storing any remaining subscripts from `child_subs`
+        and the value of the node specified by `key`.
+    :returns: A dictionary object representing node specified by `key`.
+    """
+    sub = child_subs[0]
+    if sub not in result:
+        # Allocate a new dictionary for the given subscript key if one
+        # was not previously allocated.
+        result[sub] = {}
+
+    if len(child_subs) == 1:
+        # No more subscripts to nest: retrieve the value, store it,
+        # and cease recursing.
+        key_status = data(key[0], list(key[1]) + list(child_subs))
+        if key_status == 1 or key_status == 11:
+            result[sub]["value"] = get(key[0], list(key[1]) + list(child_subs)).decode("utf-8")
+    elif len(child_subs) > 1:
+        # There are more subscripts to convert to dictionary keys, continue
+        # recursing with `node_to_dict()`
+        result[sub] = node_to_dict(key, child_subs[1:], result[sub])
+    else:
+        assert False
+
+    return result
+
+
+def save_tree(tree: dict, key: Key):
+    """
+    Stores data from a nested Python dictionary in YottaDB under the node represented by`key`.
+
+    The nested dictionary must adhere to the following structure:
+
+        {
+            GVN: {
+                { sub1:
+                    {
+                        nested_sub1: {
+                            ...
+                        },
+                        nested_sub2: {
+                            ...
+                        },
+                        "value": node_value
+                    }
+                },
+                { sub2:
+                    ...
+                }
+            }
+        }
+
+    :param tree: A Python dictionary representing a YottaDB tree or subtree.
+    :param key: A YottaDB `Key` object representing a YottaDB database node
+    """
+    # Recurse through each key in the dictionary and, when a leaf node is encountered,
+    # store the value in the database.
+    for sub, value in tree.items():
+        if isinstance(value, dict):
+            save_tree(value, key[sub])
+        elif sub == "value":
+            key.value = value
+        else:
+            assert False
+
+
+def replace_tree(tree: dict, key: Key):
+    """
+    Stores data from a nested Python dictionary in YottaDB under the node represented by`key`,
+    replacing the existing tree and deleting any pre-existing values from the database that
+    are not included in the new tree.
+
+    The nested dictionary must adhere to the following structure:
+
+        {
+            GVN: {
+                { sub1:
+                    {
+                        nested_sub1: {
+                            ...
+                        },
+                        nested_sub2: {
+                            ...
+                        },
+                        "value": node_value
+                    }
+                },
+                { sub2:
+                    ...
+                }
+            }
+        }
+
+    :param tree: A Python dictionary representing a YottaDB tree or subtree.
+    :param key: A YottaDB `Key` object representing a YottaDB database node
+    """
+    key.delete_tree()
+    key.save_tree(tree)
+
+
+def load_tree(key: Key, child_subs: List[AnyStr] = [], result: dict = {}, first_call: bool = False) -> dict:
+    """
+    Converts a `Key` object into a Python dictionary object representing the full YottaDB subtree under the
+    database node specified by `key`.
+
+    :param key: A `Key` object representing a YottaDB database node.
+    :param child_subs: A list of subscripts describing a child node under the node
+        represented by `key`.
+    :param result: A dictionary object representing a partial YottaDB subtree under the
+        database node specified by `key`. This dictionary is incrementally populated through
+        recursive calls to `load_tree()`.
+    :param first_call: A flag signalling whether the given call to `load_tree()` is the first
+        of a series of recursive calls to `load_tree()`.
+    :returns: A dictionary object representing the full YottaDB subtree under the
+        database node specified by `key`.
+    """
+    varname = key.varname
+    subsarray = [] if key.subsarray is None else list(key.subsarray)
+    if first_call and (key.data == 1 or key.data == 11):
+        # Store the value of the root database node before recursively retrieving its
+        # child nodes.
+        result["value"] = key.value.decode("utf-8")
+    for sub in subscripts(varname, subsarray + [""]):
+        sub = sub.decode("utf-8")
+        node_to_dict((varname, subsarray), tuple(child_subs + [sub]), result)
+        load_tree(key[sub], child_subs + [sub], result)
+    return result
+
+
 class SubscriptsIter:
     """
     Iterator class for iterating over subscripts starting from the local or global variable node
@@ -643,9 +780,9 @@ class Key:
     parent: Key
     next_subsarray: List
 
-    def __init__(self, name: AnyStr, parent: Key = None) -> Key:
+    def __init__(self, name: AnyStr, parent: Key = None, subsarray: List = None) -> Key:
         """
-        Creates a `NodesIterReversed` class object from the local or global variable node specified
+        Creates a `Key` class object from the local or global variable node specified
         by the `varname` and `subsarray` pair.
 
         :param name: A bytes-like object representing a YottaDB local or global variable name, or subscript name.
@@ -657,10 +794,22 @@ class Key:
         else:
             raise TypeError("'name' must be an instance of str or bytes")
 
-        if parent is not None:
-            if not isinstance(parent, Key):
-                raise TypeError("'parent' must be of type Key")
-        self.parent = parent
+        if subsarray is not None:
+            assert parent is None
+            # Set the parent Key be creating a new key from the recieved variable name
+            # and subscripts by omitting the last subscript from the list received.
+            if len(subsarray) > 1:
+                self.parent = Key(name, subsarray=subsarray[:-1])
+            else:
+                self.parent = Key(name)
+        else:
+            # Set the parent of the Key to the one specified by the caller
+            self.parent = parent
+            if parent is not None:
+                if subsarray is not None:
+                    raise ValueError("Cannot create Key from both a parent key and a subsarray. Please specify one or the other.")
+                if not isinstance(parent, Key):
+                    raise TypeError("'parent' must be of type Key")
         if _yottadb.YDB_MAX_SUBS < len(self.subsarray):
             raise ValueError(f"Cannot create Key with {len(self.subsarray)} subscripts (max: {_yottadb.YDB_MAX_SUBS})")
 
@@ -929,6 +1078,160 @@ class Key:
         :returns: None.
         """
         return lock_decr(self.varname, self.subsarray)
+
+    def load_tree(self) -> dict:
+        return load_tree(self, first_call=True)
+
+    def save_tree(self, tree: dict, key: Key = None):
+        """
+        Stores data from a nested Python dictionary in YottaDB. The dictionary must have been previously created using the
+        `Key.load_tree()` method, or otherwise match the format used by that method.
+
+        :param tree: A Python dictionary representing a YottaDB tree or subtree.
+        :param key: A `Key` object representing the YottaDB database node that is the root of the tree
+            structure represented by `tree`.
+        """
+        if key is None:
+            key = self
+        # Recurse through each key in the dictionary and, when a leaf node is encountered,
+        # store the value in the database.
+        for sub, value in tree.items():
+            if isinstance(value, dict):
+                self.save_tree(value, key[sub])
+            elif sub == "value":
+                key.value = value
+            else:
+                assert False
+
+    def replace_tree(self, tree: dict):
+        """
+        Stores data from a nested Python dictionary in YottaDB. The dictionary must have been previously created using the
+        `Key.load_tree()` method, or otherwise match the format used by that method.
+
+        :param tree: A Python dictionary representing a YottaDB tree or subtree.
+        :param key: A `Key` object representing the YottaDB database node that is the root of the tree
+            structure represented by `tree`.
+        """
+        self.delete_tree()
+        self.save_tree(tree)
+
+    def save_json(self, json: object, key: Key = None):
+        """
+        Saves JSON data stored in a Python object under the YottaDB node represented by the calling `Key` object.
+
+        :param self: A YottaDB `Key` object.
+        :param json: A Python object representing a JSON object.
+        """
+        # Recurse through each item in the JSON object and,
+        # when a leaf node is encountered, store the value in the database.
+        if key is None:
+            key = self
+        if isinstance(json, dict):
+            for sub, value in json.items():
+                # There is another level of nested data, continue recursing.
+                self.save_json(value, key[sub])
+        elif isinstance(json, list):
+            # The value is an array, store it in the database piecemeal by index,
+            # starting from 1.
+            if len(json) == 0:
+                key["\\l"].value = ""
+            else:
+                for index, item in enumerate(json, start=1):
+                    i = str(index)
+                    self.save_json(json[index - 1], key[i])
+        else:
+            # No more nested data, save the value in the database.
+            if not isinstance(json, str):
+                json = str(json)
+            else:
+                key["\\s"].value = ""
+            key.value = json
+            # print(f"{key}={key.value}")
+
+    def load_json(self, key: Key = None, spaces: str = "") -> object:
+        """
+        Retrieves JSON data stored under the YottaDB database node represented by the calling `Key` object,
+        and returns it as a Python object.
+
+        :param self: A YottaDB `Key` object.
+        :param result: A Python object containing JSON data loaded from the database.
+        :returns: A Python object representing a JSON object.
+        """
+        result = None
+        if key is None:
+            key = self
+        # Check whether the current node is a value (i.e. a leaf node), or if it has a subtree.
+        key_status = key.data
+        if key["\\l"].data == 1:
+            # The value is an empty JSON array, so just return an empty list.
+            return []
+        # print(f"{spaces}key_status: {key_status}\t\\s: {slash_s}")
+        if key_status == 10:
+            # The node has a subtree, which represents a JSON array or a JSON object.
+            for index, sub in enumerate(key.subscripts, start=1):
+                sub = sub.decode("utf-8")
+                # print(f"{spaces}{key[sub]}")
+                # print(f"{spaces}index: {index}\tsub: {sub}")
+                if str(index) == sub:
+                    # The subtree represents a JSON array. This is so when the subscripts form a
+                    # series of integers starting from 1, e.g. 1, 2, 3, etc. In that case, treat them
+                    # as indices of a list such that their values or subtrees are elements of a list.
+                    if result is None:
+                        result = []
+                    result.append(self.load_json(key[sub], spaces + "\t"))
+                    # print(f"{spaces}ARRAY: list result: {result}")
+                else:
+                    # The node is a subtree, signifying a nested JSON object must be retrieved.
+                    # If necessary, assign a dictionary to store it, then add the results to the
+                    # dictionary using the current subscript.
+                    if result is None:
+                        result = {}
+                    result[sub] = self.load_json(key[sub], spaces + "\t")
+                    # print(f"{spaces}SUBTREE: {result}")
+        elif key_status == 1 or key_status == 11:
+            # The node is a value and not a subtree. So, retrieve the value, decode it into a Python string,
+            # convert it to an appropriate type, if necessary, then return it to the caller.
+            #
+            # Note that `key_status` may be 11 in the case of a string literal, due to a "\s" node
+            # stored by `Key.save_json()`. In that case, 11 is acceptable.
+            value = key.value.decode("utf-8")
+            # print(f"{spaces}value: {value}")
+            if key["\\s"].data == 1:
+                # A `"\s"` node accompanies the given value, signifying that the value is a string literal.
+                # In that case, no type conversion is necessary.
+                # print(f"{spaces}type: str")
+                return value
+            else:
+                # The value is *not* a string literal and must be converted to the appropriate type. So,
+                # infer the type here and convert accordingly.
+                assert key_status == 1
+                if value == "None":
+                    # print(f"{spaces}type: None")
+                    return None
+                try:
+                    # print(f"{spaces}type: int")
+                    return int(value)
+                except ValueError:
+                    pass
+                try:
+                    # print(f"{spaces}type: float")
+                    return float(value)
+                except ValueError:
+                    pass
+                try:
+                    # print(f"{spaces}type: bool")
+                    return bool(value)
+                except ValueError:
+                    pass
+            # print(f"{spaces}VALUE: {value}")
+            result = value
+        else:
+            # `key_status` should not be 0 since the `Key.save_json()` method
+            # should not have saved any empty nodes.
+            assert False
+
+        # print(f"{spaces}END RESULT: {result}")
+        return result
 
     @property
     def varname_key(self) -> Key:
