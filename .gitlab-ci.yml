@@ -30,19 +30,16 @@ stages:
 .rocky:
   image: yottadb/yottadb-rocky-base:latest-master
   before_script:
-    - yum install -y python3 gcc python3-devel libffi-devel libasan pkg-config
+    - yum install -y python3 gcc python3-devel libffi-devel pkg-config
     - source $(pkg-config --variable=prefix yottadb)/ydb_env_set
     - python3 setup.py install --user
 
+# https://stackoverflow.com/questions/692000/how-do-i-write-standard-error-to-a-file-while-using-tee-with-a-pipe
 .test_ubuntu:
   script:
-    # Set LD_PRELOAD and ASAN_OPTIONS in case YottaDB is built with ASAN. If it isn't, these variables will simply be ignored.
-    - export LD_PRELOAD=$(gcc -print-file-name=libasan.so)
-    - export ASAN_OPTIONS="detect_leaks=0:disable_coredump=0:unmap_shadow_on_exit=1:abort_on_error=1"
     - python3 -m pip install --user pytest pytest-order psutil
-    - python3 -m pytest tests/ -vs 2> pytest.err 1> pytest.out
-    - cat pytest.out pytest.err
-    - mkdir artifacts && cp *.err artifacts && cp *.out artifacts
+    - mkdir artifacts
+    - python3 -m pytest tests/ -vs 1> artifacts/pytest.out 2> artifacts/pytest.err
   artifacts:
     paths:
       - ./artifacts
@@ -50,12 +47,9 @@ stages:
 
 .test_rocky:
   script:
-    - export LD_PRELOAD=$(cat $(gcc -print-file-name=libasan.so) | cut -f 3 -d" ")
-    - export ASAN_OPTIONS="detect_leaks=0:disable_coredump=0:unmap_shadow_on_exit=1:abort_on_error=1"
     - python3 -m pip install --user pytest pytest-order psutil
-    - python3 -m pytest tests/ -vs 2> pytest.err 1> pytest.out
-    - cat pytest.out pytest.err
-    - mkdir artifacts && cp *.err artifacts && cp *.out artifacts
+    - mkdir artifacts
+    - python3 -m pytest tests/ -vs 1> artifacts/pytest.out 2> artifacts/pytest.err
   artifacts:
     paths:
       - ./artifacts
