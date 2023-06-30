@@ -20,6 +20,7 @@ import datetime
 import time
 import os
 import re
+import sys
 from typing import NamedTuple, Callable, Tuple, Sequence, Optional, AnyStr
 
 import yottadb
@@ -1367,9 +1368,13 @@ def test_import():
 
 def test_ctrl_c(simple_data):
     def infinite_set():
-        while True:
-            key = yottadb.Key("^x")
-            key.set("")
+        try:
+            while True:
+                key = yottadb.Key("^x")
+                key.set("")
+        except KeyboardInterrupt:
+            # See comment before similar code block in tests/test_threeenp1.py for why the -2 is needed below.
+            sys.exit(-2)
 
     process = multiprocessing.Process(target=infinite_set)
 
