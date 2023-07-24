@@ -2,7 +2,7 @@
  *                                                              *
  * Copyright (c) 2019-2021 Peter Goss All rights reserved.      *
  *                                                              *
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.                                         *
  *                                                              *
  *  This source code contains the intellectual property         *
@@ -154,7 +154,7 @@ static int anystr_to_buffer(PyObject *object, ydb_buffer_t *buffer, bool is_varn
 
 	// Convert Python bytes object to C character string (char *)
 	bytes_ssize = PyBytes_Size(object);
-	if (UINT32_MAX < bytes_ssize) {
+	if (INT32_MAX < bytes_ssize) {
 		/* Python bytes objects may have more bytes than can be represented by a 32-bit unsigned integer.
 		 * If `object` is 1 more than INT32_MAX, `bytes_len` below would be set to 0, falsely indicating a
 		 * 0-byte long bytes object. So, we need to detect this integer overflow before calling Py_SAFE_DOWNCAST,
@@ -1626,7 +1626,7 @@ static PyObject *lock(PyObject *self, PyObject *args, PyObject *kwds) {
 		int	    cur_key, cur_index;
 
 		arg_values.n = (intptr_t)(YDB_LOCK_MIN_ARGS + (len_keys * YDB_LOCK_ARGS_PER_KEY));
-		arg_values.arg[0] = (void *)timeout_nsec;
+		arg_values.arg[0] = (void *)(uintptr_t)timeout_nsec;
 		arg_values.arg[1] = (void *)(uintptr_t)len_keys;
 
 		/* Initialize arg_values index to the first location after the elements
