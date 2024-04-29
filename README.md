@@ -48,7 +48,8 @@ YDBPython provides a Pythonic API for accessing YottaDB databases.
 					* Arch Linux: `sudo yay -Sy install python3-virtualenv`
 				2. Create `venv`: `python3 -m venv .venv`
 				3. Activate `venv`: `source .venv/bin/activate`
-				4. Install into `venv`: `python setup.py install`
+				4. Install pre-requisites in `venv`: `pip install setuptools`
+				5. Install into `venv`: `python setup.py install`
 			* *Option 2*: Install to user:
 				* `python3 setup.py install --user`
 			* *Option 3*: Install globally (not suggested):
