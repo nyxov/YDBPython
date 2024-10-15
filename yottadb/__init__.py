@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -507,7 +507,7 @@ def replace_tree(tree: dict, key: Key):
     key.save_tree(tree)
 
 
-def load_tree(key: Key, child_subs: List[AnyStr] = [], result: dict = {}, first_call: bool = False) -> dict:
+def load_tree(key: Key, child_subs: List[AnyStr] = None, result: dict = None, first_call: bool = False) -> dict:
     """
     Converts a `Key` object into a Python dictionary object representing the full YottaDB subtree under the
     database node specified by `key`.
@@ -517,12 +517,16 @@ def load_tree(key: Key, child_subs: List[AnyStr] = [], result: dict = {}, first_
         represented by `key`.
     :param result: A dictionary object representing a partial YottaDB subtree under the
         database node specified by `key`. This dictionary is incrementally populated through
-        recursive calls to `load_tree()`.
+        recursive calls to `load_tree()`. If not supplied, a new dictionary is returned.
     :param first_call: A flag signalling whether the given call to `load_tree()` is the first
         of a series of recursive calls to `load_tree()`.
     :returns: A dictionary object representing the full YottaDB subtree under the
         database node specified by `key`.
     """
+    if result is None:
+        result = {}
+    if child_subs is None:
+        child_subs = []
     varname = key.varname
     subsarray = [] if key.subsarray is None else list(key.subsarray)
     if first_call and (key.data == 1 or key.data == 11):

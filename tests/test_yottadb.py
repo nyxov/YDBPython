@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -1524,6 +1524,11 @@ def test_Key_load_tree(simple_data):
     assert test4_dict["sub3"]["subsub1"]["value"] == "test4sub3subsub1"
     assert test4_dict["sub3"]["subsub2"]["value"] == "test4sub3subsub2"
     assert test4_dict["sub3"]["subsub3"]["value"] == "test4sub3subsub3"
+
+    # Verify that load_tree() no longer return previous data like it once did
+    test4.delete_tree()
+    test4_dict = test4.load_tree()
+    assert repr(test4_dict) == "{}"
 
 
 def test_Key_save_tree(simple_data):
