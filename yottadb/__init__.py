@@ -17,7 +17,7 @@ YDBPython.
 YDBPython provides a Pythonic API for accessing YottaDB databases.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 __author__ = "YottaDB LLC"
 __credits__ = "Peter Goss"
 
@@ -25,7 +25,12 @@ from typing import Optional, List, Union, Generator, AnyStr, Any, Callable, NewT
 import copy
 import struct
 from builtins import property
+import sys, os
 
+# Need to do future proof name resolution as the encryption plugin tries to
+# resolve symbols in libyottadb.so, and cannot find them unless RTLD_GLOBAL is
+# set
+sys.setdlopenflags(sys.getdlopenflags() | os.RTLD_GLOBAL)
 import _yottadb
 from _yottadb import *
 

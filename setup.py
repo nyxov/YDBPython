@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -103,7 +103,7 @@ create_constants_from_header_file()
 
 setup(
     name="yottadb",
-    version="1.1.0",
+    version="1.1.1",
     description="A Pythonic API for accessing YottaDB databases.",
     long_description=(pathlib.Path(__file__).parent / "README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
