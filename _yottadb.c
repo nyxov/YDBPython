@@ -2,7 +2,7 @@
  *                                                              *
  * Copyright (c) 2019-2021 Peter Goss All rights reserved.      *
  *                                                              *
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.                                         *
  *                                                              *
  *  This source code contains the intellectual property         *
@@ -902,7 +902,13 @@ static void raise_YDBError(int status) {
 	assert((0 <= copied) && (YDBPY_MAX_ERRORMSG > copied));
 	UNUSED(copied);
 	message = Py_BuildValue("s", full_error_message); // New Reference
-
+	
+	// Note that the below call to Py_BuildValue with a first argument of "y" is done in addition
+	// to the call above with "s" due to the reasoning at:
+	// https://gitlab.com/YottaDB/Lang/YDBPython/-/merge_requests/61#note_2283744959
+	if (NULL == message) {
+		message = Py_BuildValue("y", full_error_message); // New Reference
+	}
 	RAISE_SPECIFIC_ERROR(error_type, message);
 	Py_DECREF(message);
 }

@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -127,7 +127,7 @@ setup(
             sources=["_yottadb.c"],
             include_dirs=[YDB_DIST],
             library_dirs=[YDB_DIST],
-            undef_macros=["NDEBUG"],  # Comment out to enable asserts if a Debug build is desired
+            undef_macros=["NDEBUG"],  # Comment out to disable asserts if a Release build is desired
             extra_link_args=extra_link_args,
             extra_compile_args=extra_compile_args,
         )

@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -71,6 +71,15 @@ def test_get(simple_data):
     # Using bytes arguments
     _yottadb.set(varname=b"testlong", value=(b"a" * _yottadb.YDB_MAX_STR))
     assert _yottadb.get(varname=b"testlong") == b"a" * _yottadb.YDB_MAX_STR
+    # Handling invalid Unicode GVN values
+    try:
+        _yottadb.get(b"^invutf") == b"\xfb"
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_GVUNDEF == e.code()
+    try:
+        _yottadb.get(b"invutf") == b"\xfb"
+    except YDBError as e:
+        assert _yottadb.YDB_ERR_LVUNDEF == e.code()
 
 
 def test_set():

@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2019-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -50,7 +50,10 @@ max_ci_args = 34 if 64 == arch_bits else 33
 # Get the YottaDB numeric error code for the given
 # YDBError by extracting it from the exception message.
 def get_error_code(YDBError):
-    error_code = int(YDBError.args[0].split(",")[0])  # Extract error code from between parentheses in error message
+    if type(YDBError.args[0]) is bytes:
+        error_code = int(YDBError.args[0].split(b",")[0])  # Extract error code from between parentheses in error message
+    else:
+        error_code = int(YDBError.args[0].split(",")[0])  # Extract error code from between parentheses in error message
     if 0 < error_code:
         error_code *= -1  # Multiply by -1 for conformity with negative YDB error codes
     return error_code
