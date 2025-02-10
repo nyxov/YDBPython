@@ -2,7 +2,7 @@
 #                                                               #
 # Copyright (c) 2020-2021 Peter Goss All rights reserved.       #
 #                                                               #
-# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #   This source code contains the intellectual property         #
@@ -12,23 +12,23 @@
 #                                                               #
 #################################################################
 """
-    This file is for tests of the validation of input from Python. Most tests
-    are named by the function being called and the parameter that is having
-    its data validation tested.
+This file is for tests of the validation of input from Python. Most tests
+are named by the function being called and the parameter that is having
+its data validation tested.
 
-    Some background: originally the plan was to have all validation be done by
-    the underlying YottaDB C API, however a bug arose in the transition from
-    using 'int' to 'Py_size_t' that meant that length as well as type must be
-    validated (see documentation for
-    `test_unsigned_int_length_bytes_overflow()` below for additional detail).
-    Since we were needing to test the length anyway the decision was to make
-    that length equal to YottaDB's limitations. This also has the benefit of
-    making these types of input errors raise the normal 'TypeError' and
-    'ValueError' exceptions as is expected in Python.
+Some background: originally the plan was to have all validation be done by
+the underlying YottaDB C API, however a bug arose in the transition from
+using 'int' to 'Py_size_t' that meant that length as well as type must be
+validated (see documentation for
+`test_unsigned_int_length_bytes_overflow()` below for additional detail).
+Since we were needing to test the length anyway the decision was to make
+that length equal to YottaDB's limitations. This also has the benefit of
+making these types of input errors raise the normal 'TypeError' and
+'ValueError' exceptions as is expected in Python.
 
-    Note: Many functions have "varname" and "subsarray" parameters which have
-    the same rules for valid input. Each of these functions are passed to
-    "varname_invalid" and "subsarray_invalid" for testing.
+Note: Many functions have "varname" and "subsarray" parameters which have
+the same rules for valid input. Each of these functions are passed to
+"varname_invalid" and "subsarray_invalid" for testing.
 """
 import pytest
 import _yottadb
