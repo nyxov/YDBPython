@@ -135,7 +135,7 @@ static int anystr_to_buffer(PyObject *object, ydb_buffer_t *buffer, bool is_varn
 
 	if (PyUnicode_Check(object)) {
 		// Convert Unicode object into Python bytes object
-		object = PyUnicode_AsEncodedString(object, "utf-8", "strict"); // New reference
+		object = PyUnicode_AsEncodedString(object, "cp1251", "strict"); // New reference
 		if (NULL == object) {
 			PyErr_SetString(YDBPythonError, "failed to encode Unicode string to bytes object");
 			return !YDB_OK;
